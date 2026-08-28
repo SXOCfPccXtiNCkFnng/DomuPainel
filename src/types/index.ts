@@ -22,6 +22,8 @@ export interface HSMTemplate {
   variables: string[];
 }
 
+export type Template = HSMTemplate;
+
 export interface Campaign {
   id: string;
   title: string;
@@ -61,6 +63,7 @@ export interface Property {
   code: string;
   status: 'Disponível' | 'Reservado' | 'Lançamento' | 'Vendido';
   matchingLeadsCount: number;
+  filteredLeadsCount?: number;
 }
 
 export interface Lead {

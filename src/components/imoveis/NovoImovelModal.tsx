@@ -28,12 +28,17 @@ export default function NovoImovelModal({ isOpen, onClose, onAddProperty }: Novo
     const createdProp: Property = {
       id: `prop-${Date.now()}`,
       title: title || 'Novo Empreendimento Imobiliário',
+      type: 'Apartamento',
       code: code || 'DOM-999',
       status,
       price: parseFloat(price) || 500000,
       neighborhood: neighborhood || 'Centro',
       city: city || 'Ribeirão Preto',
+      bedrooms: 3,
+      bathrooms: 2,
+      areaSqMeter: 85,
       imageUrl: imageUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+      matchingLeadsCount: parseInt(filteredLeadsCount, 10) || 85,
       filteredLeadsCount: parseInt(filteredLeadsCount, 10) || 85
     };
 

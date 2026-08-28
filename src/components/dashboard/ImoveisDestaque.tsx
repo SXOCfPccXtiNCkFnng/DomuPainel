@@ -91,7 +91,7 @@ export default function ImoveisDestaque({ properties = mockProperties, onTrigger
                   <span className="text-[9.5px] uppercase font-bold text-slate-400 block">Leads Filtros</span>
                   <span className="font-black text-domu-blue flex items-center justify-end gap-1 text-xs">
                     <Users className="w-3.5 h-3.5" />
-                    {prop.filteredLeadsCount} pessoas
+                    {prop.filteredLeadsCount ?? prop.matchingLeadsCount} pessoas
                   </span>
                 </div>
               </div>
