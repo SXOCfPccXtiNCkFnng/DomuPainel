@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, ArrowRight, ShieldCheck, Sparkles, Building2, ShoppingBag, Stethoscope, Briefcase } from 'lucide-react';
+import { Lock, Mail, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,11 +16,11 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate authentication and redirect to onboarding or dashboard
     setTimeout(() => {
+      localStorage.setItem('domu_is_logged_in', 'true');
       setIsLoading(false);
       router.push('/onboarding');
-    }, 800);
+    }, 600);
   };
 
   return (
@@ -30,28 +30,27 @@ export default function LoginPage() {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center z-10 space-y-3">
-        <div className="flex justify-center">
-          <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 shadow-xl inline-flex items-center gap-2">
-            <Image 
-              src="/logo-com-nome.png" 
-              alt="DOMU Tech Logo" 
-              width={140} 
-              height={32} 
-              className="h-7 w-auto object-contain brightness-0 invert"
-            />
-          </div>
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center z-10 space-y-4">
+        {/* Clean Logo without box border */}
+        <div className="flex justify-center mb-2">
+          <Image 
+            src="/logo-com-nome.png" 
+            alt="DOMU Tech Logo" 
+            width={160} 
+            height={36} 
+            className="h-8 w-auto object-contain brightness-0 invert"
+          />
         </div>
         
-        <div>
-          <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            Plataforma Multi-Segmento SaaS
-          </span>
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-white">
+        <div className="space-y-2">
+          <p className="text-xs font-black uppercase text-blue-400 tracking-widest">
+            Tecnologia que Impulsiona Negócios
+          </p>
+          <h2 className="text-2xl font-black tracking-tight text-white">
             Acesse o Portal DOMU Tech
           </h2>
-          <p className="mt-1 text-xs text-slate-400">
-            Gerencie disparos, automações e atendimento inteligente via Meta Cloud API
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            Sua plataforma completa de divulgação, disparos e atendimento no WhatsApp
           </p>
         </div>
       </div>
@@ -103,7 +102,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-xs pt-1">
               <label className="flex items-center gap-2 cursor-pointer text-slate-400">
                 <input type="checkbox" defaultChecked className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500" />
                 <span>Lembrar meu acesso</span>
@@ -113,7 +112,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-domu-blue hover:bg-blue-600 text-white font-bold text-xs shadow-lg shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-domu-blue hover:bg-blue-600 text-white font-bold text-xs shadow-lg shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50 mt-2"
             >
               {isLoading ? (
                 <span>Acessando...</span>
@@ -126,28 +125,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Multi-Segment Showcase Icons */}
-          <div className="pt-4 border-t border-slate-800 text-center space-y-2">
-            <p className="text-[10px] uppercase font-extrabold text-slate-500 tracking-wider">
-              Segmentos Suportados no Portal
-            </p>
-            <div className="flex items-center justify-center gap-4 text-slate-400 pt-1">
-              <div className="flex items-center gap-1 text-[11px] font-semibold bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
-                <Building2 className="w-3.5 h-3.5 text-blue-400" />
-                <span>Imobiliário</span>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-semibold bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
-                <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
-                <span>E-commerce</span>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-semibold bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
-                <Stethoscope className="w-3.5 h-3.5 text-amber-400" />
-                <span>Saúde</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center text-xs text-slate-400">
+          <div className="text-center text-xs text-slate-400 pt-2 border-t border-slate-800">
             Ainda não tem uma conta?{' '}
             <Link href="/onboarding" className="font-extrabold text-blue-400 hover:text-blue-300">
               Criar Conta Grátis

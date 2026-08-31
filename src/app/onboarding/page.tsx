@@ -13,8 +13,10 @@ import {
   ArrowLeft, 
   Smartphone, 
   ShieldCheck, 
-  Sparkles,
-  Zap
+  Zap,
+  Send,
+  MessageCircle,
+  Sparkles
 } from 'lucide-react';
 import { TenantSegment } from '@/types';
 
@@ -48,7 +50,7 @@ export default function OnboardingPage() {
     {
       id: 'imobiliario',
       title: 'Setor Imobiliário & Corretores',
-      badge: 'Segmento Principal',
+      badge: 'Lançamentos & Imóveis',
       description: 'Automação de divulgação de imóveis, busca por perfil compatível e agendamento de visitas.',
       features: ['Disparo de lançamentos por faixa de preço', 'Filtro de leads por bairro e perfil', 'IA de agendamento de visitas'],
       icon: Building2,
@@ -79,6 +81,17 @@ export default function OnboardingPage() {
       bgColor: 'bg-amber-50/50'
     },
     {
+      id: 'marketing_apenas',
+      title: 'Apenas Disparo de Mensagens (Sem Módulos)',
+      badge: 'Foco Total em Disparos',
+      description: 'Ideal para empresas que desejam focar 100% no disparo de campanhas, aviso de ofertas e atendimento direto no WhatsApp, sem módulos específicos.',
+      features: ['Envio de campanhas e ofertas em massa', 'Gestão de opt-in e histórico de mensagens', 'Sem cadastros complexos de produtos'],
+      icon: Send,
+      color: 'text-purple-600',
+      borderColor: 'border-purple-500',
+      bgColor: 'bg-purple-50/50'
+    },
+    {
       id: 'geral',
       title: 'Serviços, Jurídico & Outros',
       badge: 'Empresas & Negócios',
@@ -92,7 +105,7 @@ export default function OnboardingPage() {
   ];
 
   const handleFinishOnboarding = () => {
-    // Redirect to dashboard with configured state
+    localStorage.setItem('domu_is_onboarded', 'true');
     router.push('/');
   };
 
@@ -143,7 +156,7 @@ export default function OnboardingPage() {
                 Selecione o Segmento do seu Negócio
               </h1>
               <p className="text-xs text-slate-500">
-                O Portal DOMU Tech personaliza as ferramentas, modelos de disparo e IA para atender perfeitamente a necessidade do seu setor.
+                O Portal DOMU Tech personaliza as ferramentas, modelos de disparo e automações para atender o seu nicho.
               </p>
             </div>
 
@@ -198,8 +211,31 @@ export default function OnboardingPage() {
               })}
             </div>
 
+            {/* Banner: Pedir Novo Segmento Personalizado */}
+            <div className="p-4 bg-slate-900 text-white rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/30">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Não encontrou o segmento da sua empresa?</h4>
+                  <p className="text-[11px] text-slate-400">Solicite um segmento exclusivo para o seu nicho com nossa equipe técnica.</p>
+                </div>
+              </div>
+
+              <a
+                href="https://wa.me/5511934430659?text=Olá!%20Gostaria%20de%20solicitar%20um%20segmento%20personalizado%20no%20Portal%20DOMU%20Tech"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shrink-0 flex items-center justify-center gap-2"
+              >
+                <span>Solicitar Novo Segmento</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
             {/* Step 1 Actions */}
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end pt-2">
               <button
                 onClick={() => setCurrentStep(2)}
                 className="btn-domu-primary text-xs py-2.5 px-6 shadow-md flex items-center gap-2"
@@ -303,12 +339,12 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 3: Meta WhatsApp Connection & Coexistence */}
+        {/* STEP 3: WhatsApp Connection & Coexistence */}
         {currentStep === 3 && (
           <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="text-center space-y-2">
               <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                Passo 3 de 3 — Conexão Meta API
+                Passo 3 de 3 — Conexão WhatsApp
               </span>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">
                 Como deseja conectar seu WhatsApp?
@@ -331,7 +367,7 @@ export default function OnboardingPage() {
               >
                 <div className="flex items-center gap-2">
                   <Smartphone className="w-5 h-5 text-domu-blue" />
-                  <h3 className="text-sm font-black text-slate-900">Coexistência Meta</h3>
+                  <h3 className="text-sm font-black text-slate-900">Coexistência Oficial</h3>
                 </div>
                 <p className="text-xs text-slate-600 font-medium leading-relaxed">
                   Mantenha o aplicativo WhatsApp Business no celular funcionando normalmente enquanto o Portal DOMU envia as automações em massa.
@@ -351,7 +387,7 @@ export default function OnboardingPage() {
               >
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                  <h3 className="text-sm font-black text-slate-900">Meta API Direta</h3>
+                  <h3 className="text-sm font-black text-slate-900">API Direta</h3>
                 </div>
                 <p className="text-xs text-slate-600 font-medium leading-relaxed">
                   Conexão direta com número dedicado de API exclusivo para grandes volumes e múltiplos operadores no mesmo canal.

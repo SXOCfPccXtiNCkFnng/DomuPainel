@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, Bell, PlusCircle, CheckCircle2, Phone } from 'lucide-react';
+import { Search, Bell, PlusCircle, CheckCircle2, Phone, LogOut } from 'lucide-react';
 import { mockTenants } from '@/lib/mockData';
 
 interface HeaderProps {
@@ -29,7 +29,7 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span>Meta Cloud API: <strong className="text-emerald-700 font-bold">Online</strong></span>
+          <span>Conexão WhatsApp: <strong className="text-emerald-700 font-bold">Online</strong></span>
         </div>
 
         {/* Quick Action Button */}
@@ -49,7 +49,7 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
           </span>
         </button>
 
-        {/* User Profile Avatar */}
+        {/* User Profile Avatar & Logout */}
         <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
           <div className="w-8 h-8 rounded-full bg-domu-blue text-white font-extrabold text-xs flex items-center justify-center shadow-sm shrink-0">
             AG
@@ -58,6 +58,17 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
             <p className="text-xs font-bold text-slate-900 leading-tight">Alan (Agência)</p>
             <p className="text-[10px] text-slate-500 font-medium">Gestor DOMU</p>
           </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem('domu_is_logged_in');
+              localStorage.removeItem('domu_is_onboarded');
+              window.location.href = '/login';
+            }}
+            title="Sair do Portal"
+            className="w-7 h-7 rounded bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-500 flex items-center justify-center transition-colors ml-1"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </header>

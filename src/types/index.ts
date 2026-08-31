@@ -1,4 +1,4 @@
-export type TenantSegment = 'imobiliario' | 'ecommerce' | 'saude' | 'juridico' | 'geral';
+export type TenantSegment = 'imobiliario' | 'ecommerce' | 'saude' | 'juridico' | 'marketing_apenas' | 'geral';
 
 export interface Tenant {
   id: string;
