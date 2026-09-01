@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, 
   Send, 
@@ -16,8 +17,7 @@ import {
   Check,
   Smartphone,
   ShieldCheck,
-  MessageSquare,
-  AlertTriangle
+  MessageSquare
 } from 'lucide-react';
 
 interface CampaignWizardModalProps {
@@ -32,6 +32,7 @@ export default function CampaignWizardModal({
   onClose,
   onStartCampaign
 }: CampaignWizardModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('Nova Campanha de Envios');
   
@@ -52,6 +53,10 @@ export default function CampaignWizardModal({
   const [messageGreeting, setMessageGreeting] = useState('Olá');
   const [messageBody, setMessageBody] = useState('Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?');
   const [variableTestName, setVariableTestName] = useState('Cliente');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -133,7 +138,7 @@ export default function CampaignWizardModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   // Calculate target quantity & enforce Meta Tier 1 daily limit (1,000 max)
   const rawTargetCount = selectedSendMode === 'ALL' ? (contacts.length || 100) : Math.min(customQuantity, contacts.length || 100);
@@ -150,8 +155,8 @@ export default function CampaignWizardModal({
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans animate-in fade-in duration-200">
+  const modalMarkup = (
+    <div className="fixed inset-0 w-screen h-screen z-[99999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
         
         {/* Modal Premium Header */}
@@ -220,7 +225,7 @@ export default function CampaignWizardModal({
             {step === 1 && (
               <div className="space-y-5">
                 
-                {/* Campaign Title Input (Clean Layout Without Outer Box Overlap) */}
+                {/* Campaign Title Input */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
                     Nome Identificador da Campanha
@@ -366,7 +371,7 @@ export default function CampaignWizardModal({
             {step === 2 && (
               <div className="space-y-5">
                 
-                {/* Meta Template Selector (Clean Layout Without Outer Box Overlap) */}
+                {/* Meta Template Selector */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
                     Modelo de Template Meta Cloud API
@@ -567,4 +572,6 @@ export default function CampaignWizardModal({
       </div>
     </div>
   );
+
+  return createPortal(modalMarkup, document.body);
 }

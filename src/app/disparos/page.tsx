@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Send, 
   Plus, 
@@ -20,6 +21,7 @@ import {
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
 
 export default function DisparosPage() {
+  const [mounted, setMounted] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -31,6 +33,7 @@ export default function DisparosPage() {
   const [importSuccessMsg, setImportSuccessMsg] = useState('');
 
   useEffect(() => {
+    setMounted(true);
     fetchCampaigns();
   }, []);
 
@@ -217,9 +220,9 @@ export default function DisparosPage() {
 
       </div>
 
-      {/* Modal: Importar ou Digitar Contatos (Fixed Full Overlay Backdrop) */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+      {/* Modal: Importar ou Digitar Contatos (Fixed Full Overlay Backdrop via Portal) */}
+      {isImportModalOpen && mounted && createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-lg w-full p-7 shadow-2xl border border-slate-200 space-y-5">
             
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -285,7 +288,8 @@ export default function DisparosPage() {
             </form>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Campaign Dispatch Modal */}
