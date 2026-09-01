@@ -222,7 +222,7 @@ export default function DisparosPage() {
 
       {/* Modal: Importar ou Digitar Contatos (Fixed Full Overlay Backdrop via Portal) */}
       {isImportModalOpen && mounted && createPortal(
-        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans">
           <div className="bg-white rounded-3xl max-w-lg w-full p-7 shadow-2xl border border-slate-200 space-y-5">
             
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
