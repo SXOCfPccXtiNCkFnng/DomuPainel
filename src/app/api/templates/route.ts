@@ -3,71 +3,87 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
 
-// GET: Fetch Meta HSM Templates from Supabase
+// System Global Templates (Shared with ALL Tenants across DOMU SaaS)
+const GLOBAL_SYSTEM_TEMPLATES = [
+  {
+    id: 'meta-global-0',
+    name: 'lancamento_exclusivo_com_imagem',
+    category: 'MARKETING',
+    language: 'pt_BR',
+    status: 'APPROVED',
+    is_global: true,
+    meta_template_id: 'meta_hsm_000',
+    header_type: 'IMAGE',
+    header_content: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80',
+    body_text: 'Olá {{nome}}! Confira em primeira mão este lançamento exclusivo da nossa empresa. Gostaria de agendar uma apresentação?',
+    variables: ['nome']
+  },
+  {
+    id: 'meta-global-1',
+    name: 'aviso_oferta_promocional',
+    category: 'MARKETING',
+    language: 'pt_BR',
+    status: 'APPROVED',
+    is_global: true,
+    meta_template_id: 'meta_hsm_001',
+    header_type: 'NONE',
+    body_text: 'Olá {{nome}}! Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?',
+    variables: ['nome']
+  },
+  {
+    id: 'meta-global-2',
+    name: 'lembrete_agendamento_atendimento',
+    category: 'UTILITY',
+    language: 'pt_BR',
+    status: 'APPROVED',
+    is_global: true,
+    meta_template_id: 'meta_hsm_002',
+    header_type: 'NONE',
+    body_text: 'Olá {{nome}}, passando para confirmar nosso atendimento agendado para {{horario}}. Podemos confirmar?',
+    variables: ['nome', 'horario']
+  },
+  {
+    id: 'meta-global-3',
+    name: 'notificacao_atualizacao_pedido',
+    category: 'UTILITY',
+    language: 'pt_BR',
+    status: 'APPROVED',
+    is_global: true,
+    meta_template_id: 'meta_hsm_003',
+    header_type: 'NONE',
+    body_text: 'Olá {{nome}}! Seu pedido/solicitação foi atualizado com sucesso. Acesse nosso portal para conferir.',
+    variables: ['nome']
+  }
+];
+
+// GET: Fetch Global Templates + Custom Tenant Account Templates from Supabase
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const tenantId = searchParams.get('tenantId');
 
-    let query = supabaseAdmin.from('hsm_templates').select('*').order('created_at', { ascending: false });
+    let customTemplates: any[] = [];
     if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
+      const { data, error } = await supabaseAdmin
+        .from('hsm_templates')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        customTemplates = data.map(t => ({
+          ...t,
+          is_global: false
+        }));
+      }
     }
 
-    const { data: templates, error } = await query;
-
-    // Default Meta Official Pre-Approved Template Fallbacks if table empty
-    const officialMetaTemplates = (templates && templates.length > 0) ? templates : [
-      {
-        id: 'meta-tpl-0',
-        name: 'lancamento_exclusivo_com_imagem',
-        category: 'MARKETING',
-        language: 'pt_BR',
-        status: 'APPROVED',
-        meta_template_id: 'meta_hsm_000',
-        header_type: 'IMAGE',
-        header_content: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80',
-        body_text: 'Olá {{nome}}! Confira em primeira mão este lançamento exclusivo da nossa empresa. Gostaria de agendar uma apresentação?',
-        variables: ['nome']
-      },
-      {
-        id: 'meta-tpl-1',
-        name: 'aviso_oferta_promocional',
-        category: 'MARKETING',
-        language: 'pt_BR',
-        status: 'APPROVED',
-        meta_template_id: 'meta_hsm_001',
-        header_type: 'NONE',
-        body_text: 'Olá {{nome}}! Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?',
-        variables: ['nome']
-      },
-      {
-        id: 'meta-tpl-2',
-        name: 'lembrete_agendamento_atendimento',
-        category: 'UTILITY',
-        language: 'pt_BR',
-        status: 'APPROVED',
-        meta_template_id: 'meta_hsm_002',
-        header_type: 'NONE',
-        body_text: 'Olá {{nome}}, passando para confirmar nosso atendimento agendado para {{horario}}. Podemos confirmar?',
-        variables: ['nome', 'horario']
-      },
-      {
-        id: 'meta-tpl-3',
-        name: 'notificacao_atualizacao_pedido',
-        category: 'UTILITY',
-        language: 'pt_BR',
-        status: 'APPROVED',
-        meta_template_id: 'meta_hsm_003',
-        header_type: 'NONE',
-        body_text: 'Olá {{nome}}! Seu pedido/solicitação foi atualizado com sucesso. Acesse nosso portal para conferir.',
-        variables: ['nome']
-      }
-    ];
+    // Combine custom account templates first, followed by global system templates
+    const combinedTemplates = [...customTemplates, ...GLOBAL_SYSTEM_TEMPLATES];
 
     return NextResponse.json({
       success: true,
-      templates: officialMetaTemplates
+      templates: combinedTemplates
     });
 
   } catch (error: any) {
@@ -76,7 +92,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: Submit a new Meta Cloud API Template to Supabase
+// POST: Submit a new Meta Cloud API Template to Supabase (Bound to Tenant Account)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -119,7 +135,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      template: inserted
+      template: {
+        ...inserted,
+        is_global: false
+      }
     });
 
   } catch (error: any) {

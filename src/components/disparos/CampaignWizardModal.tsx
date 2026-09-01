@@ -22,13 +22,16 @@ import {
   ArrowLeft,
   MoreVertical,
   Wifi,
-  ImageIcon
+  ImageIcon,
+  Calendar,
+  Clock,
+  Zap
 } from 'lucide-react';
 
 interface CampaignWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStartCampaign: (title: string, templateName: string, count: number) => void;
+  onStartCampaign: (title: string, templateName: string, count: number, scheduledAt?: string | null) => void;
   initialPropertyTitle?: string;
 }
 
@@ -48,6 +51,15 @@ export default function CampaignWizardModal({
   const [showImportBox, setShowImportBox] = useState(false);
   const [pastedContacts, setPastedContacts] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+
+  // Dispatch Scheduling State (Immediate vs Scheduled)
+  const [dispatchTiming, setDispatchTiming] = useState<'IMMEDIATE' | 'SCHEDULED'>('IMMEDIATE');
+  const [scheduledDate, setScheduledDate] = useState<string>(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  });
+  const [scheduledTime, setScheduledTime] = useState<string>('09:00');
 
   // Meta Health & Tier Limits State (Automated)
   const metaTierLimit = 1000; // Tier 1 limit
@@ -172,7 +184,8 @@ export default function CampaignWizardModal({
 
   const handleFinishAndStart = () => {
     if (!selectedTemplate) return;
-    onStartCampaign(title, selectedTemplate.name, targetCount);
+    const finalScheduledAt = dispatchTiming === 'SCHEDULED' ? `${scheduledDate} ${scheduledTime}` : null;
+    onStartCampaign(title, selectedTemplate.name, targetCount, finalScheduledAt);
     onClose();
   };
 
@@ -193,7 +206,7 @@ export default function CampaignWizardModal({
                   Meta Cloud API
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Configure os destinatários e visualize o template oficial aprovado</p>
+              <p className="text-xs text-slate-400">Configure os destinatários, agendamento e visualize o template oficial</p>
             </div>
           </div>
 
@@ -217,7 +230,7 @@ export default function CampaignWizardModal({
             }`}>
               1
             </div>
-            <span className="text-sm">Destinatários & Saúde Meta</span>
+            <span className="text-sm">Destinatários & Agendamento</span>
           </div>
 
           <div className="w-16 h-0.5 bg-slate-300 rounded-full"></div>
@@ -242,7 +255,7 @@ export default function CampaignWizardModal({
           {/* Left Controls (7 cols) */}
           <div className="lg:col-span-7 space-y-5">
             
-            {/* STEP 1: Destinatários & Saúde da Conta Meta */}
+            {/* STEP 1: Destinatários & Agendamento de Data/Hora */}
             {step === 1 && (
               <div className="space-y-5">
                 
@@ -260,20 +273,81 @@ export default function CampaignWizardModal({
                   />
                 </div>
 
-                {/* Automated Meta Health & Tier Limit Card */}
-                <div className="p-4 bg-emerald-50/90 rounded-2xl border border-emerald-200 text-xs text-emerald-950 flex items-start gap-3 shadow-xs">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1 w-full">
-                    <div className="flex items-center justify-between">
-                      <h5 className="font-black text-emerald-950 uppercase tracking-wider">Status Automático da Meta API</h5>
-                      <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black bg-emerald-600 text-white">
-                        Saúde: {metaHealthStatus}
-                      </span>
+                {/* Dispatch Timing Selector (Immediate vs Scheduled Date/Time) */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Momento do Disparo (Envio Imediato ou Agendado)
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    
+                    {/* Option: Immediate */}
+                    <div 
+                      onClick={() => setDispatchTiming('IMMEDIATE')}
+                      className={`p-3.5 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${
+                        dispatchTiming === 'IMMEDIATE' 
+                          ? 'border-domu-blue bg-blue-50/80 ring-2 ring-domu-blue/20' 
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                        dispatchTiming === 'IMMEDIATE' ? 'bg-domu-blue text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-slate-900">Enviar Agora</p>
+                        <p className="text-[10.5px] text-slate-500">Disparo imediato</p>
+                      </div>
                     </div>
-                    <p className="text-[11.5px] leading-relaxed text-emerald-900">
-                      Sua conta WhatsApp está autorizada no <strong>Tier 1 (1.000 mensagens / 24h)</strong>. O limite diário é calculado automaticamente para proteção do seu canal.
-                    </p>
+
+                    {/* Option: Scheduled */}
+                    <div 
+                      onClick={() => setDispatchTiming('SCHEDULED')}
+                      className={`p-3.5 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${
+                        dispatchTiming === 'SCHEDULED' 
+                          ? 'border-domu-blue bg-blue-50/80 ring-2 ring-domu-blue/20' 
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                        dispatchTiming === 'SCHEDULED' ? 'bg-domu-blue text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-slate-900">Agendar Envio</p>
+                        <p className="text-[10.5px] text-slate-500">Escolher data/hora</p>
+                      </div>
+                    </div>
+
                   </div>
+
+                  {/* Scheduled Date & Time Pickers */}
+                  {dispatchTiming === 'SCHEDULED' && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 p-3 bg-blue-50/70 rounded-2xl border border-blue-200 animate-in fade-in duration-150">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-extrabold text-slate-700 block">Data do Disparo</label>
+                        <input
+                          type="date"
+                          min={new Date().toISOString().split('T')[0]}
+                          value={scheduledDate}
+                          onChange={(e) => setScheduledDate(e.target.value)}
+                          className="w-full h-10 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-bold focus:ring-2 focus:ring-domu-blue focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-extrabold text-slate-700 block">Horário do Disparo</label>
+                        <input
+                          type="time"
+                          value={scheduledTime}
+                          onChange={(e) => setScheduledTime(e.target.value)}
+                          className="w-full h-10 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-bold focus:ring-2 focus:ring-domu-blue focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Selection Mode Card */}
@@ -393,7 +467,7 @@ export default function CampaignWizardModal({
               </div>
             )}
 
-            {/* STEP 2: Template Meta HSM (With Optional Image Header Support) */}
+            {/* STEP 2: Template Meta HSM (Global vs Account Template Selector) */}
             {step === 2 && (
               <div className="space-y-5">
                 
@@ -417,7 +491,7 @@ export default function CampaignWizardModal({
                   >
                     {templates.map((tpl) => (
                       <option key={tpl.id} value={tpl.name}>
-                        {tpl.name} ({tpl.category}) {tpl.header_type === 'IMAGE' ? '[COM IMAGEM]' : ''} - Aprovado Meta
+                        {tpl.is_global !== false ? '🌐 [PADRÃO DOMU]' : '🏢 [MINHA EMPRESA]'} {tpl.name} ({tpl.category}) {tpl.header_type === 'IMAGE' ? '[COM IMAGEM]' : ''}
                       </option>
                     ))}
                   </select>
@@ -545,6 +619,9 @@ export default function CampaignWizardModal({
 
             <div className="mt-4 pt-3 border-t border-slate-300 text-center space-y-1">
               <p className="text-xs text-slate-800 font-medium">
+                Execução: <strong className="text-domu-blue font-black">{dispatchTiming === 'SCHEDULED' ? `Agendado (${scheduledDate} às ${scheduledTime})` : 'Disparo Imediato'}</strong>
+              </p>
+              <p className="text-xs text-slate-700 font-medium">
                 Total estimado para envio: <strong className="text-slate-900 font-black">{targetCount} contatos</strong>
               </p>
 
@@ -583,7 +660,7 @@ export default function CampaignWizardModal({
               className="btn-domu-primary text-xs py-2.5 px-6 bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-500/20 flex items-center gap-2"
             >
               <Send className="w-4 h-4" />
-              <span>Disparar Mensagens Agora</span>
+              <span>{dispatchTiming === 'SCHEDULED' ? 'Confirmar Agendamento' : 'Disparar Mensagens Agora'}</span>
             </button>
           )}
         </div>

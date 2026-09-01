@@ -193,15 +193,23 @@ export default function TemplatesPage() {
                   {renderStatusBadge(tpl.status)}
                 </div>
 
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase">
+                <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold text-slate-500 uppercase">
                   <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700">{tpl.category}</span>
+                  {tpl.is_global !== false ? (
+                    <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded font-extrabold">
+                      🌐 PADRÃO DOMU
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-extrabold">
+                      🏢 MINHA EMPRESA
+                    </span>
+                  )}
                   {hasImage && (
                     <span className="px-2 py-0.5 bg-blue-100 text-domu-blue rounded flex items-center gap-1 font-black">
                       <ImageIcon className="w-3 h-3" />
                       COM IMAGEM
                     </span>
                   )}
-                  <span>Português (BR)</span>
                 </div>
 
                 {/* Optional Image Thumbnail Preview */}
