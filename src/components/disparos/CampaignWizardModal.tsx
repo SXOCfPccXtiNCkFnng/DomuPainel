@@ -21,7 +21,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   MoreVertical,
-  Wifi
+  Wifi,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface CampaignWizardModalProps {
@@ -52,9 +53,10 @@ export default function CampaignWizardModal({
   const metaTierLimit = 1000; // Tier 1 limit
   const metaHealthStatus = 'VERDE'; // Account Health
 
-  // Template State (Locked from Meta Cloud API)
+  // Template & Image Header State
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [campaignImageUrl, setCampaignImageUrl] = useState<string>('https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80');
   const [variableTestName, setVariableTestName] = useState('Carlos Eduardo');
 
   useEffect(() => {
@@ -88,9 +90,14 @@ export default function CampaignWizardModal({
       const json = await res.json();
       if (json.success && json.templates) {
         const approvedOnly = json.templates.filter((t: any) => t.status === 'APPROVED');
-        setTemplates(approvedOnly.length > 0 ? approvedOnly : json.templates);
-        if (json.templates.length > 0) {
-          setSelectedTemplate(json.templates[0]);
+        const activeList = approvedOnly.length > 0 ? approvedOnly : json.templates;
+        setTemplates(activeList);
+        if (activeList.length > 0) {
+          const initialTpl = activeList[0];
+          setSelectedTemplate(initialTpl);
+          if (initialTpl.header_content) {
+            setCampaignImageUrl(initialTpl.header_content);
+          }
         }
       }
     } catch (err) {
@@ -151,6 +158,8 @@ export default function CampaignWizardModal({
   const rawTargetCount = selectedSendMode === 'ALL' ? (contacts.length || 100) : Math.min(customQuantity, contacts.length || 100);
   const isMetaLimitReached = rawTargetCount > metaTierLimit;
   const targetCount = Math.min(rawTargetCount, metaTierLimit);
+
+  const hasImageHeader = selectedTemplate?.header_type === 'IMAGE' || Boolean(selectedTemplate?.header_content) || Boolean(campaignImageUrl && selectedTemplate?.name?.includes('imagem'));
 
   // Render locked template text with test name
   const getRenderedPreviewText = () => {
@@ -384,7 +393,7 @@ export default function CampaignWizardModal({
               </div>
             )}
 
-            {/* STEP 2: Template Meta HSM (Locked Text by Meta Regulations) */}
+            {/* STEP 2: Template Meta HSM (With Optional Image Header Support) */}
             {step === 2 && (
               <div className="space-y-5">
                 
@@ -397,13 +406,18 @@ export default function CampaignWizardModal({
                     value={selectedTemplate?.name || ''}
                     onChange={(e) => {
                       const found = templates.find(t => t.name === e.target.value);
-                      if (found) setSelectedTemplate(found);
+                      if (found) {
+                        setSelectedTemplate(found);
+                        if (found.header_content) {
+                          setCampaignImageUrl(found.header_content);
+                        }
+                      }
                     }}
                     className="w-full px-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue shadow-xs"
                   >
                     {templates.map((tpl) => (
                       <option key={tpl.id} value={tpl.name}>
-                        {tpl.name} ({tpl.category}) - Aprovado Meta
+                        {tpl.name} ({tpl.category}) {tpl.header_type === 'IMAGE' ? '📷 COM IMAGEM' : ''} - Aprovado Meta
                       </option>
                     ))}
                   </select>
@@ -422,15 +436,25 @@ export default function CampaignWizardModal({
                     </span>
                   </div>
 
-                  {/* Visual Notice explaining Meta Immutability */}
-                  <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-200/90 text-xs text-slate-700 flex items-center gap-3 shadow-xs">
-                    <div className="w-7 h-7 rounded-xl bg-domu-blue text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <Lock className="w-4 h-4" />
+                  {/* Conditional Image Header URL Customizer */}
+                  {hasImageHeader && (
+                    <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-200 text-xs text-slate-800 space-y-2">
+                      <div className="flex items-center justify-between font-extrabold text-domu-blue">
+                        <span className="flex items-center gap-1.5">
+                          <ImageIcon className="w-4 h-4" />
+                          Imagem de Destaque da Mensagem (URL da Foto/Banner)
+                        </span>
+                        <span className="text-[10px] bg-blue-200 px-2 py-0.5 rounded text-blue-900 uppercase">Cabeçalho de Mídia</span>
+                      </div>
+                      <input
+                        type="url"
+                        value={campaignImageUrl}
+                        onChange={(e) => setCampaignImageUrl(e.target.value)}
+                        placeholder="https://suaempresa.com/imagem_anuncio.jpg"
+                        className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-mono focus:ring-2 focus:ring-domu-blue focus:outline-none"
+                      />
                     </div>
-                    <p className="text-[11.5px] leading-relaxed">
-                      Conforme as exigências da Meta Cloud API, o corpo das mensagens HSM é <strong>pré-aprovado e travado contra alterações</strong>. Apenas as variáveis como <span className="font-extrabold font-mono text-domu-blue bg-white px-2 py-0.5 rounded-lg border border-blue-300">{"{{nome}}"}</span> são dinâmicas.
-                    </p>
-                  </div>
+                  )}
 
                   {/* Locked Read-Only Template Text Display */}
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 leading-relaxed font-sans select-none">
@@ -491,17 +515,28 @@ export default function CampaignWizardModal({
               </div>
 
               {/* Authentic WhatsApp Wallpaper & Chat Bubble */}
-              <div className="bg-[#E5DDD5] p-4 rounded-b-2xl border border-t-0 border-slate-300 shadow-inner min-h-[240px] flex flex-col justify-end">
-                <div className="bg-white p-4 rounded-2xl rounded-tl-none shadow-md max-w-[95%] space-y-2 border border-slate-200/90 relative">
+              <div className="bg-[#E5DDD5] p-4 rounded-b-2xl border border-t-0 border-slate-300 shadow-inner min-h-[260px] flex flex-col justify-end">
+                <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-md max-w-[95%] space-y-2 border border-slate-200/90 relative">
                   
                   {/* Little speech tail triangle */}
                   <div className="absolute -top-2 -left-2 w-0 h-0 border-t-8 border-t-transparent border-r-8 border-r-white border-b-8 border-b-transparent"></div>
 
-                  <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans font-normal">
+                  {/* Render Image Banner inside Message Bubble if present */}
+                  {hasImageHeader && (
+                    <div className="rounded-xl overflow-hidden border border-slate-200 h-36 bg-slate-100 shadow-xs relative">
+                      <img 
+                        src={campaignImageUrl || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80'} 
+                        alt="Imagem da Campanha"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans font-normal px-1">
                     {getRenderedPreviewText()}
                   </p>
 
-                  <div className="flex items-center justify-end gap-1 text-[9.5px] text-slate-400 pt-0.5 font-sans">
+                  <div className="flex items-center justify-end gap-1 text-[9.5px] text-slate-400 pt-0.5 font-sans px-1">
                     <span>14:32</span>
                     <span className="text-blue-500 font-black tracking-tighter">✓✓</span>
                   </div>

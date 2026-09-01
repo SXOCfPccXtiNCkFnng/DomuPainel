@@ -13,7 +13,8 @@ import {
   Search,
   Sparkles,
   Info,
-  X
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function TemplatesPage() {
@@ -25,6 +26,8 @@ export default function TemplatesPage() {
   // New Template Form State
   const [name, setName] = useState('');
   const [category, setCategory] = useState<'MARKETING' | 'UTILITY'>('MARKETING');
+  const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE'>('NONE');
+  const [headerContent, setHeaderContent] = useState('https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80');
   const [bodyText, setBodyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -63,6 +66,8 @@ export default function TemplatesPage() {
           tenantId: storedTenantId,
           name: name.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
           category,
+          headerType,
+          headerContent: headerType === 'IMAGE' ? headerContent : null,
           language: 'pt_BR',
           bodyText
         })
@@ -72,6 +77,7 @@ export default function TemplatesPage() {
         setIsModalOpen(false);
         setName('');
         setBodyText('');
+        setHeaderType('NONE');
         fetchTemplates();
       }
     } catch (err) {
@@ -148,7 +154,7 @@ export default function TemplatesPage() {
         <div className="space-y-1">
           <h4 className="font-extrabold text-slate-900">Regras Oficiais da Meta Cloud API (HSM)</h4>
           <p className="text-[11.5px] leading-relaxed text-slate-600">
-            Para garantir a entrega de disparos no WhatsApp sem bloqueios, a Meta exige que toda mensagem iniciada pela empresa utilize um <strong>Template HSM pré-aprovado</strong> nas categorias <em>MARKETING</em> ou <em>UTILITY</em>. Variáveis são marcadas entre chaves duplas como <code className="font-mono text-domu-blue bg-white px-1.5 py-0.5 rounded border border-blue-200">{"{{nome}}"}</code>.
+            Para garantir a entrega de disparos no WhatsApp sem bloqueios, a Meta exige que toda mensagem iniciada pela empresa utilize um <strong>Template HSM pré-aprovado</strong> nas categorias <em>MARKETING</em> ou <em>UTILITY</em>. Você pode cadastrar modelos com <strong>Imagem de Destaque 📷</strong> ou apenas texto. Variáveis são marcadas entre chaves duplas como <code className="font-mono text-domu-blue bg-white px-1.5 py-0.5 rounded border border-blue-200">{"{{nome}}"}</code>.
           </p>
         </div>
       </div>
@@ -157,6 +163,7 @@ export default function TemplatesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {templates.map((tpl) => {
           const isApproved = tpl.status === 'APPROVED';
+          const hasImage = tpl.header_type === 'IMAGE' || Boolean(tpl.header_content);
 
           return (
             <div 
@@ -176,8 +183,29 @@ export default function TemplatesPage() {
 
                 <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase">
                   <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700">{tpl.category}</span>
+                  {hasImage && (
+                    <span className="px-2 py-0.5 bg-blue-100 text-domu-blue rounded flex items-center gap-1 font-black">
+                      <ImageIcon className="w-3 h-3" />
+                      COM IMAGEM
+                    </span>
+                  )}
                   <span>Português (BR)</span>
                 </div>
+
+                {/* Optional Image Thumbnail Preview */}
+                {hasImage && (
+                  <div className="rounded-xl overflow-hidden border border-slate-200 h-28 bg-slate-100 relative">
+                    <img 
+                      src={tpl.header_content || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80'} 
+                      alt="Template Preview Image"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-1.5 right-1.5 px-2 py-0.5 bg-slate-900/80 text-white text-[9px] font-bold rounded-md backdrop-blur-xs flex items-center gap-1">
+                      <ImageIcon className="w-2.5 h-2.5" />
+                      Banner Imagem
+                    </span>
+                  </div>
+                )}
 
                 <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed font-sans min-h-[75px]">
                   "{tpl.body_text}"
@@ -204,7 +232,7 @@ export default function TemplatesPage() {
         })}
       </div>
 
-      {/* Modal: Criar Novo Template Meta (Fixed Full Overlay Backdrop via Portal) */}
+      {/* Modal: Criar Novo Template Meta */}
       {isModalOpen && mounted && createPortal(
         <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans">
           <div className="bg-white rounded-3xl max-w-lg w-full p-7 shadow-2xl border border-slate-200 space-y-5">
@@ -229,24 +257,59 @@ export default function TemplatesPage() {
                 <input
                   type="text"
                   required
-                  placeholder="ex: aviso_promocao_especial"
+                  placeholder="ex: lancamento_promocao_especial"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Categoria Meta</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
-                >
-                  <option value="MARKETING">MARKETING (Ofertas, Promoções, Lançamentos)</option>
-                  <option value="UTILITY">UTILITY (Notificações, Lembretes de Atendimento)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Categoria Meta</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as any)}
+                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
+                  >
+                    <option value="MARKETING">MARKETING (Ofertas)</option>
+                    <option value="UTILITY">UTILITY (Atendimento)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Formato do Cabeçalho</label>
+                  <select
+                    value={headerType}
+                    onChange={(e) => setHeaderType(e.target.value as any)}
+                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
+                  >
+                    <option value="NONE">Apenas Texto</option>
+                    <option value="IMAGE">📷 Imagem (Banner/Foto)</option>
+                  </select>
+                </div>
               </div>
+
+              {/* Conditional Image URL Input */}
+              {headerType === 'IMAGE' && (
+                <div className="space-y-1.5 p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl animate-in fade-in duration-150">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-domu-blue" />
+                    <span>URL da Imagem de Exemplo (Foto do Lançamento/Banner)</span>
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={headerContent}
+                    onChange={(e) => setHeaderContent(e.target.value)}
+                    placeholder="https://suaempresa.com/banner.jpg"
+                    className="w-full p-2.5 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-mono"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Insira o link direto da imagem JPG/PNG do seu anúncio ou banner promocional.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Texto da Mensagem (use {"{{nome}}"} para personalizar)</label>

@@ -19,12 +19,25 @@ export async function GET(req: NextRequest) {
     // Default Meta Official Pre-Approved Template Fallbacks if table empty
     const officialMetaTemplates = (templates && templates.length > 0) ? templates : [
       {
+        id: 'meta-tpl-0',
+        name: 'lancamento_exclusivo_com_imagem',
+        category: 'MARKETING',
+        language: 'pt_BR',
+        status: 'APPROVED',
+        meta_template_id: 'meta_hsm_000',
+        header_type: 'IMAGE',
+        header_content: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80',
+        body_text: 'Olá {{nome}}! Confira em primeira mão este lançamento exclusivo da nossa empresa. Gostaria de agendar uma apresentação?',
+        variables: ['nome']
+      },
+      {
         id: 'meta-tpl-1',
         name: 'aviso_oferta_promocional',
         category: 'MARKETING',
         language: 'pt_BR',
         status: 'APPROVED',
         meta_template_id: 'meta_hsm_001',
+        header_type: 'NONE',
         body_text: 'Olá {{nome}}! Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?',
         variables: ['nome']
       },
@@ -35,6 +48,7 @@ export async function GET(req: NextRequest) {
         language: 'pt_BR',
         status: 'APPROVED',
         meta_template_id: 'meta_hsm_002',
+        header_type: 'NONE',
         body_text: 'Olá {{nome}}, passando para confirmar nosso atendimento agendado para {{horario}}. Podemos confirmar?',
         variables: ['nome', 'horario']
       },
@@ -45,6 +59,7 @@ export async function GET(req: NextRequest) {
         language: 'pt_BR',
         status: 'APPROVED',
         meta_template_id: 'meta_hsm_003',
+        header_type: 'NONE',
         body_text: 'Olá {{nome}}! Seu pedido/solicitação foi atualizado com sucesso. Acesse nosso portal para conferir.',
         variables: ['nome']
       }
@@ -65,7 +80,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { tenantId, name, category, bodyText } = body;
+    const { tenantId, name, category, headerType, headerContent, bodyText } = body;
 
     if (!name || !bodyText) {
       return NextResponse.json({ success: false, error: 'Nome e texto do template são obrigatórios.' }, { status: 400 });
@@ -91,6 +106,8 @@ export async function POST(req: NextRequest) {
         category: category || 'MARKETING',
         language: 'pt_BR',
         status: 'APPROVED', // Simulated instant Meta Cloud API Approval
+        header_type: headerType || 'NONE',
+        header_content: headerContent || null,
         body_text: bodyText,
         variables: variables,
         created_at: new Date().toISOString()
