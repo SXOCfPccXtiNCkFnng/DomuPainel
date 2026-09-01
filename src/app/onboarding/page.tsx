@@ -4,10 +4,6 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { 
-  Building2, 
-  ShoppingBag, 
-  Stethoscope, 
-  Briefcase, 
   Check, 
   ArrowRight, 
   ArrowLeft, 
@@ -20,11 +16,11 @@ import {
   CreditCard,
   CheckCircle2,
   RefreshCw,
-  Sparkles,
   Lock,
   Star
 } from 'lucide-react';
 import { TenantSegment } from '@/types';
+import { SegmentIcon } from '@/components/icons/DomuIcons';
 
 interface SegmentOption {
   id: TenantSegment;
@@ -32,10 +28,8 @@ interface SegmentOption {
   badge: string;
   description: string;
   features: string[];
-  icon: React.ElementType;
   color: string;
   borderColor: string;
-  bgColor: string;
 }
 
 export default function OnboardingPage() {
@@ -62,58 +56,48 @@ export default function OnboardingPage() {
   const segments: SegmentOption[] = [
     {
       id: 'imobiliario',
-      title: 'Setor Imobiliário & Corretores',
-      badge: 'Lançamentos & Imóveis',
+      title: 'Setor Imobiliário e Corretores',
+      badge: 'Lançamentos e Imóveis',
       description: 'Automação de divulgação de imóveis, busca por perfil compatível e agendamento de visitas.',
       features: ['Disparo de lançamentos por faixa de preço', 'Filtro de leads por bairro e perfil', 'IA de agendamento de visitas'],
-      icon: Building2,
       color: 'text-domu-blue',
       borderColor: 'border-blue-500',
-      bgColor: 'bg-blue-50/50'
     },
     {
       id: 'ecommerce',
-      title: 'E-commerce & Varejo',
+      title: 'E-commerce e Varejo',
       badge: 'Vendas Online',
       description: 'Recuperação de carrinho abandonado, lançamento de coleções e rastreio de entregas.',
       features: ['Recuperação de compras pendentes', 'Envio de cupons de desconto VIP', 'Notificação de produto em estoque'],
-      icon: ShoppingBag,
       color: 'text-emerald-600',
       borderColor: 'border-emerald-500',
-      bgColor: 'bg-emerald-50/50'
     },
     {
       id: 'saude',
-      title: 'Saúde & Clínicas',
+      title: 'Saúde e Clínicas',
       badge: 'Agendamentos',
       description: 'Confirmação automática de consultas, lembretes de retorno e alertas de exames.',
       features: ['Confirmação de agenda no WhatsApp', 'Instruções pré-exame automatizadas', 'Redução de faltas em até 80%'],
-      icon: Stethoscope,
       color: 'text-amber-600',
       borderColor: 'border-amber-500',
-      bgColor: 'bg-amber-50/50'
     },
     {
       id: 'marketing_apenas',
-      title: 'Apenas Disparo de Mensagens (Sem Módulos)',
+      title: 'Apenas Disparo de Mensagens',
       badge: 'Foco Total em Disparos',
-      description: 'Ideal para empresas que desejam focar 100% no disparo de campanhas, aviso de ofertas e atendimento direto no WhatsApp, sem módulos específicos.',
+      description: 'Ideal para empresas que desejam focar 100% no disparo de campanhas, aviso de ofertas e atendimento direto no WhatsApp.',
       features: ['Envio de campanhas e ofertas em massa', 'Gestão de opt-in e histórico de mensagens', 'Sem cadastros complexos de produtos'],
-      icon: Send,
       color: 'text-purple-600',
       borderColor: 'border-purple-500',
-      bgColor: 'bg-purple-50/50'
     },
     {
       id: 'geral',
-      title: 'Serviços, Jurídico & Outros',
-      badge: 'Empresas & Negócios',
+      title: 'Serviços, Jurídico e Outros',
+      badge: 'Empresas e Negócios',
       description: 'Lembretes de vencimento, cobrança amigável e atendimento 1:1 ao cliente.',
       features: ['Avisos de vencimento de contrato', 'Cobrança preventiva com PIX', 'Central multiatendentes no WhatsApp'],
-      icon: Briefcase,
       color: 'text-indigo-600',
       borderColor: 'border-indigo-500',
-      bgColor: 'bg-indigo-50/50'
     }
   ];
 
@@ -146,6 +130,8 @@ export default function OnboardingPage() {
 
       localStorage.setItem('domu_is_onboarded', 'true');
       localStorage.setItem('domu_selected_segment', selectedSegment);
+      if (companyName) localStorage.setItem('domu_company_name', companyName);
+      if (ownerName) localStorage.setItem('domu_user_name', ownerName);
       setIsProcessingPayment(false);
       router.push('/');
     } catch (err) {
@@ -218,7 +204,6 @@ export default function OnboardingPage() {
             {/* Segment Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               {segments.map((seg) => {
-                const IconComponent = seg.icon;
                 const isSelected = selectedSegment === seg.id;
 
                 return (
@@ -238,9 +223,7 @@ export default function OnboardingPage() {
                     )}
 
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg ${seg.bgColor} flex items-center justify-center border border-slate-200/60`}>
-                        <IconComponent className={`w-5 h-5 ${seg.color}`} />
-                      </div>
+                      <SegmentIcon segment={seg.id} />
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-black text-slate-900">{seg.title}</h3>
@@ -310,7 +293,7 @@ export default function OnboardingPage() {
                 Passo 2 de 5
               </span>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Dados da sua Empresa & Marca
+                Dados da sua Empresa e Marca
               </h1>
               <p className="text-xs text-slate-500">
                 Informe o nome comercial da sua empresa e contatos para personalizar o cabeçalho das mensagens.
@@ -564,7 +547,7 @@ export default function OnboardingPage() {
 
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    <span>Canal de Disparos Ativo & Pronto</span>
+                    <span>Canal de Disparos Ativo e Pronto</span>
                   </span>
                 </div>
               )}
@@ -597,7 +580,7 @@ export default function OnboardingPage() {
           <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="text-center space-y-2 max-w-2xl mx-auto">
               <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-200">
-                Passo 5 de 5 — Plano & Assinatura
+                Passo 5 de 5 — Plano e Assinatura
               </span>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">
                 Escolha o Plano Ideal para seu Negócio
@@ -620,7 +603,7 @@ export default function OnboardingPage() {
                 <div className="space-y-3">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">Plano Starter</h3>
-                    <p className="text-[11px] text-slate-500">Para pequenos negócios e corretores autônomos</p>
+                    <p className="text-[11px] text-slate-500">Para pequenos negócios e profissionais autônomos</p>
                   </div>
 
                   <div className="flex items-baseline gap-1">
@@ -639,7 +622,7 @@ export default function OnboardingPage() {
                     </li>
                     <li className="flex items-center gap-1.5">
                       <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Disparos em Lote & Relatórios</span>
+                      <span>Disparos em Lote e Relatórios</span>
                     </li>
                   </ul>
                 </div>
@@ -666,7 +649,7 @@ export default function OnboardingPage() {
                 <div className="space-y-3 pt-1">
                   <div>
                     <h3 className="text-sm font-black text-white">Plano Pro</h3>
-                    <p className="text-[11px] text-slate-400">Para imobiliárias e empresas em expansão</p>
+                    <p className="text-[11px] text-slate-400">Para empresas em expansão e equipes comerciais</p>
                   </div>
 
                   <div className="flex items-baseline gap-1">
@@ -730,7 +713,7 @@ export default function OnboardingPage() {
                     </li>
                     <li className="flex items-center gap-1.5">
                       <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Gerente de Conta Exclusivo & SLA</span>
+                      <span>Gerente de Conta Exclusivo e SLA</span>
                     </li>
                   </ul>
                 </div>
@@ -814,7 +797,7 @@ export default function OnboardingPage() {
                   </>
                 ) : (
                   <>
-                    <span>Ativar Plano {selectedPlan} & Entrar no Portal</span>
+                    <span>Ativar Plano {selectedPlan} e Entrar no Portal</span>
                     <Check className="w-4 h-4" />
                   </>
                 )}

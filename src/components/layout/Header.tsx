@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Search, Bell, PlusCircle, CheckCircle2, Phone, LogOut, User, Settings, CreditCard, ChevronDown, Sparkles, AlertCircle } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown } from 'lucide-react';
+import { getPageTitle } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
 
 interface HeaderProps {
@@ -12,6 +13,8 @@ interface HeaderProps {
 
 export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const pageInfo = getPageTitle(pathname);
   
   // State for user & company
   const [userName, setUserName] = useState('Gestor DOMU');
@@ -105,9 +108,9 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
         {/* Title */}
         <div>
           <h1 className="text-sm font-black text-slate-900 tracking-tight">
-            Dashboard de Análise & Performance
+            {pageInfo.title}
           </h1>
-          <p className="text-[11px] text-slate-500 font-medium">Métricas unificadas de disparos e automações no WhatsApp</p>
+          <p className="text-[11px] text-slate-500 font-medium">{pageInfo.subtitle}</p>
         </div>
 
         {/* Right Controls */}
@@ -231,7 +234,7 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
                     className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 font-medium text-slate-700 transition-colors"
                   >
                     <CreditCard className="w-4 h-4 text-slate-500" />
-                    <span>Minha Assinatura & Plano</span>
+                    <span>Minha Assinatura e Plano</span>
                   </Link>
                 </div>
 

@@ -19,7 +19,7 @@ export default function ImoveisDestaque({ properties = mockProperties, onTrigger
         <div>
           <h3 className="text-xs font-black text-slate-900 flex items-center gap-2">
             <Building2 className="w-4 h-4 text-domu-blue" />
-            Catálogo de Imóveis & Automação de Alertas
+            Catálogo de Imóveis e Automação de Alertas
           </h3>
           <p className="text-[11px] text-slate-500">
             Cadastre imóveis manualmente ou conecte seu sistema para disparar alertas para compradores interessados

@@ -2,22 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  FileText, 
-  Plus, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  ShieldCheck, 
+import WhatsAppPreview, { renderTemplateVariables } from '@/components/shared/WhatsAppPreview';
+import ImageSourceField from '@/components/shared/ImageSourceField';
+import {
+  FileText,
+  Plus,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  ShieldCheck,
   RefreshCw,
   Search,
   Sparkles,
   Info,
   X,
   ImageIcon,
-  Eye,
-  Smartphone,
-  Lock
+  Lock,
 } from 'lucide-react';
 
 export default function TemplatesPage() {
@@ -30,13 +30,16 @@ export default function TemplatesPage() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<'MARKETING' | 'UTILITY'>('MARKETING');
   const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE'>('NONE');
-  const [headerContent, setHeaderContent] = useState('https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80');
+  const [headerContent, setHeaderContent] = useState('https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&auto=format&fit=crop&q=80');
   const [bodyText, setBodyText] = useState('Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa. Podemos conversar?');
   const [previewTestName, setPreviewTestName] = useState('Carlos Eduardo');
+  const [companyName, setCompanyName] = useState('Sua Empresa');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    const saved = localStorage.getItem('domu_company_name');
+    if (saved) setCompanyName(saved);
     fetchTemplates();
   }, []);
 
@@ -93,10 +96,12 @@ export default function TemplatesPage() {
 
   const getLivePreviewText = () => {
     if (!bodyText.trim()) return 'Digite o texto da mensagem no formulário para visualizar o resultado...';
-    let text = bodyText;
-    text = text.replace(/\{\{nome\}\}/g, previewTestName || 'Cliente');
-    text = text.replace(/\{\{horario\}\}/g, '15:00');
-    return text;
+    return renderTemplateVariables(bodyText, {
+      nome: previewTestName || 'Cliente',
+      horario: '15:00',
+      produto: 'Oferta Especial',
+      valor: 'R$ 299,00',
+    });
   };
 
   const renderStatusBadge = (status: string) => {
@@ -144,7 +149,7 @@ export default function TemplatesPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={fetchTemplates}
-            className="p-2 bg-white text-slate-600 border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+            className="p-2 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
             title="Atualizar lista com a Meta"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -161,7 +166,7 @@ export default function TemplatesPage() {
       </div>
 
       {/* Official Meta Regulations Banner */}
-      <div className="p-4 bg-blue-50/80 rounded-2xl border border-blue-200/90 text-xs text-slate-700 flex items-start gap-3 shadow-xs">
+      <div className="p-4 bg-blue-50 border border-blue-200 text-xs text-slate-700 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-domu-blue shrink-0 mt-0.5" />
         <div className="space-y-1">
           <h4 className="font-extrabold text-slate-900">Regras Oficiais da Meta Cloud API (HSM)</h4>
@@ -180,8 +185,8 @@ export default function TemplatesPage() {
           return (
             <div 
               key={tpl.id}
-              className={`bg-white rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all ${
-                isApproved ? 'border-slate-200/90 hover:border-blue-300 hover:shadow-md' : 'border-amber-200/80 bg-amber-50/20'
+              className={`bg-white border p-5 flex flex-col justify-between transition-all ${
+                isApproved ? 'border-slate-200 hover:border-domu-blue/40' : 'border-amber-200 bg-amber-50/20'
               }`}
             >
               <div className="space-y-3">
@@ -214,7 +219,7 @@ export default function TemplatesPage() {
 
                 {/* Optional Image Thumbnail Preview */}
                 {hasImage && (
-                  <div className="rounded-xl overflow-hidden border border-slate-200 h-28 bg-slate-100 relative">
+                  <div className="overflow-hidden border border-slate-200 h-28 bg-slate-100 relative">
                     <img 
                       src={tpl.header_content || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80'} 
                       alt="Template Preview Image"
@@ -223,7 +228,7 @@ export default function TemplatesPage() {
                   </div>
                 )}
 
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed font-sans min-h-[75px]">
+                <div className="p-3.5 bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed font-sans min-h-[75px]">
                   "{tpl.body_text}"
                 </div>
               </div>
@@ -250,200 +255,138 @@ export default function TemplatesPage() {
 
       {/* Modal: Criar Novo Template Meta com Live WhatsApp Preview de 2 Colunas */}
       {isModalOpen && mounted && createPortal(
-        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-7 shadow-2xl border border-slate-200 space-y-5 max-h-[92vh] flex flex-col overflow-hidden">
-            
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-[99999] bg-slate-900/50 flex items-center justify-center p-4 font-sans">
+          <div className="bg-white border border-slate-200 shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div>
-                <h3 className="text-base font-black text-slate-900">Novo Template HSM para Aprovação Meta</h3>
-                <p className="text-xs text-slate-500">Cadastre o modelo e veja a simulação ao vivo antes de enviar para aprovação</p>
+                <h3 className="text-sm font-bold text-slate-900">Novo Template HSM</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">Cadastre o modelo e visualize antes de enviar à Meta</p>
               </div>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* 2-Column Grid: Form Inputs (Left) & Real-Time WhatsApp Live Preview (Right) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 overflow-y-auto flex-1 p-1">
-              
-              {/* Left Column: Form Fields (7 cols) */}
-              <form onSubmit={handleCreateTemplate} id="create-tpl-form" className="lg:col-span-7 space-y-4">
-                
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Nome do Template (sem espaços, ex: aviso_promocao)</label>
+            <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 min-h-0">
+
+              <form onSubmit={handleCreateTemplate} id="create-tpl-form" className="lg:col-span-7 p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-slate-100">
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">Nome do template</label>
                   <input
                     type="text"
                     required
-                    placeholder="ex: lancamento_promocao_especial"
+                    placeholder="ex: aviso_promocao_verao"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Categoria Meta</label>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">Categoria</label>
                     <select
                       value={category}
-                      onChange={(e) => setCategory(e.target.value as any)}
-                      className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
+                      onChange={(e) => setCategory(e.target.value as 'MARKETING' | 'UTILITY')}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                     >
-                      <option value="MARKETING">MARKETING (Ofertas)</option>
-                      <option value="UTILITY">UTILITY (Atendimento)</option>
+                      <option value="MARKETING">Marketing</option>
+                      <option value="UTILITY">Utilidade</option>
                     </select>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Formato do Cabeçalho</label>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">Cabeçalho</label>
                     <select
                       value={headerType}
-                      onChange={(e) => setHeaderType(e.target.value as any)}
-                      className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
+                      onChange={(e) => setHeaderType(e.target.value as 'NONE' | 'IMAGE')}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                     >
-                      <option value="NONE">Apenas Texto</option>
-                      <option value="IMAGE">Imagem de Destaque (Banner)</option>
+                      <option value="NONE">Apenas texto</option>
+                      <option value="IMAGE">Com imagem</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Conditional Image URL Input */}
                 {headerType === 'IMAGE' && (
-                  <div className="space-y-1.5 p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl animate-in fade-in duration-150">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <ImageIcon className="w-4 h-4 text-domu-blue" />
-                      <span>URL da Imagem de Exemplo (Foto do Lançamento/Banner)</span>
-                    </label>
-                    <input
-                      type="url"
-                      required
-                      value={headerContent}
-                      onChange={(e) => setHeaderContent(e.target.value)}
-                      placeholder="https://suaempresa.com/banner.jpg"
-                      className="w-full p-2.5 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-mono"
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      Insira o link direto da imagem JPG/PNG do seu anúncio ou banner promocional.
-                    </p>
-                  </div>
+                  <ImageSourceField
+                    value={headerContent}
+                    onChange={setHeaderContent}
+                    label="Imagem do banner (exemplo para aprovação Meta)"
+                    hint="Imagem de exemplo enviada à Meta na aprovação do template. Em cada disparo você poderá trocar por outra URL ou upload."
+                    required
+                  />
                 )}
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Texto da Mensagem (use {"{{nome}}"} para personalizar)</label>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">
+                    Texto da mensagem
+                  </label>
                   <textarea
                     rows={4}
                     required
-                    placeholder="Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa."
+                    placeholder="Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva."
                     value={bodyText}
                     onChange={(e) => setBodyText(e.target.value)}
-                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 leading-relaxed"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Nome de Teste p/ Preview ao Vivo</label>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">Nome de teste no preview</label>
                   <input
                     type="text"
                     value={previewTestName}
                     onChange={(e) => setPreviewTestName(e.target.value)}
                     placeholder="ex: Carlos Eduardo"
-                    className="w-full p-2.5 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-bold"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                   />
                 </div>
 
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900">
-                  📌 Ao clicar em salvar, o modelo é registrado na sua conta e disponibilizado para aprovação da Meta.
-                </div>
+                <p className="text-[11px] text-slate-500 border-l-2 border-slate-300 pl-3">
+                  Ao salvar, o modelo é registrado e enviado para aprovação da Meta.
+                </p>
 
               </form>
 
-              {/* Right Column: Live Real-Time WhatsApp Device Simulator (5 cols) */}
-              <div className="lg:col-span-5 bg-gradient-to-b from-slate-100 to-slate-200/80 p-4 rounded-3xl border border-slate-300 flex flex-col justify-between shadow-inner">
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-300 mb-3">
-                    <span className="text-xs font-black text-slate-800 flex items-center gap-2">
-                      <Eye className="w-4 h-4 text-domu-blue" />
-                      Preview no WhatsApp (Ao Vivo)
-                    </span>
-                    <span className="text-[10px] text-emerald-700 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Simulação Real
-                    </span>
-                  </div>
-
-                  {/* Realistic WhatsApp Chat Device Bar */}
-                  <div className="bg-[#075E54] rounded-t-2xl px-4 py-3 text-white flex items-center justify-between shadow-md">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-emerald-800 border border-emerald-400/40 flex items-center justify-center text-xs font-black tracking-tight text-white shadow-xs">
-                        DOMU
-                      </div>
-                      <div>
-                        <h5 className="text-[12px] font-bold leading-none text-white">DOMU Bot</h5>
-                        <span className="text-[9.5px] text-emerald-200 font-medium">Atendimento Oficial • Online</span>
-                      </div>
-                    </div>
-                    <Smartphone className="w-4 h-4 text-white/80" />
-                  </div>
-
-                  {/* Authentic WhatsApp Message Box Body */}
-                  <div className="bg-[#E5DDD5] p-3.5 rounded-b-2xl border border-t-0 border-slate-300 shadow-inner min-h-[240px] flex flex-col justify-end">
-                    <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 overflow-hidden space-y-2">
-                      
-                      {/* Live Image Banner if IMAGE Header selected */}
-                      {headerType === 'IMAGE' && (
-                        <div className="w-full h-36 bg-slate-100 relative overflow-hidden border-b border-slate-100">
-                          <img 
-                            src={headerContent || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80'} 
-                            alt="Preview do Banner"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-
-                      <div className="p-3 space-y-1.5">
-                        <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans">
-                          {getLivePreviewText()}
-                        </p>
-
-                        <div className="flex items-center justify-end gap-1 text-[9.5px] text-slate-400 pt-0.5 font-sans">
-                          <span>14:32</span>
-                          <span className="text-blue-500 font-black tracking-tighter">✓✓</span>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-
-                </div>
-
-                <p className="text-[11px] text-slate-500 text-center pt-2">
-                  Esta simulação mostra como seu cliente visualizará a mensagem oficial no aplicativo do WhatsApp.
-                </p>
+              <div className="lg:col-span-5 p-6 bg-slate-50/80">
+                <WhatsAppPreview
+                  bodyText={getLivePreviewText()}
+                  showImage={headerType === 'IMAGE'}
+                  imageUrl={headerContent}
+                  contactName={companyName}
+                  companyLabel="Atendimento Oficial"
+                  buttonText={category === 'MARKETING' ? 'Saiba Mais' : undefined}
+                  footer={
+                    <p className="text-[11px] text-slate-500">
+                      Simulação de como o cliente verá a mensagem.
+                    </p>
+                  }
+                />
               </div>
 
             </div>
 
-            {/* Modal Footer Controls */}
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+            <div className="px-6 py-3 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 Cancelar
               </button>
-
               <button
                 type="submit"
                 form="create-tpl-form"
                 disabled={isSubmitting}
-                className="btn-domu-primary text-xs py-2.5 px-6 flex items-center gap-1.5 shadow-xs"
+                className="btn-domu-primary text-xs py-2 px-5 flex items-center gap-1.5"
               >
-                {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                <span>Enviar para Aprovação Meta</span>
+                {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                Enviar para aprovação
               </button>
             </div>
 

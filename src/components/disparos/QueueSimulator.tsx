@@ -44,7 +44,7 @@ export default function QueueSimulator({ campaignTitle, totalRecipients }: Queue
         recipientPhone: `+55 16 99${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
         recipientName: randomName,
         status: 'READ',
-        details: 'Enviado via Cloud API da Meta • Entregue & Lido'
+        details: 'Enviado via Cloud API da Meta • Entregue e Lido'
       };
 
       setLogs((prevLogs) => [newLog, ...prevLogs.slice(0, 7)]);
