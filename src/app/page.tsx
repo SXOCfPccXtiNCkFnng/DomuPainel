@@ -143,7 +143,7 @@ export default function DashboardPage() {
                   <span className="text-domu-blue font-black">{totalLeads}</span>
                 </div>
                 <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-domu-blue h-full w-[100%] rounded-full"></div>
+                  <div className="bg-domu-blue h-full rounded-full transition-all duration-300" style={{ width: totalLeads > 0 ? '100%' : '0%' }}></div>
                 </div>
                 <p className="text-[10.5px] text-slate-500">Contatos cadastrados no sistema</p>
               </div>
@@ -155,7 +155,7 @@ export default function DashboardPage() {
                   <span className="text-domu-blue font-black">{totalSent}</span>
                 </div>
                 <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-domu-blue h-full w-[85%] rounded-full"></div>
+                  <div className="bg-domu-blue h-full rounded-full transition-all duration-300" style={{ width: totalSent > 0 ? '85%' : '0%' }}></div>
                 </div>
                 <p className="text-[10.5px] text-slate-500">Campanhas disparadas via Meta API</p>
               </div>
@@ -164,10 +164,10 @@ export default function DashboardPage() {
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-slate-700">3. Em Atendimento</span>
-                  <span className="text-domu-blue font-black">{Math.floor(totalLeads * 0.4)}</span>
+                  <span className="text-domu-blue font-black">{totalLeads > 0 ? Math.floor(totalLeads * 0.4) : 0}</span>
                 </div>
                 <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-domu-blue h-full w-[40%] rounded-full"></div>
+                  <div className="bg-domu-blue h-full rounded-full transition-all duration-300" style={{ width: totalLeads > 0 ? '40%' : '0%' }}></div>
                 </div>
                 <p className="text-[10.5px] text-slate-500">Conversas ativas no WhatsApp</p>
               </div>
@@ -176,10 +176,10 @@ export default function DashboardPage() {
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-slate-700">4. Concluído</span>
-                  <span className="text-emerald-600 font-black">{Math.floor(totalLeads * 0.15)}</span>
+                  <span className="text-emerald-600 font-black">{totalLeads > 0 ? Math.floor(totalLeads * 0.15) : 0}</span>
                 </div>
                 <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full w-[15%] rounded-full"></div>
+                  <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: totalLeads > 0 ? '15%' : '0%' }}></div>
                 </div>
                 <p className="text-[10.5px] text-slate-500">Negócios finalizados</p>
               </div>
