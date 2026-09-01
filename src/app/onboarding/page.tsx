@@ -298,14 +298,14 @@ export default function OnboardingPage() {
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Nome Comercial da Empresa / Imobiliária
+                  Nome da Empresa
                 </label>
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="Ex: DOMU Imóveis & Consultoria"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-white font-medium text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-600"
+                  placeholder="Nome da sua empresa"
                 />
               </div>
 

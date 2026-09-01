@@ -112,7 +112,7 @@ export default function LoginPage() {
             {/* E-mail Input (Empty by default, placeholder transparent) */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                E-mail Corporativo
+                E-mail
               </label>
               <div className="relative rounded-md shadow-xs">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, User, Building, Phone, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, User, Building, Phone, ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function CadastroPage() {
         return;
       }
 
-      setSuccessMessage(data.message || 'Conta criada com sucesso no banco de dados!');
+      setSuccessMessage(data.message || 'Conta criada com sucesso! Redirecionando...');
       setIsLoading(false);
 
       setTimeout(() => {
@@ -154,7 +154,7 @@ export default function CadastroPage() {
             {/* Nome da Empresa */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
-                Nome Comercial da Empresa / Imobiliária
+                Nome da Empresa
               </label>
               <div className="relative rounded-md shadow-xs">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
@@ -166,7 +166,7 @@ export default function CadastroPage() {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   className="block w-full pl-9 pr-3 py-2 border border-slate-700/80 rounded-lg bg-slate-950 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
-                  placeholder="Ex: DOMU Imóveis & Consultoria"
+                  placeholder="Nome da sua Empresa"
                 />
               </div>
             </div>
@@ -175,7 +175,7 @@ export default function CadastroPage() {
               {/* E-mail */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  E-mail Corporativo
+                  E-mail
                 </label>
                 <div className="relative rounded-md shadow-xs">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
@@ -192,10 +192,10 @@ export default function CadastroPage() {
                 </div>
               </div>
 
-              {/* WhatsApp */}
+              {/* Telefone */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  WhatsApp Comercial
+                  Telefone
                 </label>
                 <div className="relative rounded-md shadow-xs">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
@@ -216,7 +216,7 @@ export default function CadastroPage() {
             {/* Senha */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
-                Senha Segura
+                Senha
               </label>
               <div className="relative rounded-md shadow-xs">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
@@ -295,7 +295,7 @@ export default function CadastroPage() {
                 <span>Criando sua conta...</span>
               ) : (
                 <>
-                  <span>Criar Conta & Salvar no Banco</span>
+                  <span>Criar Conta</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
