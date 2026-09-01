@@ -44,10 +44,10 @@ export default function OnboardingPage() {
   const [selectedSegment, setSelectedSegment] = useState<TenantSegment>('imobiliario');
 
   // Step 2 Form States
-  const [companyName, setCompanyName] = useState('DOMU Imóveis & Soluções');
-  const [ownerName, setOwnerName] = useState('Alan Felipe');
-  const [whatsappPhone, setWhatsappPhone] = useState('(11) 93443-0659');
-  const [cityState, setCityState] = useState('São Paulo, SP');
+  const [companyName, setCompanyName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [cityState, setCityState] = useState('');
 
   // Step 3 & 4 Config Options
   const [connectionType, setConnectionType] = useState<'COEXISTENCE' | 'DIRECT_API'>('COEXISTENCE');
@@ -326,7 +326,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-white font-medium text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-600"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white text-slate-900 placeholder-slate-400"
                   placeholder="Nome da sua empresa"
                 />
               </div>

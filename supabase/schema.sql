@@ -226,6 +226,20 @@ CREATE TABLE IF NOT EXISTS public.access_logs (
 );
 
 -- ==============================================================================
+-- 13. NOTIFICATIONS (Notificações em Tempo Real dos Usuários)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(30) DEFAULT 'INFO', -- 'INFO', 'SUCCESS', 'WARNING', 'ERROR'
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================================================
 -- INDEXES FOR MAXIMUM SEARCH & DISPATCH PERFORMANCE
 -- ==============================================================================
 CREATE INDEX IF NOT EXISTS idx_users_tenant ON public.users(tenant_id);
@@ -236,6 +250,7 @@ CREATE INDEX IF NOT EXISTS idx_campaigns_tenant ON public.campaigns(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_logs_campaign ON public.campaign_logs(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_logs_wamid ON public.campaign_logs(wamid);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_lead ON public.chat_messages(lead_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON public.notifications(tenant_id);
 
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES FOR MULTI-TENANT ISOLATION
@@ -252,3 +267,4 @@ ALTER TABLE public.campaign_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.media_storage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.access_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
