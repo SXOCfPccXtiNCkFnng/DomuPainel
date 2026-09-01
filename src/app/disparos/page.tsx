@@ -92,7 +92,7 @@ export default function DisparosPage() {
       const json = await res.json();
 
       if (json.success) {
-        setImportSuccessMsg(`${contactsToSave.length} contatos salvos com sucesso no banco de dados!`);
+        setImportSuccessMsg(`${contactsToSave.length} contatos salvos com sucesso na sua conta DOMU Tech!`);
         setPasteText('');
         setTimeout(() => {
           setIsImportModalOpen(false);
@@ -127,7 +127,7 @@ export default function DisparosPage() {
           {/* Import Contacts Button */}
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="px-3 py-2 bg-white text-slate-700 font-bold border border-slate-300 rounded-lg text-xs hover:bg-slate-50 flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+            className="px-3.5 py-2 bg-white text-slate-700 font-extrabold border border-slate-300 rounded-xl text-xs hover:bg-slate-50 flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
           >
             <UserPlus className="w-4 h-4 text-domu-blue" />
             <span>Importar / Digitar Contatos</span>
@@ -145,7 +145,7 @@ export default function DisparosPage() {
       </div>
 
       {/* Campaigns Table / Empty State */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <h3 className="text-sm font-black text-slate-900">Histórico de Disparos Executados</h3>
           <button onClick={fetchCampaigns} className="text-xs font-bold text-domu-blue hover:underline flex items-center gap-1">
@@ -185,7 +185,7 @@ export default function DisparosPage() {
             </table>
           </div>
         ) : (
-          <div className="p-10 text-center bg-slate-50/70 rounded-xl border border-slate-200/80 space-y-3">
+          <div className="p-10 text-center bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
             <div className="w-12 h-12 bg-blue-100 text-domu-blue rounded-full flex items-center justify-center mx-auto">
               <Send className="w-6 h-6" />
             </div>
@@ -198,7 +198,7 @@ export default function DisparosPage() {
             <div className="pt-2 flex items-center justify-center gap-3">
               <button
                 onClick={() => setIsImportModalOpen(true)}
-                className="px-4 py-2 bg-white text-slate-700 font-bold border border-slate-300 rounded-lg text-xs hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-4 py-2 bg-white text-slate-700 font-extrabold border border-slate-300 rounded-xl text-xs hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <UserPlus className="w-4 h-4 text-domu-blue" />
                 <span>Importar Contatos</span>
@@ -217,22 +217,22 @@ export default function DisparosPage() {
 
       </div>
 
-      {/* Modal: Importar ou Digitar Contatos */}
+      {/* Modal: Importar ou Digitar Contatos (Fixed Full Overlay Backdrop) */}
       {isImportModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-7 shadow-2xl border border-slate-200 space-y-5">
             
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                   <UserPlus className="w-5 h-5 text-domu-blue" />
                   Importar ou Digitar Contatos
                 </h3>
-                <p className="text-xs text-slate-500">Salva os contatos no banco de dados Supabase para futuros disparos</p>
+                <p className="text-xs text-slate-500">Salva os contatos na sua conta para futuros disparos</p>
               </div>
               <button 
                 onClick={() => setIsImportModalOpen(false)} 
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -240,7 +240,7 @@ export default function DisparosPage() {
 
             <form onSubmit={handleImportContacts} className="space-y-4">
               
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Cole ou digite os contatos (Um por linha: Nome, Telefone)</label>
                 <textarea
                   rows={6}
@@ -248,26 +248,26 @@ export default function DisparosPage() {
                   placeholder={`Carlos Silva, 11999998888\nMariana Souza, 11988887777\n5511977776666`}
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 font-mono bg-white"
+                  className="w-full p-3.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 font-mono bg-white"
                 />
               </div>
 
               {importSuccessMsg && (
-                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" />
                   <span>{importSuccessMsg}</span>
                 </div>
               )}
 
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-[11px] text-slate-600">
-                💡 <strong>Dica DOMU:</strong> Todos os contatos que você importar ficam permanentemente salvos na sua conta no Supabase, dispensando a necessidade de reimportar!
+              <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200 text-[11.5px] text-slate-600">
+                💡 <strong>Dica DOMU:</strong> Todos os contatos que você importar ficam permanentemente salvos na sua conta, dispensando a necessidade de reimportar!
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsImportModalOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -275,10 +275,10 @@ export default function DisparosPage() {
                 <button
                   type="submit"
                   disabled={isImporting}
-                  className="btn-domu-primary text-xs py-2 px-4 flex items-center gap-1.5"
+                  className="btn-domu-primary text-xs py-2.5 px-5 flex items-center gap-1.5 shadow-xs"
                 >
-                  {isImporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
-                  <span>Salvar Contatos no Banco</span>
+                  {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                  <span>Salvar Contatos na Conta</span>
                 </button>
               </div>
 

@@ -16,7 +16,8 @@ import {
   Check,
   Smartphone,
   ShieldCheck,
-  MessageSquare
+  MessageSquare,
+  AlertTriangle
 } from 'lucide-react';
 
 interface CampaignWizardModalProps {
@@ -42,6 +43,9 @@ export default function CampaignWizardModal({
   const [pastedContacts, setPastedContacts] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
+  // Meta Official Tier 1 Daily Messaging Limit
+  const META_DAILY_LIMIT = 1000;
+
   // Template & Locked Variable Message State
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplateName, setSelectedTemplateName] = useState('aviso_oferta_promocional');
@@ -65,7 +69,7 @@ export default function CampaignWizardModal({
         setContacts(json.leads);
       }
     } catch (err) {
-      console.error('Erro ao carregar contatos do Supabase:', err);
+      console.error('Erro ao carregar contatos:', err);
     }
   };
 
@@ -131,7 +135,10 @@ export default function CampaignWizardModal({
 
   if (!isOpen) return null;
 
-  const targetCount = selectedSendMode === 'ALL' ? (contacts.length || 100) : Math.min(customQuantity, contacts.length || 100);
+  // Calculate target quantity & enforce Meta Tier 1 daily limit (1,000 max)
+  const rawTargetCount = selectedSendMode === 'ALL' ? (contacts.length || 100) : Math.min(customQuantity, contacts.length || 100);
+  const isMetaLimitReached = rawTargetCount > META_DAILY_LIMIT;
+  const targetCount = Math.min(rawTargetCount, META_DAILY_LIMIT);
 
   const getRenderedPreviewText = () => {
     const cleanBody = messageBody.trim();
@@ -144,7 +151,7 @@ export default function CampaignWizardModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 font-sans animate-in fade-in duration-200">
+    <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
         
         {/* Modal Premium Header */}
@@ -213,8 +220,8 @@ export default function CampaignWizardModal({
             {step === 1 && (
               <div className="space-y-5">
                 
-                {/* Campaign Title Input */}
-                <div className="space-y-1.5 bg-white p-4.5 rounded-2xl border border-slate-200 shadow-xs">
+                {/* Campaign Title Input (Clean Layout Without Outer Box Overlap) */}
+                <div className="space-y-1.5">
                   <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
                     Nome Identificador da Campanha
                   </label>
@@ -223,8 +230,19 @@ export default function CampaignWizardModal({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="ex: Campanha de Ofertas - Setembro"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue focus:bg-white transition-all"
+                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue transition-all shadow-xs"
                   />
+                </div>
+
+                {/* Meta Daily Messaging Tier Limit Notice */}
+                <div className="p-3.5 bg-amber-50/90 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-start gap-3 shadow-xs">
+                  <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <h5 className="font-extrabold text-amber-950">Limite Oficial Diário Meta Cloud API (Tier 1)</h5>
+                    <p className="text-[11.5px] leading-relaxed text-amber-800">
+                      O limite máximo de disparo inicial é de <strong>1.000 mensagens / 24 horas</strong>. Conforme seu histórico de entregas aumenta, a Meta eleva seu limite para 10.000 e 100.000 envios/dia.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Selection Mode Card */}
@@ -267,7 +285,7 @@ export default function CampaignWizardModal({
                         className="btn-domu-primary text-xs py-2 px-4 w-full justify-center shadow-xs"
                       >
                         {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                        <span>Salvar no Supabase e Usar nos Disparos</span>
+                        <span>Salvar Contatos na Conta</span>
                       </button>
                     </div>
                   )}
@@ -292,7 +310,7 @@ export default function CampaignWizardModal({
                         </div>
                         <div>
                           <p className="text-xs font-black text-slate-900">Enviar para Todos os Contatos Salvos</p>
-                          <p className="text-[11px] text-slate-500">Base armazenada com segurança no Supabase</p>
+                          <p className="text-[11px] text-slate-500">Base de contatos salva na sua conta</p>
                         </div>
                       </div>
                       <span className="px-3 py-1 rounded-full text-xs font-black bg-domu-blue text-white shadow-xs">
@@ -325,6 +343,7 @@ export default function CampaignWizardModal({
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
+                            max={1000}
                             value={customQuantity}
                             onChange={(e) => setCustomQuantity(Number(e.target.value))}
                             className="w-20 h-9 px-3 text-xs border border-slate-300 rounded-xl text-slate-900 bg-white font-black text-center focus:ring-2 focus:ring-domu-blue focus:outline-none shadow-xs"
@@ -347,8 +366,8 @@ export default function CampaignWizardModal({
             {step === 2 && (
               <div className="space-y-5">
                 
-                {/* Meta Template Selector */}
-                <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                {/* Meta Template Selector (Clean Layout Without Outer Box Overlap) */}
+                <div className="space-y-1.5">
                   <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
                     Modelo de Template Meta Cloud API
                   </label>
@@ -362,11 +381,11 @@ export default function CampaignWizardModal({
                         setMessageBody('Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?');
                       }
                     }}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue"
+                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue shadow-xs"
                   >
                     {templates.map((tpl) => (
                       <option key={tpl.id} value={tpl.name}>
-                        {tpl.name} ({tpl.category}) - Aprovado
+                        {tpl.name} ({tpl.category}) - Aprovado Meta
                       </option>
                     ))}
                   </select>
@@ -413,7 +432,7 @@ export default function CampaignWizardModal({
                       {/* Column 2: Locked Variable Badge */}
                       <div className="col-span-5 space-y-1">
                         <label className="text-[11px] font-black text-slate-700 flex items-center gap-1">
-                          <span>Variável do Nome (Travada)</span>
+                          <span>Variável Protegida</span>
                           <Lock className="w-3 h-3 text-domu-blue" />
                         </label>
                         <div className="w-full h-10 px-3 bg-domu-blue text-white rounded-xl text-xs font-mono font-black flex items-center justify-center gap-2 shadow-xs select-none">
@@ -500,10 +519,17 @@ export default function CampaignWizardModal({
 
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-300/80 text-center">
+            <div className="mt-4 pt-3 border-t border-slate-300/80 text-center space-y-1">
               <p className="text-xs text-slate-700 font-medium">
                 Total estimado para envio: <strong className="text-slate-900 font-black">{targetCount} contatos</strong>
               </p>
+
+              {isMetaLimitReached && (
+                <p className="text-[10.5px] text-amber-700 font-extrabold bg-amber-100 p-1.5 rounded-lg border border-amber-200 flex items-center justify-center gap-1">
+                  <Lock className="w-3 h-3 text-amber-700" />
+                  <span>Trava Meta Cloud API (Tier 1): Cap de 1.000/dia ativado.</span>
+                </p>
+              )}
             </div>
           </div>
 
