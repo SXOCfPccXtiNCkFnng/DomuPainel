@@ -125,13 +125,35 @@ export default function OnboardingPage() {
     }, 1200);
   };
 
-  const handleFinishOnboarding = () => {
+  const handleFinishOnboarding = async () => {
     setIsProcessingPayment(true);
-    setTimeout(() => {
+    try {
+      const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
+
+      await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: storedTenantId,
+          segment: selectedSegment,
+          companyName,
+          whatsappPhone,
+          connectionType,
+          selectedPlan,
+          paymentMethod
+        })
+      });
+
+      localStorage.setItem('domu_is_onboarded', 'true');
+      localStorage.setItem('domu_selected_segment', selectedSegment);
+      setIsProcessingPayment(false);
+      router.push('/');
+    } catch (err) {
+      console.error('Erro ao salvar onboarding no Supabase:', err);
       localStorage.setItem('domu_is_onboarded', 'true');
       setIsProcessingPayment(false);
       router.push('/');
-    }, 1000);
+    }
   };
 
   return (
