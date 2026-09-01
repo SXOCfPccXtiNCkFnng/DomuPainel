@@ -14,10 +14,10 @@ export default function AssinaturaPage() {
             <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-domu-blue border border-blue-200">
               SaaS Multi-Tenant
             </span>
-            <span className="text-xs text-slate-500 font-medium">Gestão de Conta & Faturamento</span>
+            <span className="text-xs text-slate-500 font-medium">Gestão de Conta e Faturamento</span>
           </div>
           <h1 className="text-lg font-black text-slate-900 tracking-tight">
-            Assinatura & Planos do DOMU Tech
+            Assinatura e Planos do DOMU Tech
           </h1>
         </div>
 
@@ -36,7 +36,7 @@ export default function AssinaturaPage() {
             <span className="text-[10px] font-extrabold uppercase bg-domu-blue text-white px-2 py-0.5 rounded">
               SEU PLANO ATUAL
             </span>
-            <h2 className="text-xl font-black text-white mt-1.5">Plano Pro Imobiliário</h2>
+            <h2 className="text-xl font-black text-white mt-1.5">Plano Pro</h2>
             <p className="text-xs text-slate-300">Inclui Coexistência Celular + Web e Meta Cloud API Oficial</p>
           </div>
 
@@ -91,7 +91,7 @@ export default function AssinaturaPage() {
           <div className="bg-white rounded-md border border-slate-200/80 p-5 space-y-4 shadow-sm flex flex-col justify-between">
             <div className="space-y-3">
               <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Imobiliária Inicial</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Empresa Inicial</span>
                 <h4 className="text-base font-black text-slate-900">Plano Starter</h4>
                 <div className="mt-2">
                   <span className="text-2xl font-black text-slate-900">R$ 197</span>
@@ -129,7 +129,7 @@ export default function AssinaturaPage() {
             <div className="space-y-3 pt-1">
               <div>
                 <span className="text-[10px] font-bold text-domu-blue uppercase">Mais Popular</span>
-                <h4 className="text-base font-black text-slate-900">Plano Pro Imobiliário</h4>
+                <h4 className="text-base font-black text-slate-900">Plano Pro</h4>
                 <div className="mt-2">
                   <span className="text-2xl font-black text-slate-900">R$ 497</span>
                   <span className="text-xs text-slate-500"> / mês</span>

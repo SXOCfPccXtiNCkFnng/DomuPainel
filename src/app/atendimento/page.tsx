@@ -346,7 +346,7 @@ export default function AtendimentoPage() {
           {/* Profile Header */}
           <div className="pb-3 border-b border-slate-200 space-y-1">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              Perfil do Lead & CRM
+              Perfil do Lead e CRM
             </span>
             <h4 className="text-sm font-black text-slate-900">{activeLead.name}</h4>
             <p className="text-xs font-mono font-bold text-domu-blue">{activeLead.phone}</p>

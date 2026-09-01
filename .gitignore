@@ -28,3 +28,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# uploaded campaign images (local dev)
+/public/uploads/campaigns/**
+!/public/uploads/campaigns/.gitkeep

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
+import { isRealEstateSegment, getSegmentFromStorage } from '@/lib/segmentConfig';
 
 export default function AppLayoutGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,9 +39,16 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
     if (isLoggedIn && isOnboarded) {
       if (pathname === '/login' || pathname === '/onboarding' || pathname === '/cadastro') {
         router.push('/');
-      } else {
-        setIsAuthChecked(true);
+        return;
       }
+
+      const segment = getSegmentFromStorage();
+      if (pathname === '/imoveis' && !isRealEstateSegment(segment)) {
+        router.push('/');
+        return;
+      }
+
+      setIsAuthChecked(true);
       return;
     }
 

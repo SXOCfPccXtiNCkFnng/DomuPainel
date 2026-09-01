@@ -42,10 +42,10 @@ export default function ImoveisPage() {
             <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-domu-blue border border-blue-200">
               Setor Imobiliário
             </span>
-            <span className="text-xs text-slate-500 font-medium">Catálogo de Lançamentos & Automação de Leads</span>
+            <span className="text-xs text-slate-500 font-medium">Catálogo de Lançamentos e Automação de Leads</span>
           </div>
           <h1 className="text-lg font-black text-slate-900 tracking-tight">
-            Gestão de Imóveis & Automações de Alertas
+            Gestão de Imóveis e Automações de Alertas
           </h1>
         </div>
 

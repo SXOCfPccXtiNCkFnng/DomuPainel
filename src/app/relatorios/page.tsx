@@ -80,7 +80,7 @@ export default function RelatoriosPage() {
             <span className="text-xs text-slate-500 font-medium">Dados unificados do Banco de Dados</span>
           </div>
           <h1 className="text-lg font-black text-slate-900 tracking-tight">
-            Relatórios de Análise & Performance
+            Relatórios de Análise e Performance
           </h1>
         </div>
 

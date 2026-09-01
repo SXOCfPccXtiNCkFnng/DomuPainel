@@ -25,12 +25,12 @@ export default function ConfiguracoesPage() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-domu-blue/10 text-domu-blue border border-domu-blue/20">
-            Coexistência & API
+            Coexistência e API
           </span>
           <span className="text-xs text-slate-500 font-medium">Meta Cloud API v20.0</span>
         </div>
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-          Configuração da API Oficial & WhatsApp Coexistence
+          Configuração da API Oficial e WhatsApp Coexistence
         </h1>
       </div>
 

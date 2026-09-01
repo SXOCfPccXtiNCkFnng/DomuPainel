@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, FileCode, Plus, Sparkles, CheckCircle2, MessageSquare, Send } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Plus } from 'lucide-react';
 import { Template } from '@/types';
+import WhatsAppPreview, { renderTemplateVariables } from '@/components/shared/WhatsAppPreview';
 
 interface CriarTemplateModalProps {
   isOpen: boolean;
@@ -10,18 +11,28 @@ interface CriarTemplateModalProps {
   onAddTemplate: (newTpl: Template) => void;
 }
 
+const inputClass =
+  'w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30';
+
 export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: CriarTemplateModalProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<'MARKETING' | 'UTILITY'>('MARKETING');
-  const [bodyText, setBodyText] = useState('Olá {{nome}}! Acabamos de liberar unidades exclusivas no imóvel {{imovel}} em {{bairro}}. Gostaria de agendar uma visita presencial esta semana?');
-  const [variables, setVariables] = useState('nome, imovel, bairro');
+  const [bodyText, setBodyText] = useState('Olá {{nome}}! Temos uma novidade especial para você. Gostaria de saber mais detalhes?');
+  const [variables, setVariables] = useState('nome');
+  const [previewTestName, setPreviewTestName] = useState('Carlos Eduardo');
+  const [companyName, setCompanyName] = useState('Sua Empresa');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('domu_company_name');
+    if (saved) setCompanyName(saved);
+  }, []);
 
   if (!isOpen) return null;
 
   const handleInsertVariable = (varName: string) => {
-    setBodyText(prev => `${prev} {{${varName}}}`);
+    setBodyText((prev) => `${prev} {{${varName}}}`);
     if (!variables.includes(varName)) {
-      setVariables(prev => prev ? `${prev}, ${varName}` : varName);
+      setVariables((prev) => (prev ? `${prev}, ${varName}` : varName));
     }
   };
 
@@ -34,185 +45,136 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
       .replace(/\s+/g, '_')
       .replace(/[^a-z0-9_]/g, '');
 
-    const createdTemplate: Template = {
+    onAddTemplate({
       id: `tpl-${Date.now()}`,
       name: formattedName,
       category,
       language: 'pt_BR',
       status: 'APPROVED',
-      bodyText: bodyText,
-      variables: variables.split(',').map(v => v.trim()).filter(Boolean)
-    };
-
-    onAddTemplate(createdTemplate);
+      bodyText,
+      variables: variables.split(',').map((v) => v.trim()).filter(Boolean),
+    });
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-md border border-slate-200 shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-        
-        {/* Modal Header */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-domu-blue/10 text-domu-blue flex items-center justify-center border border-domu-blue/20">
-              <FileCode className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900">Criar Novo Template do WhatsApp</h3>
-              <p className="text-[11px] text-slate-500 font-medium">Monte sua própria mensagem com variáveis personalizadas</p>
-            </div>
-          </div>
+  const previewText = renderTemplateVariables(bodyText, {
+    nome: previewTestName,
+    produto: 'Oferta Especial',
+    valor: 'R$ 299,00',
+    empresa: companyName,
+  });
 
-          <button 
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+      <div className="bg-white border border-slate-200 shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Criar Template</h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Monte sua mensagem e visualize em tempo real</p>
+          </div>
+          <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Body & Preview Grid */}
-        <form onSubmit={handleSubmit} className="p-5 grid grid-cols-1 md:grid-cols-12 gap-5">
-          
-          {/* Left Form Controls (7 cols) */}
-          <div className="md:col-span-7 space-y-4">
-            
-            {/* Template Identifier Name */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">Nome Identificador do Template *</label>
-              <input 
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 min-h-0">
+
+          <div className="lg:col-span-7 p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-slate-100">
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">Nome do template</label>
+              <input
                 type="text"
                 required
-                placeholder="ex: lancamento_residencial_sul"
+                placeholder="ex: promocao_verao_2026"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-mono font-bold focus:outline-none focus:border-domu-blue"
+                className={`${inputClass} font-mono`}
               />
-              <p className="text-[10px] text-slate-400">Usado internamente pela Meta Cloud API (apenas letras minúsculas e underline)</p>
             </div>
 
-            {/* Category Selection */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">Categoria do Envio</label>
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">Categoria</label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as any)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold focus:outline-none focus:border-domu-blue"
+                onChange={(e) => setCategory(e.target.value as 'MARKETING' | 'UTILITY')}
+                className={inputClass}
               >
-                <option value="MARKETING">Marketing & Vendas (Lançamentos e Alertas)</option>
-                <option value="UTILITY">Utilidade (Lembrete de Visita / Notificações)</option>
+                <option value="MARKETING">Marketing</option>
+                <option value="UTILITY">Utilidade</option>
               </select>
             </div>
 
-            {/* Body Text Editor */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-700 block">Texto da Mensagem *</label>
-                <span className="text-[10px] text-slate-400">Variáveis: &#123;&#123;nome&#125;&#125;</span>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-semibold text-slate-600">Texto da mensagem</label>
+                <div className="flex gap-1">
+                  {['nome', 'produto', 'valor'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => handleInsertVariable(v)}
+                      className="px-1.5 py-0.5 text-[10px] font-semibold text-domu-blue hover:bg-blue-50 border border-slate-200"
+                    >
+                      +{`{{${v}}}`}
+                    </button>
+                  ))}
+                </div>
               </div>
-
-              {/* Variable Quick Insert Buttons */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] font-bold text-slate-400">Atalhos:</span>
-                <button
-                  type="button"
-                  onClick={() => handleInsertVariable('nome')}
-                  className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-domu-blue text-[10.5px] font-bold border border-blue-200 transition-colors"
-                >
-                  + &#123;&#123;nome&#125;&#125;
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleInsertVariable('imovel')}
-                  className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-domu-blue text-[10.5px] font-bold border border-blue-200 transition-colors"
-                >
-                  + &#123;&#123;imovel&#125;&#125;
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleInsertVariable('valor')}
-                  className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-domu-blue text-[10.5px] font-bold border border-blue-200 transition-colors"
-                >
-                  + &#123;&#123;valor&#125;&#125;
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleInsertVariable('bairro')}
-                  className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-domu-blue text-[10.5px] font-bold border border-blue-200 transition-colors"
-                >
-                  + &#123;&#123;bairro&#125;&#125;
-                </button>
-              </div>
-
-              <textarea 
-                rows={4}
+              <textarea
+                rows={5}
                 required
                 value={bodyText}
                 onChange={(e) => setBodyText(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-xs focus:outline-none focus:border-domu-blue font-medium leading-relaxed"
-              ></textarea>
+                className={`${inputClass} leading-relaxed`}
+              />
             </div>
 
-            {/* Actions */}
-            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">Nome de teste no preview</label>
+              <input
+                type="text"
+                value={previewTestName}
+                onChange={(e) => setPreviewTestName(e.target.value)}
+                placeholder="ex: Carlos Eduardo"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 Cancelar
               </button>
-              <button
-                type="submit"
-                className="btn-domu-primary text-xs py-1.5 px-4 shadow-sm"
-              >
+              <button type="submit" className="btn-domu-primary text-xs py-2 px-5">
                 <Plus className="w-3.5 h-3.5" />
-                <span>Salvar Template</span>
+                Salvar template
               </button>
             </div>
-
           </div>
 
-          {/* Right Live WhatsApp Card Preview (5 cols) */}
-          <div className="md:col-span-5 space-y-2">
-            <span className="text-[10px] font-extrabold uppercase text-slate-400 block">
-              Preview do WhatsApp em Tempo Real
-            </span>
-
-            <div className="bg-[#E5DDD5]/30 p-3.5 rounded-lg border border-slate-200 space-y-2 min-h-[260px] flex flex-col justify-center">
-              
-              <div className="bg-white rounded-lg p-3 shadow-xs border border-slate-200/80 space-y-1.5">
-                <span className="text-[9.5px] font-bold text-domu-blue block uppercase tracking-wider">
-                  Meta Cloud API Approved
-                </span>
-
-                <p className="text-xs text-slate-800 leading-relaxed font-medium">
-                  {bodyText
-                    .replace(/\{\{nome\}\}/g, 'Carlos Eduardo')
-                    .replace(/\{\{imovel\}\}/g, 'Horizon Tower')
-                    .replace(/\{\{valor\}\}/g, 'R$ 890.000')
-                    .replace(/\{\{bairro\}\}/g, 'Alto da Boa Vista')}
+          <div className="lg:col-span-5 p-6 bg-slate-50/80">
+            <WhatsAppPreview
+              bodyText={previewText}
+              contactName={companyName}
+              companyLabel="Atendimento Oficial"
+              buttonText={category === 'MARKETING' ? 'Saiba Mais' : undefined}
+              footer={
+                <p className="text-[11px] text-slate-500">
+                  O preview atualiza conforme você edita o texto.
                 </p>
-
-                <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 pt-1">
-                  <span>14:30</span>
-                  <CheckCircle2 className="w-3 h-3 text-domu-blue" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded p-2 text-center text-xs font-bold text-domu-blue border border-slate-200 cursor-pointer shadow-2xs">
-                Falar com Corretor
-              </div>
-
-            </div>
+              }
+            />
           </div>
 
         </form>
-
       </div>
     </div>
   );
