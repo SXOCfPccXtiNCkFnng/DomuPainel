@@ -10,7 +10,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
   const router = useRouter();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
-  const isAuthPage = pathname === '/login' || pathname === '/onboarding';
+  const isAuthPage = pathname === '/login' || pathname === '/onboarding' || pathname === '/cadastro';
 
   useEffect(() => {
     // Read state from localStorage
@@ -18,7 +18,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
     const isOnboarded = localStorage.getItem('domu_is_onboarded') === 'true';
 
     if (!isLoggedIn) {
-      if (pathname !== '/login') {
+      if (pathname !== '/login' && pathname !== '/cadastro') {
         router.push('/login');
       } else {
         setIsAuthChecked(true);
@@ -36,7 +36,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
     }
 
     if (isLoggedIn && isOnboarded) {
-      if (pathname === '/login' || pathname === '/onboarding') {
+      if (pathname === '/login' || pathname === '/onboarding' || pathname === '/cadastro') {
         router.push('/');
       } else {
         setIsAuthChecked(true);

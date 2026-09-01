@@ -4,23 +4,64 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('contato@domutech.digital');
-  const [password, setPassword] = useState('••••••••••••');
-  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage('');
+
+    if (!email || !password) {
+      setErrorMessage('Por favor, preencha o e-mail e a senha.');
+      return;
+    }
+
     setIsLoading(true);
-    
-    setTimeout(() => {
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'E-mail ou senha incorretos.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Save Auth State
       localStorage.setItem('domu_is_logged_in', 'true');
+      localStorage.setItem('domu_user_email', data.user.email);
+      localStorage.setItem('domu_user_name', data.user.name);
+      localStorage.setItem('domu_tenant_id', data.user.tenantId);
+
       setIsLoading(false);
-      router.push('/onboarding');
-    }, 600);
+
+      // Redirect to Onboarding or Dashboard
+      const isOnboarded = localStorage.getItem('domu_is_onboarded') === 'true';
+      if (isOnboarded) {
+        router.push('/');
+      } else {
+        router.push('/onboarding');
+      }
+
+    } catch (err: any) {
+      setErrorMessage('Erro ao conectar ao servidor. Tente novamente.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -58,8 +99,17 @@ export default function LoginPage() {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md z-10 px-4">
         <div className="bg-slate-900/90 py-8 px-6 shadow-2xl rounded-2xl border border-slate-800/80 backdrop-blur-md space-y-6">
           
+          {/* Error Alert */}
+          {errorMessage && (
+            <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
             
+            {/* E-mail Input (Empty by default, placeholder transparent) */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5">
                 E-mail Corporativo
@@ -74,11 +124,12 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-9 pr-3 py-2 border border-slate-700/80 rounded-lg bg-slate-950 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs font-medium"
-                  placeholder="seuemail@empresa.com"
+                  placeholder="seu.email@email.com"
                 />
               </div>
             </div>
 
+            {/* Password Input (Empty by default) */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-bold text-slate-300">
@@ -93,18 +144,32 @@ export default function LoginPage() {
                   <Lock className="h-4 w-4" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-9 pr-3 py-2 border border-slate-700/80 rounded-lg bg-slate-950 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs font-medium"
+                  className="block w-full pl-9 pr-10 py-2 border border-slate-700/80 rounded-lg bg-slate-950 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs font-medium"
+                  placeholder="Sua senha"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
+            {/* Checkbox "Lembrar meu acesso" (Unchecked by default) */}
             <div className="flex items-center justify-between text-xs pt-1">
               <label className="flex items-center gap-2 cursor-pointer text-slate-400">
-                <input type="checkbox" defaultChecked className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500" />
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500" 
+                />
                 <span>Lembrar meu acesso</span>
               </label>
             </div>
@@ -127,7 +192,7 @@ export default function LoginPage() {
 
           <div className="text-center text-xs text-slate-400 pt-2 border-t border-slate-800">
             Ainda não tem uma conta?{' '}
-            <Link href="/onboarding" className="font-extrabold text-blue-400 hover:text-blue-300">
+            <Link href="/cadastro" className="font-extrabold text-blue-400 hover:text-blue-300">
               Criar Conta Grátis
             </Link>
           </div>
