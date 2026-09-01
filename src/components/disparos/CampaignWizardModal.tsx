@@ -22,7 +22,7 @@ import {
   ArrowLeft,
   MoreVertical,
   Wifi,
-  Image as ImageIcon
+  ImageIcon
 } from 'lucide-react';
 
 interface CampaignWizardModalProps {
@@ -417,7 +417,7 @@ export default function CampaignWizardModal({
                   >
                     {templates.map((tpl) => (
                       <option key={tpl.id} value={tpl.name}>
-                        {tpl.name} ({tpl.category}) {tpl.header_type === 'IMAGE' ? '📷 COM IMAGEM' : ''} - Aprovado Meta
+                        {tpl.name} ({tpl.category}) {tpl.header_type === 'IMAGE' ? '[COM IMAGEM]' : ''} - Aprovado Meta
                       </option>
                     ))}
                   </select>
@@ -482,11 +482,11 @@ export default function CampaignWizardModal({
 
           </div>
 
-          {/* Right Realistic WhatsApp Phone Device Simulator (5 cols) */}
-          <div className="lg:col-span-5 bg-gradient-to-b from-slate-200 to-slate-300 p-4.5 rounded-3xl border border-slate-300 flex flex-col justify-between shadow-xl">
+          {/* Right Sleek WhatsApp Phone Device Simulator (5 cols) */}
+          <div className="lg:col-span-5 bg-gradient-to-b from-slate-100 to-slate-200/80 p-4 rounded-3xl border border-slate-300 flex flex-col justify-between shadow-inner">
             <div>
               
-              {/* Device Notch & Simulator Header */}
+              {/* Simulator Header */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-300 mb-3">
                 <span className="text-xs font-black text-slate-800 flex items-center gap-2">
                   <Eye className="w-4 h-4 text-domu-blue" />
@@ -498,7 +498,7 @@ export default function CampaignWizardModal({
                 </span>
               </div>
 
-              {/* Ultra Realistic WhatsApp Chat Bar Header */}
+              {/* Realistic WhatsApp Header Bar */}
               <div className="bg-[#075E54] rounded-t-2xl px-4 py-3 text-white flex items-center justify-between shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-emerald-800 border border-emerald-400/40 flex items-center justify-center text-xs font-black tracking-tight text-white shadow-xs">
@@ -509,21 +509,16 @@ export default function CampaignWizardModal({
                     <span className="text-[9.5px] text-emerald-200 font-medium">Atendimento Oficial • Online</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-white/80">
-                  <Smartphone className="w-4 h-4" />
-                </div>
+                <Smartphone className="w-4 h-4 text-white/80" />
               </div>
 
-              {/* Authentic WhatsApp Wallpaper & Chat Bubble */}
-              <div className="bg-[#E5DDD5] p-4 rounded-b-2xl border border-t-0 border-slate-300 shadow-inner min-h-[260px] flex flex-col justify-end">
-                <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-md max-w-[95%] space-y-2 border border-slate-200/90 relative">
+              {/* WhatsApp Message Bubble Card */}
+              <div className="bg-[#E5DDD5] p-3.5 rounded-b-2xl border border-t-0 border-slate-300 shadow-inner min-h-[250px] flex flex-col justify-end">
+                <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 overflow-hidden space-y-2">
                   
-                  {/* Little speech tail triangle */}
-                  <div className="absolute -top-2 -left-2 w-0 h-0 border-t-8 border-t-transparent border-r-8 border-r-white border-b-8 border-b-transparent"></div>
-
-                  {/* Render Image Banner inside Message Bubble if present */}
+                  {/* Seamless Image Banner if present */}
                   {hasImageHeader && (
-                    <div className="rounded-xl overflow-hidden border border-slate-200 h-36 bg-slate-100 shadow-xs relative">
+                    <div className="w-full h-36 bg-slate-100 relative overflow-hidden border-b border-slate-100">
                       <img 
                         src={campaignImageUrl || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80'} 
                         alt="Imagem da Campanha"
@@ -532,14 +527,17 @@ export default function CampaignWizardModal({
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans font-normal px-1">
-                    {getRenderedPreviewText()}
-                  </p>
+                  <div className="p-3 space-y-1.5">
+                    <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans font-normal">
+                      {getRenderedPreviewText()}
+                    </p>
 
-                  <div className="flex items-center justify-end gap-1 text-[9.5px] text-slate-400 pt-0.5 font-sans px-1">
-                    <span>14:32</span>
-                    <span className="text-blue-500 font-black tracking-tighter">✓✓</span>
+                    <div className="flex items-center justify-end gap-1 text-[9.5px] text-slate-400 pt-0.5 font-sans">
+                      <span>14:32</span>
+                      <span className="text-blue-500 font-black tracking-tighter">✓✓</span>
+                    </div>
                   </div>
+
                 </div>
               </div>
 

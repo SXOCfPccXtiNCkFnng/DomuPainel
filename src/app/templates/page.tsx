@@ -14,7 +14,10 @@ import {
   Sparkles,
   Info,
   X,
-  Image as ImageIcon
+  ImageIcon,
+  Eye,
+  Smartphone,
+  Lock
 } from 'lucide-react';
 
 export default function TemplatesPage() {
@@ -28,7 +31,8 @@ export default function TemplatesPage() {
   const [category, setCategory] = useState<'MARKETING' | 'UTILITY'>('MARKETING');
   const [headerType, setHeaderType] = useState<'NONE' | 'IMAGE'>('NONE');
   const [headerContent, setHeaderContent] = useState('https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80');
-  const [bodyText, setBodyText] = useState('');
+  const [bodyText, setBodyText] = useState('Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa. Podemos conversar?');
+  const [previewTestName, setPreviewTestName] = useState('Carlos Eduardo');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -76,7 +80,7 @@ export default function TemplatesPage() {
       if (json.success) {
         setIsModalOpen(false);
         setName('');
-        setBodyText('');
+        setBodyText('Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa. Podemos conversar?');
         setHeaderType('NONE');
         fetchTemplates();
       }
@@ -85,6 +89,14 @@ export default function TemplatesPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getLivePreviewText = () => {
+    if (!bodyText.trim()) return 'Digite o texto da mensagem no formulário para visualizar o resultado...';
+    let text = bodyText;
+    text = text.replace(/\{\{nome\}\}/g, previewTestName || 'Cliente');
+    text = text.replace(/\{\{horario\}\}/g, '15:00');
+    return text;
   };
 
   const renderStatusBadge = (status: string) => {
@@ -154,7 +166,7 @@ export default function TemplatesPage() {
         <div className="space-y-1">
           <h4 className="font-extrabold text-slate-900">Regras Oficiais da Meta Cloud API (HSM)</h4>
           <p className="text-[11.5px] leading-relaxed text-slate-600">
-            Para garantir a entrega de disparos no WhatsApp sem bloqueios, a Meta exige que toda mensagem iniciada pela empresa utilize um <strong>Template HSM pré-aprovado</strong> nas categorias <em>MARKETING</em> ou <em>UTILITY</em>. Você pode cadastrar modelos com <strong>Imagem de Destaque 📷</strong> ou apenas texto. Variáveis são marcadas entre chaves duplas como <code className="font-mono text-domu-blue bg-white px-1.5 py-0.5 rounded border border-blue-200">{"{{nome}}"}</code>.
+            Para garantir a entrega de disparos no WhatsApp sem bloqueios, a Meta exige que toda mensagem iniciada pela empresa utilize um <strong>Template HSM pré-aprovado</strong> nas categorias <em>MARKETING</em> ou <em>UTILITY</em>. Você pode cadastrar modelos com Imagem de Destaque ou apenas texto. Variáveis são marcadas entre chaves duplas como <code className="font-mono text-domu-blue bg-white px-1.5 py-0.5 rounded border border-blue-200">{"{{nome}}"}</code>.
           </p>
         </div>
       </div>
@@ -200,10 +212,6 @@ export default function TemplatesPage() {
                       alt="Template Preview Image"
                       className="w-full h-full object-cover"
                     />
-                    <span className="absolute bottom-1.5 right-1.5 px-2 py-0.5 bg-slate-900/80 text-white text-[9px] font-bold rounded-md backdrop-blur-xs flex items-center gap-1">
-                      <ImageIcon className="w-2.5 h-2.5" />
-                      Banner Imagem
-                    </span>
                   </div>
                 )}
 
@@ -232,15 +240,15 @@ export default function TemplatesPage() {
         })}
       </div>
 
-      {/* Modal: Criar Novo Template Meta */}
+      {/* Modal: Criar Novo Template Meta com Live WhatsApp Preview de 2 Colunas */}
       {isModalOpen && mounted && createPortal(
         <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-7 shadow-2xl border border-slate-200 space-y-5">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-7 shadow-2xl border border-slate-200 space-y-5 max-h-[92vh] flex flex-col overflow-hidden">
             
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-base font-black text-slate-900">Novo Template HSM para Aprovação Meta</h3>
-                <p className="text-xs text-slate-500">Cadastre um modelo oficial para disparos em massa</p>
+                <p className="text-xs text-slate-500">Cadastre o modelo e veja a simulação ao vivo antes de enviar para aprovação</p>
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)} 
@@ -250,103 +258,186 @@ export default function TemplatesPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTemplate} className="space-y-4">
+            {/* 2-Column Grid: Form Inputs (Left) & Real-Time WhatsApp Live Preview (Right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 overflow-y-auto flex-1 p-1">
               
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Nome do Template (sem espaços, ex: aviso_promocao)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ex: lancamento_promocao_especial"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              {/* Left Column: Form Fields (7 cols) */}
+              <form onSubmit={handleCreateTemplate} id="create-tpl-form" className="lg:col-span-7 space-y-4">
+                
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Categoria Meta</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
-                  >
-                    <option value="MARKETING">MARKETING (Ofertas)</option>
-                    <option value="UTILITY">UTILITY (Atendimento)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Formato do Cabeçalho</label>
-                  <select
-                    value={headerType}
-                    onChange={(e) => setHeaderType(e.target.value as any)}
-                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
-                  >
-                    <option value="NONE">Apenas Texto</option>
-                    <option value="IMAGE">📷 Imagem (Banner/Foto)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Conditional Image URL Input */}
-              {headerType === 'IMAGE' && (
-                <div className="space-y-1.5 p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl animate-in fade-in duration-150">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-domu-blue" />
-                    <span>URL da Imagem de Exemplo (Foto do Lançamento/Banner)</span>
-                  </label>
+                  <label className="text-xs font-bold text-slate-700">Nome do Template (sem espaços, ex: aviso_promocao)</label>
                   <input
-                    type="url"
+                    type="text"
                     required
-                    value={headerContent}
-                    onChange={(e) => setHeaderContent(e.target.value)}
-                    placeholder="https://suaempresa.com/banner.jpg"
-                    className="w-full p-2.5 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-mono"
+                    placeholder="ex: lancamento_promocao_especial"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white"
                   />
-                  <p className="text-[11px] text-slate-500">
-                    Insira o link direto da imagem JPG/PNG do seu anúncio ou banner promocional.
-                  </p>
                 </div>
-              )}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Texto da Mensagem (use {"{{nome}}"} para personalizar)</label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa."
-                  value={bodyText}
-                  onChange={(e) => setBodyText(e.target.value)}
-                  className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white"
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Categoria Meta</label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value as any)}
+                      className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
+                    >
+                      <option value="MARKETING">MARKETING (Ofertas)</option>
+                      <option value="UTILITY">UTILITY (Atendimento)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Formato do Cabeçalho</label>
+                    <select
+                      value={headerType}
+                      onChange={(e) => setHeaderType(e.target.value as any)}
+                      className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white font-bold"
+                    >
+                      <option value="NONE">Apenas Texto</option>
+                      <option value="IMAGE">Imagem de Destaque (Banner)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Conditional Image URL Input */}
+                {headerType === 'IMAGE' && (
+                  <div className="space-y-1.5 p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl animate-in fade-in duration-150">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-domu-blue" />
+                      <span>URL da Imagem de Exemplo (Foto do Lançamento/Banner)</span>
+                    </label>
+                    <input
+                      type="url"
+                      required
+                      value={headerContent}
+                      onChange={(e) => setHeaderContent(e.target.value)}
+                      placeholder="https://suaempresa.com/banner.jpg"
+                      className="w-full p-2.5 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Insira o link direto da imagem JPG/PNG do seu anúncio ou banner promocional.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Texto da Mensagem (use {"{{nome}}"} para personalizar)</label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa."
+                    value={bodyText}
+                    onChange={(e) => setBodyText(e.target.value)}
+                    className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Nome de Teste p/ Preview ao Vivo</label>
+                  <input
+                    type="text"
+                    value={previewTestName}
+                    onChange={(e) => setPreviewTestName(e.target.value)}
+                    placeholder="ex: Carlos Eduardo"
+                    className="w-full p-2.5 text-xs border border-slate-300 rounded-xl bg-white text-slate-900 font-bold"
+                  />
+                </div>
+
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900">
+                  📌 Ao clicar em salvar, o modelo é registrado na sua conta e disponibilizado para aprovação da Meta.
+                </div>
+
+              </form>
+
+              {/* Right Column: Live Real-Time WhatsApp Device Simulator (5 cols) */}
+              <div className="lg:col-span-5 bg-gradient-to-b from-slate-100 to-slate-200/80 p-4 rounded-3xl border border-slate-300 flex flex-col justify-between shadow-inner">
+                <div>
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-300 mb-3">
+                    <span className="text-xs font-black text-slate-800 flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-domu-blue" />
+                      Preview no WhatsApp (Ao Vivo)
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Simulação Real
+                    </span>
+                  </div>
+
+                  {/* Realistic WhatsApp Chat Device Bar */}
+                  <div className="bg-[#075E54] rounded-t-2xl px-4 py-3 text-white flex items-center justify-between shadow-md">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-emerald-800 border border-emerald-400/40 flex items-center justify-center text-xs font-black tracking-tight text-white shadow-xs">
+                        DOMU
+                      </div>
+                      <div>
+                        <h5 className="text-[12px] font-bold leading-none text-white">DOMU Bot</h5>
+                        <span className="text-[9.5px] text-emerald-200 font-medium">Atendimento Oficial • Online</span>
+                      </div>
+                    </div>
+                    <Smartphone className="w-4 h-4 text-white/80" />
+                  </div>
+
+                  {/* Authentic WhatsApp Message Box Body */}
+                  <div className="bg-[#E5DDD5] p-3.5 rounded-b-2xl border border-t-0 border-slate-300 shadow-inner min-h-[240px] flex flex-col justify-end">
+                    <div className="bg-white rounded-2xl shadow-md border border-slate-200/80 overflow-hidden space-y-2">
+                      
+                      {/* Live Image Banner if IMAGE Header selected */}
+                      {headerType === 'IMAGE' && (
+                        <div className="w-full h-36 bg-slate-100 relative overflow-hidden border-b border-slate-100">
+                          <img 
+                            src={headerContent || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80'} 
+                            alt="Preview do Banner"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+
+                      <div className="p-3 space-y-1.5">
+                        <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans">
+                          {getLivePreviewText()}
+                        </p>
+
+                        <div className="flex items-center justify-end gap-1 text-[9.5px] text-slate-400 pt-0.5 font-sans">
+                          <span>14:32</span>
+                          <span className="text-blue-500 font-black tracking-tighter">✓✓</span>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+                <p className="text-[11px] text-slate-500 text-center pt-2">
+                  Esta simulação mostra como seu cliente visualizará a mensagem oficial no aplicativo do WhatsApp.
+                </p>
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900">
-                📌 Ao clicar em salvar, o modelo é registrado na sua conta e disponibilizado para aprovação da Meta.
-              </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
+            {/* Modal Footer Controls */}
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="btn-domu-primary text-xs py-2.5 px-5 flex items-center gap-1.5 shadow-xs"
-                >
-                  {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                  <span>Salvar Template</span>
-                </button>
-              </div>
-
-            </form>
+              <button
+                type="submit"
+                form="create-tpl-form"
+                disabled={isSubmitting}
+                className="btn-domu-primary text-xs py-2.5 px-6 flex items-center gap-1.5 shadow-xs"
+              >
+                {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                <span>Enviar para Aprovação Meta</span>
+              </button>
+            </div>
 
           </div>
         </div>,
