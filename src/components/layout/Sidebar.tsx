@@ -46,8 +46,8 @@ export default function Sidebar() {
     { name: 'Imóveis & Leads', href: '/imoveis', icon: Building2, badge: 'Em Breve', isComingSoon: true }
   ];
 
-  const adminNav = [
-    { name: 'Relatórios de Análise', href: '/relatorios', icon: BarChart3, badge: 'Em Breve', isComingSoon: true },
+  const adminNav: { name: string; href: string; icon: any; badge?: string; isComingSoon: boolean }[] = [
+    { name: 'Relatórios de Análise', href: '/relatorios', icon: BarChart3, isComingSoon: false },
     { name: 'Configurações', href: '/configuracoes', icon: Settings, isComingSoon: false },
     { name: 'Assinatura & Planos', href: '/assinatura', icon: CreditCard, isComingSoon: false }
   ];

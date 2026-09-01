@@ -25,8 +25,8 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
   const [notifications, setNotifications] = useState([
     {
       id: '1',
-      title: 'Banco Supabase Conectado',
-      message: 'Sua conta e empresa estão sincronizadas com o banco de dados.',
+      title: 'Bem-vindo ao Portal DOMU Tech',
+      message: 'Sua empresa e conta foram ativadas com sucesso.',
       time: 'Agora',
       type: 'SUCCESS',
       read: false
