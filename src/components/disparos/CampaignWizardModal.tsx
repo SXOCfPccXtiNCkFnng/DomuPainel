@@ -10,7 +10,14 @@ import {
   UserPlus, 
   FileText, 
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  Sparkles,
+  Sliders,
+  Check,
+  Smartphone,
+  ShieldCheck,
+  MessageSquare
 } from 'lucide-react';
 
 interface CampaignWizardModalProps {
@@ -28,7 +35,7 @@ export default function CampaignWizardModal({
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('Nova Campanha de Envios');
   
-  // Contacts & Audience State
+  // Contacts State
   const [contacts, setContacts] = useState<any[]>([]);
   const [selectedSendMode, setSelectedSendMode] = useState<'ALL' | 'CUSTOM'>('ALL');
   const [customQuantity, setCustomQuantity] = useState<number>(50);
@@ -36,11 +43,12 @@ export default function CampaignWizardModal({
   const [pastedContacts, setPastedContacts] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
-  // Template & Custom Message State
+  // Template & Locked Variable Message State
   const [templates, setTemplates] = useState<any[]>([]);
-  const [selectedTemplateName, setSelectedTemplateName] = useState('aviso_promocao');
-  const [customMessage, setCustomMessage] = useState('Olá {{nome}}! Temos uma super oferta e novidades para você hoje. Gostaria de saber mais?');
-  const [variableName, setVariableName] = useState('Cliente');
+  const [selectedTemplateName, setSelectedTemplateName] = useState('aviso_oferta_promocional');
+  const [messageGreeting, setMessageGreeting] = useState('Olá');
+  const [messageBody, setMessageBody] = useState('! Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?');
+  const [variableTestName, setVariableTestName] = useState('Cliente');
 
   useEffect(() => {
     if (isOpen) {
@@ -69,10 +77,6 @@ export default function CampaignWizardModal({
       const json = await res.json();
       if (json.success && json.templates) {
         setTemplates(json.templates);
-        if (json.templates.length > 0) {
-          setSelectedTemplateName(json.templates[0].name);
-          setCustomMessage(json.templates[0].body_text);
-        }
       }
     } catch (err) {
       console.error('Erro ao carregar templates:', err);
@@ -116,7 +120,7 @@ export default function CampaignWizardModal({
         if (json.success) {
           setPastedContacts('');
           setShowImportBox(false);
-          fetchLeads(); // Reload leads from Supabase!
+          fetchLeads();
         }
       }
     } catch (err) {
@@ -130,8 +134,13 @@ export default function CampaignWizardModal({
 
   const targetCount = selectedSendMode === 'ALL' ? (contacts.length || 100) : Math.min(customQuantity, contacts.length || 100);
 
+  // Constructs full message guaranteed to preserve locked {{nome}}
+  const getFullMessageTemplate = () => {
+    return `${messageGreeting} {{nome}}${messageBody}`;
+  };
+
   const getRenderedPreviewText = () => {
-    return customMessage.replace(/\{\{nome\}\}/g, variableName || 'Cliente');
+    return `${messageGreeting} ${variableTestName || 'Cliente'}${messageBody}`;
   };
 
   const handleFinishAndStart = () => {
@@ -140,159 +149,192 @@ export default function CampaignWizardModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 font-sans animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
         
-        {/* Modal Header */}
-        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-domu-blue text-white flex items-center justify-center shadow-xs">
+        {/* Modal Premium Header */}
+        <div className="px-7 py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Send className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-900">Assistente de Disparo em Massa</h3>
-              <p className="text-xs text-slate-500">Configure os destinatários e o modelo de disparo</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black tracking-tight text-white">Assistente de Disparo em Massa</h3>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                  Meta Cloud API
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Selecione o lote de contatos e personalize sua mensagem</p>
             </div>
           </div>
 
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+            className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 2 Steps Indicator Bar */}
-        <div className="px-6 py-3 bg-slate-900 text-white flex items-center justify-center gap-6 text-xs font-bold border-b border-slate-800">
-          <div className={`flex items-center gap-2 ${step === 1 ? 'text-domu-blue' : 'text-slate-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-black ${step === 1 ? 'bg-domu-blue text-white' : 'bg-slate-800'}`}>1</span>
-            <span>Destinatários & Contatos</span>
+        {/* 2-Step Interactive Visual Stepper */}
+        <div className="px-8 py-3.5 bg-slate-100 border-b border-slate-200/80 flex items-center justify-center gap-8 text-xs font-bold">
+          
+          <div className={`flex items-center gap-2.5 transition-all ${step === 1 ? 'text-domu-blue font-extrabold' : 'text-slate-500'}`}>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+              step === 1 ? 'bg-domu-blue text-white shadow-md shadow-blue-500/30' : 'bg-slate-300 text-slate-700'
+            }`}>
+              1
+            </div>
+            <span className="text-sm">Destinatários & Contatos</span>
           </div>
 
-          <div className="w-12 h-0.5 bg-slate-800"></div>
+          <div className="w-16 h-0.5 bg-slate-300 rounded-full"></div>
 
-          <div className={`flex items-center gap-2 ${step === 2 ? 'text-domu-blue' : 'text-slate-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-black ${step === 2 ? 'bg-domu-blue text-white' : 'bg-slate-800'}`}>2</span>
-            <span>Mensagem & Preview</span>
+          <div className={`flex items-center gap-2.5 transition-all ${step === 2 ? 'text-domu-blue font-extrabold' : 'text-slate-500'}`}>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+              step === 2 ? 'bg-domu-blue text-white shadow-md shadow-blue-500/30' : 'bg-slate-300 text-slate-700'
+            }`}>
+              2
+            </div>
+            <span className="text-sm">Mensagem & Preview</span>
           </div>
+
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Modal Content Body */}
+        <div className="p-7 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-7 bg-slate-50/50">
           
           {/* Left Controls (7 cols) */}
           <div className="lg:col-span-7 space-y-5">
             
-            {/* Step 1: Destinatários & Contatos */}
+            {/* STEP 1: Destinatários & Contatos */}
             {step === 1 && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Título da Campanha</label>
+                {/* Campaign Title Input */}
+                <div className="space-y-1.5 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                    Nome Identificador da Campanha
+                  </label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="ex: Campanha de Lançamento"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue"
+                    placeholder="ex: Campanha de Ofertas - Setembro"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue focus:bg-white transition-all"
                   />
                 </div>
 
-                {/* Contacts Selection */}
-                <div className="space-y-2">
+                {/* Selection Mode Card */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-700">Seleção de Destinatários</label>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                        Seleção de Destinatários
+                      </h4>
+                      <p className="text-[11px] text-slate-500">Escolha como selecionar a lista de telefones</p>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => setShowImportBox(!showImportBox)}
-                      className="text-xs font-bold text-domu-blue hover:underline flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-1.5 bg-blue-50 text-domu-blue font-bold rounded-lg text-xs hover:bg-blue-100 flex items-center gap-1.5 transition-colors cursor-pointer border border-blue-200"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
-                      <span>{showImportBox ? 'Fechar Importador' : '+ Importar / Digitar Contatos'}</span>
+                      <span>{showImportBox ? 'Fechar Importador' : '+ Importar Lista'}</span>
                     </button>
                   </div>
 
-                  {/* Inline Import Box */}
+                  {/* Inline Contact Importer */}
                   {showImportBox && (
-                    <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 space-y-2 animate-in fade-in duration-150">
-                      <label className="text-[11px] font-bold text-slate-800 block">Cole os contatos (Um por linha: Nome, Telefone)</label>
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50/60 rounded-xl border border-blue-200 space-y-3 animate-in fade-in duration-150">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                        <span>Cole ou digite os contatos (Um por linha: Nome, Telefone)</span>
+                      </div>
                       <textarea
                         rows={3}
-                        placeholder={`Carlos, 11999998888\nMariana, 11988887777`}
+                        placeholder={`Carlos Silva, 11999998888\nMariana Souza, 11988887777`}
                         value={pastedContacts}
                         onChange={(e) => setPastedContacts(e.target.value)}
-                        className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white font-mono text-slate-900"
+                        className="w-full p-3 text-xs border border-slate-300 rounded-xl bg-white font-mono text-slate-900 focus:ring-2 focus:ring-domu-blue focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleImportPastedContacts}
                         disabled={isImporting}
-                        className="btn-domu-primary text-xs py-1.5 px-3 w-full justify-center"
+                        className="btn-domu-primary text-xs py-2 px-4 w-full justify-center shadow-sm"
                       >
-                        {isImporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
-                        <span>Salvar no Banco e Usar nos Disparos</span>
+                        {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                        <span>Salvar no Supabase e Usar nos Disparos</span>
                       </button>
                     </div>
                   )}
 
-                  {/* Mode Options */}
-                  <div className="space-y-2">
-                    <label 
+                  {/* Sending Mode Options */}
+                  <div className="space-y-3 pt-1">
+                    
+                    {/* Option 1: All saved contacts */}
+                    <div 
                       onClick={() => setSelectedSendMode('ALL')}
-                      className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                        selectedSendMode === 'ALL' ? 'border-domu-blue bg-blue-50/50 ring-1 ring-domu-blue' : 'border-slate-200 bg-white'
+                      className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                        selectedSendMode === 'ALL' 
+                          ? 'border-domu-blue bg-blue-50/70 ring-2 ring-domu-blue/20 shadow-xs' 
+                          : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="radio" 
-                          name="sendMode" 
-                          checked={selectedSendMode === 'ALL'} 
-                          onChange={() => setSelectedSendMode('ALL')}
-                          className="text-domu-blue focus:ring-domu-blue"
-                        />
+                      <div className="flex items-center gap-3.5">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          selectedSendMode === 'ALL' ? 'border-domu-blue bg-domu-blue text-white' : 'border-slate-300 bg-white'
+                        }`}>
+                          {selectedSendMode === 'ALL' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-900">Enviar para Todos os Contatos Salvos</p>
-                          <p className="text-[11px] text-slate-500">Base total armazenada no Supabase</p>
+                          <p className="text-xs font-black text-slate-900">Enviar para Todos os Contatos Salvos</p>
+                          <p className="text-[11px] text-slate-500">Base armazenada com segurança no Supabase</p>
                         </div>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-domu-blue text-white">
+                      <span className="px-3 py-1 rounded-full text-xs font-black bg-domu-blue text-white shadow-xs">
                         {contacts.length > 0 ? `${contacts.length} Contatos` : 'Todos'}
                       </span>
-                    </label>
+                    </div>
 
-                    <label 
+                    {/* Option 2: Custom batch size */}
+                    <div 
                       onClick={() => setSelectedSendMode('CUSTOM')}
-                      className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                        selectedSendMode === 'CUSTOM' ? 'border-domu-blue bg-blue-50/50 ring-1 ring-domu-blue' : 'border-slate-200 bg-white'
+                      className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                        selectedSendMode === 'CUSTOM' 
+                          ? 'border-domu-blue bg-blue-50/70 ring-2 ring-domu-blue/20 shadow-xs' 
+                          : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="radio" 
-                          name="sendMode" 
-                          checked={selectedSendMode === 'CUSTOM'} 
-                          onChange={() => setSelectedSendMode('CUSTOM')}
-                          className="text-domu-blue focus:ring-domu-blue"
-                        />
+                      <div className="flex items-center gap-3.5">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          selectedSendMode === 'CUSTOM' ? 'border-domu-blue bg-domu-blue text-white' : 'border-slate-300 bg-white'
+                        }`}>
+                          {selectedSendMode === 'CUSTOM' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-900">Especificar Lote / Quantidade Personalizada</p>
-                          <p className="text-[11px] text-slate-500">Defina o limite de envio para este lote</p>
+                          <p className="text-xs font-black text-slate-900">Especificar Lote / Quantidade Personalizada</p>
+                          <p className="text-[11px] text-slate-500">Limite a quantidade de disparos para este envio</p>
                         </div>
                       </div>
                       
                       {selectedSendMode === 'CUSTOM' ? (
-                        <input
-                          type="number"
-                          value={customQuantity}
-                          onChange={(e) => setCustomQuantity(Number(e.target.value))}
-                          className="w-20 px-2 py-1 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white font-bold text-center"
-                        />
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            value={customQuantity}
+                            onChange={(e) => setCustomQuantity(Number(e.target.value))}
+                            className="w-20 px-3 py-1.5 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white font-bold text-center focus:ring-2 focus:ring-domu-blue focus:outline-none"
+                          />
+                          <span className="text-xs text-slate-500 font-bold">contatos</span>
+                        </div>
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-700">Lote</span>
+                        <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-slate-100 text-slate-700">Lote</span>
                       )}
-                    </label>
+                    </div>
+
                   </div>
 
                 </div>
@@ -300,47 +342,104 @@ export default function CampaignWizardModal({
               </div>
             )}
 
-            {/* Step 2: Mensagem & Preview */}
+            {/* STEP 2: Mensagem & Preview */}
             {step === 2 && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Selecione um Template Meta Aprovado</label>
+                {/* Meta Template Selector */}
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                    Modelo de Template Meta Cloud API
+                  </label>
                   <select
                     value={selectedTemplateName}
                     onChange={(e) => {
                       setSelectedTemplateName(e.target.value);
                       const t = templates.find(item => item.name === e.target.value);
-                      if (t) setCustomMessage(t.body_text);
+                      if (t) {
+                        // Keep greeting, update body
+                        setMessageGreeting('Olá');
+                        setMessageBody('! Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?');
+                      }
                     }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue"
                   >
                     {templates.map((tpl) => (
                       <option key={tpl.id} value={tpl.name}>
-                        {tpl.name} ({tpl.category})
+                        {tpl.name} ({tpl.category}) - Aprovado
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Texto da Mensagem (com variáveis)</label>
-                  <textarea
-                    rows={4}
-                    value={customMessage}
-                    onChange={(e) => setCustomMessage(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue"
-                  />
-                </div>
+                {/* Locked Variable Text Editor Card */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <MessageSquare className="w-4 h-4 text-domu-blue" />
+                      Personalização da Mensagem
+                    </h4>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-domu-blue border border-blue-200 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-domu-blue" />
+                      Variável {"{{nome}}"} Protegida
+                    </span>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Exemplo de Nome para Teste de Preview</label>
-                  <input
-                    type="text"
-                    value={variableName}
-                    onChange={(e) => setVariableName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900"
-                  />
+                  {/* Visual Locked Variable Banner */}
+                  <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-200/90 text-xs text-slate-700 flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded-lg bg-domu-blue text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Lock className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-[11.5px] leading-relaxed">
+                      A variável <span className="font-extrabold font-mono text-domu-blue bg-white px-2 py-0.5 rounded border border-blue-300">{"{{nome}}"}</span> está <strong>travada e protegida</strong>. O sistema substituirá automaticamente pelo nome de cada cliente durante o envio.
+                    </p>
+                  </div>
+
+                  {/* Structured Editor preserving {{nome}} */}
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-12 gap-2.5 items-center">
+                      <div className="col-span-3">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Saudação</label>
+                        <input
+                          type="text"
+                          value={messageGreeting}
+                          onChange={(e) => setMessageGreeting(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                        />
+                      </div>
+
+                      {/* Locked Badge Pill */}
+                      <div className="col-span-4 flex flex-col justify-center">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Variável do Nome (Travada)</label>
+                        <div className="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1.5 shadow-sm select-none">
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>{"{{nome}}"}</span>
+                        </div>
+                      </div>
+
+                      <div className="col-span-5">
+                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Teste de Preview</label>
+                        <input
+                          type="text"
+                          value={variableTestName}
+                          onChange={(e) => setVariableTestName(e.target.value)}
+                          placeholder="ex: Carlos"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 block">Texto Complementar da Mensagem</label>
+                      <textarea
+                        rows={3}
+                        value={messageBody}
+                        onChange={(e) => setMessageBody(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-domu-blue focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
                 </div>
 
               </div>
@@ -348,36 +447,54 @@ export default function CampaignWizardModal({
 
           </div>
 
-          {/* Right Live WhatsApp Preview Bubble (5 cols) */}
-          <div className="lg:col-span-5 bg-slate-100 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+          {/* Right WhatsApp Real Preview Simulator (5 cols) */}
+          <div className="lg:col-span-5 bg-gradient-to-b from-slate-100 to-slate-200/60 p-5 rounded-2xl border border-slate-300/80 flex flex-col justify-between shadow-inner">
             <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
-                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              
+              {/* Simulator Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-300/80 mb-3">
+                <span className="text-xs font-black text-slate-800 flex items-center gap-2">
                   <Eye className="w-4 h-4 text-domu-blue" />
-                  Preview no WhatsApp
+                  Preview do WhatsApp
                 </span>
-                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                  Visualização Real
+                <span className="text-[10px] text-emerald-700 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Simulação Real
                 </span>
               </div>
 
-              {/* WhatsApp Message Bubble */}
-              <div className="bg-[#E5DDD5] p-3 rounded-xl border border-slate-300 shadow-inner min-h-[200px] flex flex-col justify-end">
-                <div className="bg-white p-3.5 rounded-xl rounded-tl-none shadow-xs max-w-[90%] space-y-1">
-                  <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
+              {/* Realistic WhatsApp Chat Device Frame */}
+              <div className="bg-[#075E54] rounded-t-xl px-3 py-2 text-white flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-black">
+                    DOMU
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-bold leading-none">DOMU Bot</h5>
+                    <span className="text-[8.5px] text-emerald-200">Online</span>
+                  </div>
+                </div>
+                <Smartphone className="w-4 h-4 text-white/80" />
+              </div>
+
+              <div className="bg-[#E5DDD5] p-4 rounded-b-xl border border-t-0 border-slate-300 shadow-inner min-h-[220px] flex flex-col justify-end">
+                {/* Outbound Message Bubble */}
+                <div className="bg-white p-3.5 rounded-2xl rounded-tl-none shadow-md max-w-[92%] space-y-1.5 border border-slate-200">
+                  <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans">
                     {getRenderedPreviewText()}
                   </p>
-                  <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 mt-1">
+                  <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400">
                     <span>14:32</span>
-                    <span className="text-blue-500">✓✓</span>
+                    <span className="text-blue-500 font-black">✓✓</span>
                   </div>
                 </div>
               </div>
+
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-slate-200 text-center">
-              <p className="text-[11px] text-slate-600">
-                Total estimado para este lote: <strong className="text-slate-900">{targetCount} contatos</strong>
+            <div className="mt-4 pt-3 border-t border-slate-300/80 text-center">
+              <p className="text-xs text-slate-700 font-medium">
+                Total estimado para envio: <strong className="text-slate-900 font-black">{targetCount} contatos</strong>
               </p>
             </div>
           </div>
@@ -385,11 +502,11 @@ export default function CampaignWizardModal({
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <div className="px-7 py-4 bg-white border-t border-slate-200 flex items-center justify-between">
           <button
             onClick={() => setStep(Math.max(1, step - 1))}
             disabled={step === 1}
-            className="px-4 py-2 rounded-lg text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 transition-colors cursor-pointer"
+            className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 transition-colors cursor-pointer"
           >
             Voltar
           </button>
@@ -397,7 +514,7 @@ export default function CampaignWizardModal({
           {step === 1 ? (
             <button
               onClick={() => setStep(2)}
-              className="btn-domu-primary text-xs py-2 px-4"
+              className="btn-domu-primary text-xs py-2.5 px-6 shadow-md shadow-blue-500/20"
             >
               <span>Próximo Passo (Mensagem)</span>
               <ChevronRight className="w-4 h-4" />
@@ -405,7 +522,7 @@ export default function CampaignWizardModal({
           ) : (
             <button
               onClick={handleFinishAndStart}
-              className="btn-domu-primary text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-700"
+              className="btn-domu-primary text-xs py-2.5 px-6 bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-500/20 flex items-center gap-2"
             >
               <Send className="w-4 h-4" />
               <span>Disparar Mensagens Agora</span>
