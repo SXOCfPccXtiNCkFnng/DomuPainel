@@ -57,9 +57,6 @@ export default function AuthShell({ title, subtitle, children, footer }: AuthShe
 
         <div className="relative z-10 space-y-8 max-w-md">
           <div className="space-y-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-400">
-              Portal SaaS · Domu Tech
-            </p>
             <h1 className="text-3xl xl:text-[2rem] font-bold leading-tight tracking-tight">
               Tecnologia que{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-200">

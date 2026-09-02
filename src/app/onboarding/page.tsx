@@ -1469,7 +1469,7 @@ export default function OnboardingPage() {
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Termos de Uso e Privacidade</h3>
-                <p className="text-sm text-slate-500">Domu Tech · Portal SaaS</p>
+                <p className="text-sm text-slate-500">Domu Tech</p>
               </div>
               <button
                 type="button"
