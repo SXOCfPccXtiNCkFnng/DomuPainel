@@ -56,10 +56,14 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
     const savedName = localStorage.getItem('domu_user_name');
     const savedEmail = localStorage.getItem('domu_user_email');
     const savedCompany = localStorage.getItem('domu_company_name');
+    const isRead = localStorage.getItem('domu_notifications_read') === 'true';
 
     if (savedName) setUserName(savedName);
     if (savedEmail) setUserEmail(savedEmail);
     if (savedCompany) setCompanyName(savedCompany);
+    if (isRead) {
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    }
 
     // Close dropdowns on outside click
     const handleClickOutside = (e: MouseEvent) => {
@@ -173,6 +177,7 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
                 <div className="p-2.5 bg-slate-50 border-t border-slate-100 text-center">
                   <button 
                     onClick={() => {
+                      localStorage.setItem('domu_notifications_read', 'true');
                       setNotifications(notifications.map(n => ({ ...n, read: true })));
                       setIsNotificationsOpen(false);
                     }}
