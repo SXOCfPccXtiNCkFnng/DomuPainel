@@ -79,8 +79,8 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
     ),
     configuracoes: (
       <>
-        <circle cx="9" cy="9" r="2.5" stroke={s} strokeWidth="1.4" />
-        <path d="M9 1.5V3.5M9 14.5V16.5M1.5 9H3.5M14.5 9H16.5M3.4 3.4L4.8 4.8M13.2 13.2L14.6 14.6M3.4 14.6L4.8 13.2M13.2 4.8L14.6 3.4" stroke={s} strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M9 11.5A2.5 2.5 0 1 0 9 6.5A2.5 2.5 0 0 0 9 11.5Z" stroke={s} strokeWidth="1.4" />
+        <path d="M14.5 8.2V9.8L13.1 10.3C13 10.7 12.8 11.1 12.5 11.4L13 12.8L11.8 14L10.4 13.5C10.1 13.8 9.7 14 9.3 14.1L8.8 15.5H7.2L6.7 14.1C6.3 14 5.9 13.8 5.6 13.5L4.2 14L3 12.8L3.5 11.4C3.2 11.1 3 10.7 2.9 10.3L1.5 9.8V8.2L2.9 7.7C3 7.3 3.2 6.9 3.5 6.6L3 5.2L4.2 4L5.6 4.5C5.9 4.2 6.3 4 6.7 3.9L7.2 2.5H8.8L9.3 3.9C9.7 4 10.1 4.2 10.4 4.5L11.8 4L13 5.2L12.5 6.6C12.8 6.9 13 7.3 13.1 7.7L14.5 8.2Z" stroke={s} strokeWidth="1.3" strokeLinejoin="round" />
       </>
     ),
     assinatura: (

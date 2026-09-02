@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [activeQueue, setActiveQueue] = useState<{ title: string; count: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'funil' | 'disparos' | 'atendimento'>('funil');
 
+  const [userName, setUserName] = useState('Gestor');
   const [companyName, setCompanyName] = useState('Sua Empresa');
   const [whatsappPhone, setWhatsappPhone] = useState('(11) 99999-9999');
   const [totalLeads, setTotalLeads] = useState(0);
@@ -33,8 +34,12 @@ export default function DashboardPage() {
   const [segment, setSegment] = useState<TenantSegment>('geral');
 
   useEffect(() => {
+    const savedName = localStorage.getItem('domu_user_name');
     const savedCompany = localStorage.getItem('domu_company_name');
-    if (savedCompany) setCompanyName(savedCompany);
+    if (savedName) setUserName(savedName);
+    if (savedCompany && savedCompany !== 'Domu' && savedCompany !== 'Empresa DOMU') {
+      setCompanyName(savedCompany);
+    }
     setSegment(getSegmentFromStorage());
     fetchDashboardData();
   }, []);
@@ -46,7 +51,9 @@ export default function DashboardPage() {
       const json = await res.json();
 
       if (json.success && json.metrics) {
-        if (json.metrics.tenantName) setCompanyName(json.metrics.tenantName);
+        if (json.metrics.tenantName && json.metrics.tenantName !== 'Domu') {
+          setCompanyName(json.metrics.tenantName);
+        }
         if (json.metrics.whatsappPhone && json.metrics.whatsappPhone !== 'Não cadastrado') {
           setWhatsappPhone(json.metrics.whatsappPhone);
         }
@@ -62,9 +69,7 @@ export default function DashboardPage() {
     setActiveQueue({ title, count });
   };
 
-  const segmentLabel = SEGMENT_LABELS[segment] || 'Geral';
   const welcomeMessage = SEGMENT_WELCOME[segment] || SEGMENT_WELCOME.geral;
-  const showRealEstateExtras = isRealEstateSegment(segment);
 
   return (
     <div className="space-y-5 w-full font-sans">
@@ -73,10 +78,10 @@ export default function DashboardPage() {
       <div className="bg-[#0B132B] p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800">
         <div className="space-y-1">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-blue-300">
-            Portal DOMU Tech · {segmentLabel}
+            PORTAL DOMU TECH
           </p>
-          <h2 className="text-base font-black">Olá, {companyName}</h2>
-          <p className="text-xs text-slate-300 max-w-lg">{welcomeMessage}</p>
+          <h2 className="text-base font-black">Olá, {userName}</h2>
+          <p className="text-xs text-slate-300 max-w-lg">Automatize suas mensagens, leads e atendimentos no WhatsApp.</p>
         </div>
         <button
           onClick={() => setIsWizardOpen(true)}
@@ -272,7 +277,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-domu-blue" />
               <h3 className="text-xs font-black text-slate-900">
-                {showRealEstateExtras ? 'Disparos e Alertas de Oferta' : 'Disparos e Campanhas'}
+                Disparos e Campanhas
               </h3>
             </div>
             <Link href="/disparos" className="text-[11px] font-bold text-domu-blue hover:underline flex items-center gap-1">
@@ -281,9 +286,7 @@ export default function DashboardPage() {
           </div>
 
           <p className="text-xs text-slate-600 leading-relaxed font-medium">
-            {showRealEstateExtras
-              ? 'Inicie campanhas de lançamentos e alertas de imóveis para sua base de leads qualificados.'
-              : 'Inicie uma nova campanha de mensagens em massa para comunicar novidades e ofertas para sua base de clientes no WhatsApp.'}
+            Inicie uma nova campanha de mensagens em massa para comunicar novidades e ofertas para sua base de clientes no WhatsApp.
           </p>
 
           <div className="pt-1">

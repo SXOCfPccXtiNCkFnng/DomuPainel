@@ -1,25 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { 
   Send, 
   Plus, 
-  Search, 
-  Play, 
-  Pause, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  Users,
-  FileSpreadsheet,
-  Upload,
-  X,
   RefreshCw,
   UserPlus,
   Calendar
 } from 'lucide-react';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
+import ImportContactsModal from '@/components/disparos/ImportContactsModal';
 
 export default function DisparosPage() {
   const [mounted, setMounted] = useState(false);
@@ -27,11 +17,6 @@ export default function DisparosPage() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Import Modal state
-  const [pasteText, setPasteText] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importSuccessMsg, setImportSuccessMsg] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -72,61 +57,6 @@ export default function DisparosPage() {
       setCampaigns(prev => [newCampaign, ...prev]);
     } catch (err) {
       console.error('Erro ao registrar campanha:', err);
-    }
-  };
-
-  const handleImportContacts = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pasteText.trim()) return;
-
-    setIsImporting(true);
-    setImportSuccessMsg('');
-
-    try {
-      const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
-      
-      const lines = pasteText.split('\n');
-      const contactsToSave: { name: string; phone: string }[] = [];
-
-      lines.forEach((line) => {
-        const clean = line.trim();
-        if (!clean) return;
-
-        if (clean.includes(',')) {
-          const [name, phone] = clean.split(',');
-          contactsToSave.push({ name: name.trim(), phone: phone.trim() });
-        } else if (clean.includes(';')) {
-          const [name, phone] = clean.split(';');
-          contactsToSave.push({ name: name.trim(), phone: phone.trim() });
-        } else {
-          contactsToSave.push({ name: 'Contato', phone: clean });
-        }
-      });
-
-      if (contactsToSave.length === 0) return;
-
-      const res = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantId: storedTenantId,
-          contacts: contactsToSave
-        })
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        setImportSuccessMsg(`${contactsToSave.length} contatos salvos com sucesso na sua conta DOMU Tech!`);
-        setPasteText('');
-        setTimeout(() => {
-          setIsImportModalOpen(false);
-          setImportSuccessMsg('');
-        }, 1500);
-      }
-    } catch (err) {
-      console.error('Erro ao importar contatos:', err);
-    } finally {
-      setIsImporting(false);
     }
   };
 
@@ -252,77 +182,14 @@ export default function DisparosPage() {
 
       </div>
 
-      {/* Modal: Importar ou Digitar Contatos */}
-      {isImportModalOpen && mounted && createPortal(
-        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-7 shadow-2xl border border-slate-200 space-y-5">
-            
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-domu-blue" />
-                  Importar ou Digitar Contatos
-                </h3>
-                <p className="text-xs text-slate-500">Salva os contatos na sua conta para futuros disparos</p>
-              </div>
-              <button 
-                onClick={() => setIsImportModalOpen(false)} 
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleImportContacts} className="space-y-4">
-              
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Cole ou digite os contatos (Um por linha: Nome, Telefone)</label>
-                <textarea
-                  rows={6}
-                  required
-                  placeholder={`Carlos Silva, 11999998888\nMariana Souza, 11988887777\n5511977776666`}
-                  value={pasteText}
-                  onChange={(e) => setPasteText(e.target.value)}
-                  className="w-full p-3.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-domu-blue text-slate-900 font-mono bg-white"
-                />
-              </div>
-
-              {importSuccessMsg && (
-                <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2">
-                  <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" />
-                  <span>{importSuccessMsg}</span>
-                </div>
-              )}
-
-              <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200 text-[11.5px] text-slate-600">
-                💡 <strong>Dica DOMU:</strong> Todos os contatos que você importar ficam permanentemente salvos na sua conta, dispensando a necessidade de reimportar!
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsImportModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isImporting}
-                  className="btn-domu-primary text-xs py-2.5 px-5 flex items-center gap-1.5 shadow-xs"
-                >
-                  {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  <span>Salvar Contatos na Conta</span>
-                </button>
-              </div>
-
-            </form>
-
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Borderless Import Contacts Modal with CSV Upload Support */}
+      <ImportContactsModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          fetchCampaigns();
+        }}
+      />
 
       {/* Campaign Dispatch Modal */}
       <CampaignWizardModal

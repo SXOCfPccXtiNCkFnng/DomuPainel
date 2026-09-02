@@ -435,7 +435,7 @@ export default function CampaignWizardModal({
                   >
                     {templates.map((tpl) => (
                       <option key={tpl.id} value={tpl.name}>
-                        {tpl.name} — {tpl.category}
+                        {tpl.is_global !== false ? '[PADRÃO DOMU] ' : '[MINHA EMPRESA] '}{tpl.name} — {tpl.category}
                         {tpl.header_type === 'IMAGE' ? ' (com imagem)' : ''}
                       </option>
                     ))}

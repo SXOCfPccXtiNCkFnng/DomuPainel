@@ -202,7 +202,7 @@ export default function TemplatesPage() {
                   <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700">{tpl.category}</span>
                   {tpl.is_global !== false ? (
                     <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded font-extrabold">
-                      🌐 PADRÃO DOMU
+                      PADRÃO DOMU
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-extrabold">

@@ -3,6 +3,16 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
 
+function formatWhatsAppPhone(rawPhone: string): string {
+  if (!rawPhone) return '';
+  let digits = rawPhone.replace(/\D/g, '');
+  // Brazilian phone without DDI (10 or 11 digits) -> prepend 55
+  if (digits.length === 10 || digits.length === 11) {
+    digits = `55${digits}`;
+  }
+  return digits;
+}
+
 // GET: List all contacts for tenant
 export async function GET(req: NextRequest) {
   try {
@@ -49,14 +59,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Tenant não localizado.' }, { status: 400 });
     }
 
-    // 2. Prepare payload for insertion
-    const leadsToInsert = contacts.map((c: any) => ({
-      tenant_id: activeTenantId,
-      name: c.name || 'Contato Importado',
-      phone: c.phone.replace(/\D/g, ''),
-      status: 'QUALIFIED',
-      created_at: new Date().toISOString()
-    }));
+    // 2. Prepare payload for insertion with automatic DDI +55 sanitization
+    const leadsToInsert = contacts
+      .map((c: any) => ({
+        tenant_id: activeTenantId,
+        name: c.name?.trim() || 'Contato Importado',
+        phone: formatWhatsAppPhone(c.phone),
+        status: 'QUALIFIED',
+        created_at: new Date().toISOString()
+      }))
+      .filter((c: any) => c.phone.length >= 10);
 
     // 3. Upsert / Insert into Supabase
     const { data: inserted, error } = await supabaseAdmin
