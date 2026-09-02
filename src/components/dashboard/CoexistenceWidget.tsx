@@ -5,18 +5,43 @@ import { ShieldCheck, Smartphone, CheckCircle2, Info, AlertTriangle, Zap } from 
 
 export default function CoexistenceWidget() {
   const [phone, setPhone] = useState<string>('');
-  const [qualityScore, setQualityScore] = useState<string>('VERDE');
+  const [qualityScore, setQualityScore] = useState<string>('VERDE (Excelente)');
   const [dailyLimitTier, setDailyLimitTier] = useState<string>('Tier 1 (1.000 msgs/24h)');
+  const [numericLimit, setNumericLimit] = useState<number>(1000);
+  const [isLoadingMeta, setIsLoadingMeta] = useState<boolean>(true);
 
   useEffect(() => {
-    // Read connected phone from localStorage or tenant metrics
+    // Read connected phone from localStorage
     const savedPhone = localStorage.getItem('domu_whatsapp_phone');
     if (savedPhone && savedPhone !== 'Não cadastrado') {
       setPhone(savedPhone);
     } else {
       setPhone('');
     }
+
+    // Fetch live Meta stats from backend API
+    fetchMetaStats();
   }, []);
+
+  const fetchMetaStats = async () => {
+    try {
+      const res = await fetch('/api/whatsapp/stats');
+      const json = await res.json();
+
+      if (json.success && json.stats) {
+        setDailyLimitTier(json.stats.formattedTierLabel || 'Tier 1 (1.000 msgs/24h)');
+        setQualityScore(json.stats.formattedQuality || 'VERDE (Excelente)');
+        setNumericLimit(json.stats.numericLimit || 1000);
+        if (json.stats.displayPhoneNumber) {
+          setPhone(json.stats.displayPhoneNumber);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar dados oficiais da Meta API:', err);
+    } finally {
+      setIsLoadingMeta(false);
+    }
+  };
 
   return (
     <div className="card-domu p-5 bg-gradient-to-br from-white via-slate-50 to-blue-50/30 border border-blue-100 space-y-4">
@@ -30,7 +55,7 @@ export default function CoexistenceWidget() {
             </span>
             <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-sm border border-emerald-300">
               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-              Quality Score Meta: VERDE (Excelente)
+              Quality Score Meta: {qualityScore}
             </span>
             <span className="flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-sm border border-blue-300">
               <Zap className="w-3 h-3 text-domu-blue" />
@@ -81,10 +106,10 @@ export default function CoexistenceWidget() {
       </div>
 
       {/* Meta Eligibility & Daily Limits Notice */}
-      <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-sm text-xs text-amber-900 flex items-center gap-2">
-        <Info className="w-4 h-4 text-amber-700 shrink-0" />
+      <div className="p-3 bg-blue-50/80 border border-blue-200/90 rounded-sm text-xs text-slate-800 flex items-center gap-2">
+        <Info className="w-4 h-4 text-domu-blue shrink-0" />
         <span>
-          <strong>Elegibilidade Meta Cloud API:</strong> Sua conta está no <strong>Tier 1</strong> (autorizada para até 1.000 mensagens/24h). O limite é controlado automaticamente na hora dos disparos.
+          <strong>Consulta Direta Meta Cloud API:</strong> Sua conta está no <strong>{dailyLimitTier}</strong> (limite oficial retornado pelos servidores da Meta de até {numericLimit.toLocaleString('pt-BR')} disparos/24h). O limite é controlado automaticamente na hora dos envios.
         </span>
       </div>
     </div>
