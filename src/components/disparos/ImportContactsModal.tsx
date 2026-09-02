@@ -132,8 +132,8 @@ export default function ImportContactsModal({ isOpen, onClose, onSuccess }: Impo
   const modalMarkup = (
     <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans">
       
-      {/* Clean Borderless Card (border-0 shadow-2xl) */}
-      <div className="bg-white rounded-3xl border-0 shadow-2xl max-w-lg w-full p-7 space-y-5 overflow-hidden">
+      {/* Clean Square Card without rounded borders */}
+      <div className="bg-white rounded-none border-0 shadow-2xl max-w-lg w-full p-7 space-y-5 overflow-hidden">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">

@@ -77,7 +77,7 @@ export default function RelatoriosPage() {
             <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-domu-blue border border-blue-200 uppercase">
               Relatórios de Desempenho
             </span>
-            <span className="text-xs text-slate-500 font-medium">Dados unificados do Banco de Dados</span>
+            <span className="text-xs text-slate-500 font-medium">Métricas de Desempenho em Tempo Real</span>
           </div>
           <h1 className="text-lg font-black text-slate-900 tracking-tight">
             Relatórios de Análise e Performance
