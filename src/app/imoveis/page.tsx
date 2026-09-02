@@ -2,34 +2,63 @@
 
 import React, { useState } from 'react';
 import ImoveisDestaque from '@/components/dashboard/ImoveisDestaque';
-import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
-import QueueSimulator from '@/components/disparos/QueueSimulator';
+import CampaignWizardModal, {
+  CampaignStartPayload,
+} from '@/components/disparos/CampaignWizardModal';
+import CampaignProgress from '@/components/disparos/CampaignProgress';
 import NovoImovelModal from '@/components/imoveis/NovoImovelModal';
 import { Building2, Users, Send, MapPin, Tag, Plus, CheckCircle2, MessageSquare } from 'lucide-react';
 import { mockProperties, mockLeads } from '@/lib/mockData';
 import { Property } from '@/types';
+import { getAuthItem } from '@/lib/authStorage';
 
 export default function ImoveisPage() {
   const [properties, setProperties] = useState<Property[]>(mockProperties);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedPropertyTitle, setSelectedPropertyTitle] = useState<string | undefined>(undefined);
-  const [activeQueue, setActiveQueue] = useState<{ title: string; count: number } | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | undefined>(undefined);
+  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [successNotification, setSuccessNotification] = useState<string | null>(null);
 
-  const handleOpenWizard = (propertyTitle: string) => {
+  const handleOpenWizard = (propertyTitle: string, propertyId?: string) => {
     setSelectedPropertyTitle(propertyTitle);
+    setSelectedPropertyId(propertyId);
     setIsWizardOpen(true);
   };
 
-  const handleAddProperty = (newProp: Property) => {
+  const handleAddProperty = async (newProp: Property) => {
     setProperties([newProp, ...properties]);
+    try {
+      const tenantId = getAuthItem('domu_tenant_id') || '';
+      await fetch('/api/properties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          property: {
+            title: newProp.title,
+            type: newProp.type,
+            price: newProp.price,
+            neighborhood: newProp.neighborhood,
+            city: newProp.city,
+            bedrooms: newProp.bedrooms,
+            bathrooms: newProp.bathrooms,
+            area_sqm: newProp.areaSqMeter,
+            image_url: newProp.imageUrl,
+            code: newProp.code,
+          },
+        }),
+      });
+    } catch (err) {
+      console.error('Erro ao persistir imóvel:', err);
+    }
     setSuccessNotification(`Imóvel "${newProp.title}" cadastrado com sucesso e já disponível no painel!`);
     setTimeout(() => setSuccessNotification(null), 5000);
   };
 
-  const handleStartCampaign = (title: string, templateName: string, count: number) => {
-    setActiveQueue({ title, count });
+  const handleStartCampaign = (payload: CampaignStartPayload) => {
+    if (payload.campaignId) setActiveCampaignId(payload.campaignId);
   };
 
   return (
@@ -76,11 +105,10 @@ export default function ImoveisPage() {
         </div>
       )}
 
-      {/* Live Queue if triggered */}
-      {activeQueue && (
-        <QueueSimulator 
-          campaignTitle={activeQueue.title} 
-          totalRecipients={activeQueue.count} 
+      {activeCampaignId && (
+        <CampaignProgress
+          campaignId={activeCampaignId}
+          onClose={() => setActiveCampaignId(null)}
         />
       )}
 
@@ -159,6 +187,7 @@ export default function ImoveisPage() {
         onClose={() => setIsWizardOpen(false)}
         onStartCampaign={handleStartCampaign}
         initialPropertyTitle={selectedPropertyTitle}
+        initialPropertyId={selectedPropertyId}
       />
 
     </div>

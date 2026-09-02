@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import { isRealEstateSegment, getSegmentFromStorage } from '@/lib/segmentConfig';
+import { syncSessionToStorage } from '@/lib/sessionHelpers';
+import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
 
 export default function AppLayoutGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,48 +16,94 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
   const isAuthPage = pathname === '/login' || pathname === '/onboarding' || pathname === '/cadastro';
 
   useEffect(() => {
-    // Read state from localStorage
-    const isLoggedIn = localStorage.getItem('domu_is_logged_in') === 'true';
-    const isOnboarded = localStorage.getItem('domu_is_onboarded') === 'true';
+    let cancelled = false;
 
-    if (!isLoggedIn) {
-      if (pathname !== '/login' && pathname !== '/cadastro') {
-        router.push('/login');
-      } else {
-        setIsAuthChecked(true);
+    async function checkAuth() {
+      const loggedIn = isLoggedIn();
+      let isOnboarded = getAuthItem('domu_is_onboarded') === 'true';
+
+      // Confia no cookie HttpOnly via /api/auth/session (não no tenantId da URL)
+      try {
+        const res = await fetch('/api/auth/session');
+        if (res.status === 401) {
+          clearClientAndGoLogin();
+          return;
+        }
+        const data = await res.json();
+        if (data.success) {
+          if (!loggedIn) {
+            setAuthItem('domu_is_logged_in', 'true');
+          }
+          if (data.isOnboarded) {
+            syncSessionToStorage(data);
+            isOnboarded = true;
+          } else if (!isOnboarded) {
+            syncSessionToStorage(data);
+            isOnboarded = false;
+          } else {
+            setAuthItem('domu_selected_segment', data.segment);
+            setAuthItem('domu_company_name', data.companyName);
+            setAuthItem('domu_tenant_id', data.tenantId);
+          }
+        } else if (!loggedIn) {
+          if (pathname !== '/login' && pathname !== '/cadastro') {
+            router.replace('/login');
+          } else if (!cancelled) {
+            setIsAuthChecked(true);
+          }
+          return;
+        }
+      } catch {
+        if (!loggedIn) {
+          if (pathname !== '/login' && pathname !== '/cadastro') {
+            router.replace('/login');
+          } else if (!cancelled) {
+            setIsAuthChecked(true);
+          }
+          return;
+        }
       }
-      return;
-    }
 
-    if (isLoggedIn && !isOnboarded) {
-      if (pathname !== '/onboarding') {
-        router.push('/onboarding');
-      } else {
-        setIsAuthChecked(true);
+      if (cancelled) return;
+
+      if (!isOnboarded) {
+        if (pathname !== '/onboarding') {
+          router.replace('/onboarding');
+        } else {
+          setIsAuthChecked(true);
+        }
+        return;
       }
-      return;
-    }
 
-    if (isLoggedIn && isOnboarded) {
       if (pathname === '/login' || pathname === '/onboarding' || pathname === '/cadastro') {
-        router.push('/');
+        router.replace('/');
         return;
       }
 
       const segment = getSegmentFromStorage();
       if (pathname === '/imoveis' && !isRealEstateSegment(segment)) {
-        router.push('/');
+        router.replace('/');
         return;
       }
 
       setIsAuthChecked(true);
-      return;
     }
 
-    setIsAuthChecked(true);
+    function clearClientAndGoLogin() {
+      clearAuthSession();
+      if (pathname !== '/login' && pathname !== '/cadastro') {
+        router.replace('/login');
+      } else if (!cancelled) {
+        setIsAuthChecked(true);
+      }
+    }
+
+    checkAuth();
+    return () => {
+      cancelled = true;
+    };
   }, [pathname, router]);
 
-  // If Auth check is in progress, show a sleek DOMU loading screen
   if (!isAuthChecked) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4">
@@ -67,12 +115,10 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
     );
   }
 
-  // Auth pages (/login and /onboarding) render without Sidebar & Header
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-50 w-full">{children}</div>;
   }
 
-  // Dashboard & Protected Portal Pages render with Sidebar and Header
   return (
     <div className="min-h-screen flex w-full">
       <Sidebar />

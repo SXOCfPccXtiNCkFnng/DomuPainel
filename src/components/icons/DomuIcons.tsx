@@ -1,4 +1,5 @@
 import React from 'react';
+import { Send, Settings } from 'lucide-react';
 import { NavItemId } from '@/lib/segmentConfig';
 import { TenantSegment } from '@/types';
 
@@ -10,7 +11,6 @@ interface IconProps {
 function IconWrapper({
   children,
   className = '',
-  active = false,
 }: IconProps & { children: React.ReactNode }) {
   return (
     <span
@@ -35,8 +35,31 @@ const fill = (active: boolean) => (active ? '#1E5AF6' : '#CBD5E1');
 export function NavIcon({ id, active = false, className }: { id: NavItemId; active?: boolean; className?: string }) {
   const s = stroke(active);
   const f = fill(active);
+  const lucideColor = active ? '#1E5AF6' : '#94A3B8';
 
-  const icons: Record<NavItemId, React.ReactNode> = {
+  if (id === 'disparos') {
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 ${className || ''}`}
+        aria-hidden
+      >
+        <Send size={16} color={lucideColor} strokeWidth={1.75} />
+      </span>
+    );
+  }
+
+  if (id === 'configuracoes') {
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 ${className || ''}`}
+        aria-hidden
+      >
+        <Settings size={16} color={lucideColor} strokeWidth={1.75} />
+      </span>
+    );
+  }
+
+  const icons: Partial<Record<NavItemId, React.ReactNode>> = {
     dashboard: (
       <>
         <rect x="1.5" y="1.5" width="6.5" height="6.5" rx="1.5" stroke={s} strokeWidth="1.4" />
@@ -45,9 +68,18 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
         <rect x="10" y="10" width="6.5" height="6.5" rx="1.5" fill={f} stroke={s} strokeWidth="1.4" />
       </>
     ),
-    disparos: (
+    contatos: (
       <>
-        <path d="M2.5 15.5L15.5 2.5L9.5 15.5L7.5 9.5L1.5 7.5L15.5 2.5" stroke={s} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill={active ? '#EFF6FF' : 'none'} />
+        <circle cx="6.5" cy="6" r="2.2" stroke={s} strokeWidth="1.4" />
+        <path d="M2.5 14.5C2.5 11.5 4.2 10 6.5 10C8.8 10 10.5 11.5 10.5 14.5" stroke={s} strokeWidth="1.4" strokeLinecap="round" />
+        <circle cx="12.5" cy="6.5" r="1.8" stroke={s} strokeWidth="1.3" />
+        <path d="M11 14.5C11.2 12.4 12.2 11.2 13.8 11C15.2 11.2 16 12.2 16.2 14" stroke={s} strokeWidth="1.3" strokeLinecap="round" />
+      </>
+    ),
+    metricas: (
+      <>
+        <rect x="2.5" y="2.5" width="13" height="13" rx="2" stroke={s} strokeWidth="1.4" />
+        <path d="M5.5 12V8.5M9 12V5.5M12.5 12V9.5" stroke={s} strokeWidth="1.6" strokeLinecap="round" />
       </>
     ),
     templates: (
@@ -76,12 +108,6 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
         <path d="M5 12V9M8 12V6M11 12V8M14 12V5" stroke={s} strokeWidth="1.6" strokeLinecap="round" />
       </>
     ),
-    configuracoes: (
-      <>
-        <circle cx="9" cy="9" r="2.2" stroke={s} strokeWidth="1.4" fill={active ? '#EFF6FF' : 'none'} />
-        <path d="M9 1.8V3.4M9 14.6V16.2M1.8 9H3.4M14.6 9H16.2M3.9 3.9L5 5M13 13L14.1 14.1M3.9 14.1L5 13M13 5L14.1 3.9" stroke={s} strokeWidth="1.4" strokeLinecap="round" />
-      </>
-    ),
     assinatura: (
       <>
         <rect x="2" y="4.5" width="14" height="9" rx="2" stroke={s} strokeWidth="1.4" fill={active ? '#EFF6FF' : 'none'} />
@@ -91,7 +117,7 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
     ),
   };
 
-  return <IconWrapper active={active} className={className}>{icons[id]}</IconWrapper>;
+  return <IconWrapper className={className}>{icons[id]}</IconWrapper>;
 }
 
 export function SegmentIcon({ segment, className = '' }: { segment: TenantSegment; className?: string }) {
@@ -120,8 +146,23 @@ export function SegmentIcon({ segment, className = '' }: { segment: TenantSegmen
       bg: 'bg-amber-50 border-amber-100',
       content: (
         <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
-          <rect x="4" y="6" width="16" height="14" rx="2" stroke="#D97706" strokeWidth="1.8" />
-          <path d="M12 9V17M8 13H16" stroke="#D97706" strokeWidth="1.8" strokeLinecap="round" />
+          <path
+            d="M8 4C8 2.9 8.9 2 10 2H14C15.1 2 16 2.9 16 4V6H18C19.1 6 20 6.9 20 8V20C20 21.1 19.1 22 18 22H6C4.9 22 4 21.1 4 20V8C4 6.9 4.9 6 6 6H8V4Z"
+            stroke="#D97706"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path d="M9 11H15M12 8V14" stroke="#D97706" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    alimentacao: {
+      bg: 'bg-orange-50 border-orange-100',
+      content: (
+        <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+          <path d="M4 10C4 7 7.5 5 12 5C16.5 5 20 7 20 10V11H4V10Z" stroke="#EA580C" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M5 11H19V14C19 16.2 15.9 18 12 18C8.1 18 5 16.2 5 14V11Z" stroke="#EA580C" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M9 18V20M15 18V20" stroke="#EA580C" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       ),
     },

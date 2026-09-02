@@ -1,17 +1,17 @@
 ---
 name: domu-portal
-description: Guidance and context for developing the DOMU Tech Multi-Tenant SaaS Portal, starting with the Real Estate messaging & dispatch module and expanding into a scalable multi-segment SaaS with DOMU visual identity.
+description: Guidance and context for developing the Domu Tech Multi-Tenant SaaS Portal, starting with the Real Estate messaging & dispatch module and expanding into a scalable multi-segment SaaS with DOMU visual identity.
 ---
 
-# DOMU Tech - Portal & SaaS Development Guide
+# Domu Tech - Portal & SaaS Development Guide
 
-This skill serves as the single source of truth for building and expanding the **DOMU Tech Portal / SaaS Platform**.
+This skill serves as the single source of truth for building and expanding the **Domu Tech Portal / SaaS Platform**.
 
 ---
 
 ## 1. Project Overview & Vision
 
-DOMU Tech is developing a high-performance **Multi-Tenant SaaS Platform** designed to automate customer engagement, messaging, and operational workflows for businesses.
+Domu Tech is developing a high-performance **Multi-Tenant SaaS Platform** designed to automate customer engagement, messaging, and operational workflows for businesses.
 
 ### Core Goals
 1. **Initial Focus (MVP - Real Estate / Setor Imobiliário)**:
@@ -26,7 +26,7 @@ DOMU Tech is developing a high-performance **Multi-Tenant SaaS Platform** design
 
 ## 2. Visual Identity & UI/UX Guidelines (DOMU Brand System)
 
-All portal UI components must align directly with the established **DOMU Tech visual identity** derived from `domutech.digital`.
+All portal UI components must align directly with the established **Domu Tech visual identity** derived from `domutech.digital`.
 
 ### Color Palette
 - **Primary Electric Blue**: `#1E5AF6` / `#0052FF` (Main action buttons, highlighted text, active navigation elements).

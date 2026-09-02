@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { requireAuth } from '@/lib/requireAuth';
+import { isProduction } from '@/lib/envSecrets';
+import { logger } from '@/lib/logger';
 
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB — limite Meta
+const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const BUCKET = 'campaign-media';
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    const tenantId = (formData.get('tenantId') as string) || 'default';
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'Nenhum arquivo enviado.' }, { status: 400 });
@@ -34,48 +39,52 @@ export async function POST(req: NextRequest) {
     const safeName = `${tenantId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Tenta Supabase Storage (produção)
-    try {
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('campaign-media')
-        .upload(safeName, buffer, { contentType: file.type, upsert: false });
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .upload(safeName, buffer, { contentType: file.type, upsert: false });
 
-      if (!uploadError) {
-        const { data: publicData } = supabaseAdmin.storage
-          .from('campaign-media')
-          .getPublicUrl(safeName);
-
-        if (publicData?.publicUrl) {
-          return NextResponse.json({
-            success: true,
-            url: publicData.publicUrl,
-            source: 'supabase',
-          });
-        }
-      }
-    } catch {
-      // fallback local abaixo
+    if (uploadError) {
+      logger.error('media.upload_failed', { message: uploadError.message, tenantId });
+      return NextResponse.json(
+        {
+          success: false,
+          error: isProduction()
+            ? 'Falha no upload para o Storage. Verifique o bucket campaign-media no Supabase.'
+            : `Storage falhou: ${uploadError.message}. Rode a migration 20260328_storage_campaign_media.sql.`,
+        },
+        { status: 502 }
+      );
     }
 
-    // Fallback local (desenvolvimento)
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'campaigns', tenantId);
-    await mkdir(uploadsDir, { recursive: true });
+    const { data: publicData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(safeName);
+    const publicUrl = publicData?.publicUrl;
+    if (!publicUrl) {
+      return NextResponse.json(
+        { success: false, error: 'Upload ok, mas URL pública indisponível.' },
+        { status: 500 }
+      );
+    }
 
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const filePath = path.join(uploadsDir, fileName);
-    await writeFile(filePath, buffer);
+    await supabaseAdmin.from('media_storage').insert({
+      tenant_id: tenantId,
+      file_name: file.name || safeName,
+      file_path: safeName,
+      file_size: file.size,
+      mime_type: file.type,
+      public_url: publicUrl,
+    });
 
-    const origin = req.nextUrl.origin;
-    const publicUrl = `${origin}/uploads/campaigns/${tenantId}/${fileName}`;
+    logger.info('media.uploaded', { tenantId, path: safeName, size: file.size });
 
     return NextResponse.json({
       success: true,
       url: publicUrl,
-      source: 'local',
+      source: 'supabase',
+      path: safeName,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erro ao enviar imagem.';
-    console.error('[Media Upload Error]', error);
+    logger.error('media.upload_exception', { message });
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

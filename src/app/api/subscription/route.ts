@@ -1,47 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { getPlanMonthlyLimit, getPlanPrice, PLAN_DISPATCH_LIMITS, PlanTier } from '@/lib/planLimits';
+import { requireAuth } from '@/lib/requireAuth';
 
 export const dynamic = 'force-dynamic';
 
 // GET: Fetch tenant subscription details & usage metrics from Supabase
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get('tenantId');
-
-    let activeTenantId = tenantId;
-    if (!activeTenantId) {
-      const { data: tenant } = await supabaseAdmin.from('tenants').select('id').limit(1).single();
-      activeTenantId = tenant?.id;
-    }
-
-    if (!activeTenantId) {
-      return NextResponse.json({ success: false, error: 'Tenant não localizado.' }, { status: 400 });
-    }
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
 
     // 1. Fetch Subscription from Supabase public.subscriptions
     const { data: sub } = await supabaseAdmin
       .from('subscriptions')
       .select('*')
-      .eq('tenant_id', activeTenantId)
+      .eq('tenant_id', tenantId)
       .single();
 
     // 2. Count total dispatches this month from public.dispatches
     const { count: dispatchesCount } = await supabaseAdmin
       .from('dispatches')
       .select('*', { count: 'exact', head: true })
-      .eq('tenant_id', activeTenantId);
+      .eq('tenant_id', tenantId);
 
     // 3. Count additional agents in public.users
     const { count: usersCount } = await supabaseAdmin
       .from('users')
       .select('*', { count: 'exact', head: true })
-      .eq('tenant_id', activeTenantId);
+      .eq('tenant_id', tenantId);
 
     // Values from database (0 default for agents & dispatches)
-    const planTier = sub?.plan_tier || 'STARTER';
-    const priceBrl = sub?.monthly_price_brl || (planTier === 'STARTER' ? 197 : planTier === 'ENTERPRISE' ? 997 : 497);
-    const messageLimit = sub?.monthly_message_limit || (planTier === 'STARTER' ? 1000 : planTier === 'ENTERPRISE' ? 999999 : 5000);
+    const planTier = (sub?.plan_tier || 'STARTER') as PlanTier;
+    const priceBrl = sub?.monthly_price_brl || getPlanPrice(planTier);
+    // DOMU soft limits are product-defined by plan tier (source of truth in planLimits.ts)
+    const messageLimit = getPlanMonthlyLimit(planTier);
+    const dailyLimit = PLAN_DISPATCH_LIMITS[planTier]?.daily ?? null;
     const dispatchesUsed = dispatchesCount || 0;
     
     // Default 0 agents used for 1:1 support
@@ -64,6 +59,7 @@ export async function GET(req: NextRequest) {
         planName,
         priceBrl,
         messageLimit,
+        dailyLimit,
         dispatchesUsed,
         agentsUsed,
         agentsLimit,
@@ -83,35 +79,26 @@ export async function GET(req: NextRequest) {
 // POST: Update plan tier in Supabase (Upgrade/Downgrade)
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
+
     const body = await req.json();
-    const { tenantId, planTier } = body; // planTier: 'STARTER' | 'PRO' | 'ENTERPRISE'
+    const { planTier } = body; // planTier: 'STARTER' | 'PRO' | 'ENTERPRISE'
 
-    let activeTenantId = tenantId;
-    if (!activeTenantId) {
-      const { data: tenant } = await supabaseAdmin.from('tenants').select('id').limit(1).single();
-      activeTenantId = tenant?.id;
-    }
-
-    if (!activeTenantId || !planTier) {
+    if (!planTier) {
       return NextResponse.json({ success: false, error: 'Parâmetros inválidos.' }, { status: 400 });
     }
 
-    let priceBrl = 497;
-    let limit = 5000;
-    if (planTier === 'STARTER') {
-      priceBrl = 197;
-      limit = 1000;
-    } else if (planTier === 'ENTERPRISE') {
-      priceBrl = 997;
-      limit = 999999;
-    }
+    const priceBrl = getPlanPrice(planTier);
+    const limit = getPlanMonthlyLimit(planTier);
 
     // Upsert subscription row in Supabase
     const { data: updatedSub, error } = await supabaseAdmin
       .from('subscriptions')
       .upsert(
         {
-          tenant_id: activeTenantId,
+          tenant_id: tenantId,
           plan_tier: planTier,
           monthly_price_brl: priceBrl,
           monthly_message_limit: limit,

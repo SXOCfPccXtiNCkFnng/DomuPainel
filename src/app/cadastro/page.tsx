@@ -7,7 +7,7 @@ import { ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react
 import AuthShell from '@/components/auth/AuthShell';
 
 const inputClass =
-  'block w-full px-3 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors';
+  'block w-full px-3 py-3 border border-slate-200 bg-white text-slate-900 text-base placeholder-slate-400 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors';
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -78,8 +78,8 @@ export default function CadastroPage() {
 
   return (
     <AuthShell
-      title="Criar conta"
-      subtitle="Cadastre sua empresa e comece a usar o portal"
+      title="Comece agora"
+      subtitle="Crie sua conta e ative seu portal de automação no WhatsApp em poucos minutos."
       footer={
         <>
           Já tem conta?{' '}
@@ -105,7 +105,7 @@ export default function CadastroPage() {
 
       <form onSubmit={handleRegister} className="space-y-3.5">
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nome completo</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nome completo</label>
           <input
             type="text"
             required
@@ -117,7 +117,7 @@ export default function CadastroPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nome da empresa</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nome da empresa</label>
           <input
             type="text"
             required
@@ -130,7 +130,7 @@ export default function CadastroPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">E-mail</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
             <input
               type="email"
               required
@@ -141,7 +141,7 @@ export default function CadastroPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">WhatsApp</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">WhatsApp</label>
             <input
               type="text"
               required
@@ -154,7 +154,7 @@ export default function CadastroPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Senha</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Senha</label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
@@ -175,7 +175,7 @@ export default function CadastroPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Confirmar senha</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Confirmar senha</label>
           <input
             type={showPassword ? 'text' : 'password'}
             required
@@ -190,7 +190,7 @@ export default function CadastroPage() {
           {requirements.map((req) => (
             <div
               key={req.label}
-              className={`flex items-center gap-1.5 text-[11px] ${req.ok ? 'text-emerald-600' : 'text-slate-400'}`}
+              className={`flex items-center gap-1.5 text-xs ${req.ok ? 'text-emerald-600' : 'text-slate-400'}`}
             >
               <span className={`w-1 h-1 shrink-0 ${req.ok ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               {req.label}
@@ -201,7 +201,7 @@ export default function CadastroPage() {
         <button
           type="submit"
           disabled={isLoading || !isFormValid}
-          className="w-full btn-domu-primary text-sm py-2.5 justify-center disabled:opacity-40"
+          className="w-full btn-domu-primary text-base py-3 justify-center disabled:opacity-40"
         >
           {isLoading ? 'Criando conta...' : (
             <>

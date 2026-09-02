@@ -12,6 +12,7 @@ import {
   getSegmentFromStorage,
 } from '@/lib/segmentConfig';
 import { NavIcon, DomuShieldIcon } from '@/components/icons/DomuIcons';
+import { getAuthItem } from '@/lib/authStorage';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -19,7 +20,7 @@ export default function Sidebar() {
   const [segment, setSegment] = useState<TenantSegment>('geral');
 
   useEffect(() => {
-    const savedCompany = localStorage.getItem('domu_company_name');
+    const savedCompany = getAuthItem('domu_company_name');
     if (savedCompany) setCompanyName(savedCompany);
     setSegment(getSegmentFromStorage());
   }, []);
@@ -34,7 +35,7 @@ export default function Sidebar() {
         <Link href="/" className="flex items-center justify-center w-full">
           <Image
             src="/logo-com-nome.png"
-            alt="DOMU TECH Logo"
+            alt="Domu Tech Logo"
             width={155}
             height={38}
             priority
@@ -80,14 +81,21 @@ export default function Sidebar() {
               <Link
                 key={item.id}
                 href={item.href}
-                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all ${
                   isActive
                     ? 'bg-blue-50 text-domu-blue font-bold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
-                <NavIcon id={item.id} active={isActive} />
-                <span>{item.name}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <NavIcon id={item.id} active={isActive} />
+                  <span className="truncate">{item.name}</span>
+                </div>
+                {item.badge ? (
+                  <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-blue-50 text-domu-blue border border-blue-100 shrink-0">
+                    {item.badge}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

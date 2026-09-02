@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import AuthShell from '@/components/auth/AuthShell';
+import { syncSessionToStorage } from '@/lib/sessionHelpers';
+import { persistLoginSession } from '@/lib/authStorage';
 
 const inputClass =
-  'block w-full px-3 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors';
+  'block w-full px-3 py-3 border border-slate-200 bg-white text-slate-900 text-base placeholder-slate-400 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,7 +35,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
 
       const data = await res.json();
@@ -44,13 +46,27 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem('domu_is_logged_in', 'true');
-      localStorage.setItem('domu_user_email', data.user.email);
-      localStorage.setItem('domu_user_name', data.user.name);
-      localStorage.setItem('domu_tenant_id', data.user.tenantId);
+      persistLoginSession(
+        {
+          domu_is_logged_in: 'true',
+          domu_user_email: data.user.email,
+          domu_user_name: data.user.name,
+          domu_tenant_id: data.user.tenantId,
+          domu_is_onboarded: data.user.isOnboarded ? 'true' : 'false',
+          domu_selected_segment: data.user.segment,
+          domu_company_name: data.user.companyName,
+        },
+        rememberMe
+      );
 
-      const isOnboarded = localStorage.getItem('domu_is_onboarded') === 'true';
-      router.push(isOnboarded ? '/' : '/onboarding');
+      syncSessionToStorage({
+        isOnboarded: Boolean(data.user.isOnboarded),
+        segment: data.user.segment,
+        companyName: data.user.companyName,
+        tenantId: data.user.tenantId,
+      });
+
+      router.push(data.user.isOnboarded ? '/' : '/onboarding');
     } catch {
       setErrorMessage('Erro ao conectar ao servidor. Tente novamente.');
       setIsLoading(false);
@@ -59,8 +75,8 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Entrar no portal"
-      subtitle="Acesse sua conta para gerenciar disparos e automações"
+      title="Bem-vindo de volta"
+      subtitle="Entre na sua conta e continue automatizando o WhatsApp da sua empresa."
       footer={
         <>
           Ainda não tem conta?{' '}
@@ -79,7 +95,7 @@ export default function LoginPage() {
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">E-mail</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
           <input
             type="email"
             required
@@ -92,10 +108,10 @@ export default function LoginPage() {
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-semibold text-slate-600">Senha</label>
-            <a href="#" className="text-[11px] font-medium text-domu-blue hover:underline">
+            <label className="text-sm font-semibold text-slate-700">Senha</label>
+            <Link href="/recuperar-senha" className="text-xs font-medium text-domu-blue hover:underline">
               Esqueceu a senha?
-            </a>
+            </Link>
           </div>
           <div className="relative">
             <input
@@ -116,7 +132,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-slate-500 cursor-pointer">
           <input
             type="checkbox"
             checked={rememberMe}
@@ -129,11 +145,11 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full btn-domu-primary text-sm py-2.5 justify-center disabled:opacity-50"
+          className="w-full btn-domu-primary text-base py-3 justify-center disabled:opacity-50"
         >
           {isLoading ? 'Entrando...' : (
             <>
-              Entrar no portal
+              Acessar portal
               <ArrowRight className="w-4 h-4" />
             </>
           )}

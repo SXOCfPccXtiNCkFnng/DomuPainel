@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { requireAuth } from '@/lib/requireAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,23 +60,22 @@ const GLOBAL_SYSTEM_TEMPLATES = [
 // GET: Fetch Global Templates + Custom Tenant Account Templates from Supabase
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get('tenantId');
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
 
     let customTemplates: any[] = [];
-    if (tenantId) {
-      const { data, error } = await supabaseAdmin
-        .from('hsm_templates')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabaseAdmin
+      .from('hsm_templates')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        customTemplates = data.map(t => ({
-          ...t,
-          is_global: false
-        }));
-      }
+    if (!error && data) {
+      customTemplates = data.map(t => ({
+        ...t,
+        is_global: false
+      }));
     }
 
     // Combine custom account templates first, followed by global system templates
@@ -95,17 +95,15 @@ export async function GET(req: NextRequest) {
 // POST: Submit a new Meta Cloud API Template to Supabase (Bound to Tenant Account)
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
+
     const body = await req.json();
-    const { tenantId, name, category, headerType, headerContent, bodyText } = body;
+    const { name, category, headerType, headerContent, bodyText } = body;
 
     if (!name || !bodyText) {
       return NextResponse.json({ success: false, error: 'Nome e texto do template são obrigatórios.' }, { status: 400 });
-    }
-
-    let activeTenantId = tenantId;
-    if (!activeTenantId) {
-      const { data: tenant } = await supabaseAdmin.from('tenants').select('id').limit(1).single();
-      activeTenantId = tenant?.id;
     }
 
     const formattedName = name.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
@@ -117,7 +115,7 @@ export async function POST(req: NextRequest) {
     const { data: inserted, error } = await supabaseAdmin
       .from('hsm_templates')
       .insert({
-        tenant_id: activeTenantId,
+        tenant_id: tenantId,
         name: formattedName,
         category: category || 'MARKETING',
         language: 'pt_BR',

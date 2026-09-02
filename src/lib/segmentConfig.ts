@@ -1,9 +1,11 @@
 import { TenantSegment } from '@/types';
+import { getAuthItem } from '@/lib/authStorage';
 
 export const SEGMENT_LABELS: Record<TenantSegment, string> = {
   imobiliario: 'Imobiliário',
   ecommerce: 'E-commerce',
-  saude: 'Saúde',
+  saude: 'Saúde e Beleza',
+  alimentacao: 'Alimentação',
   juridico: 'Jurídico',
   marketing_apenas: 'Marketing',
   geral: 'Geral',
@@ -12,7 +14,8 @@ export const SEGMENT_LABELS: Record<TenantSegment, string> = {
 export const SEGMENT_WELCOME: Record<TenantSegment, string> = {
   imobiliario: 'Automatize lançamentos, leads e visitas pelo WhatsApp.',
   ecommerce: 'Recupere carrinhos, envie ofertas e notifique seus clientes.',
-  saude: 'Confirme consultas e reduza faltas com mensagens automáticas.',
+  saude: 'Confirme consultas, horários e retornos com mensagens automáticas.',
+  alimentacao: 'Receba pedidos, confirme entregas e fidelize clientes no WhatsApp.',
   juridico: 'Gerencie prazos, cobranças e comunicação com clientes.',
   marketing_apenas: 'Foque em campanhas e disparos em massa no WhatsApp.',
   geral: 'Automatize comunicação e engajamento com seus clientes.',
@@ -24,7 +27,7 @@ export function isRealEstateSegment(segment: TenantSegment | string | null): boo
 
 export function getSegmentFromStorage(): TenantSegment {
   if (typeof window === 'undefined') return 'geral';
-  const saved = localStorage.getItem('domu_selected_segment') as TenantSegment | null;
+  const saved = getAuthItem('domu_selected_segment') as TenantSegment | null;
   return saved && saved in SEGMENT_LABELS ? saved : 'geral';
 }
 
@@ -32,6 +35,8 @@ export type NavItemId =
   | 'dashboard'
   | 'disparos'
   | 'templates'
+  | 'contatos'
+  | 'metricas'
   | 'atendimento'
   | 'imoveis'
   | 'relatorios'
@@ -49,22 +54,39 @@ export interface NavItemConfig {
 
 export const PLATFORM_NAV: NavItemConfig[] = [
   { id: 'dashboard', name: 'Dashboard', href: '/', isComingSoon: false },
-  { id: 'disparos', name: 'Disparos em Massa', href: '/disparos', isComingSoon: false },
+  {
+    id: 'disparos',
+    name: 'Disparo de Campanha',
+    href: '/disparos',
+    isComingSoon: false,
+  },
+  {
+    id: 'metricas',
+    name: 'Métricas de ROI',
+    href: '/metricas',
+    isComingSoon: false,
+  },
   { id: 'templates', name: 'Templates de Mensagens', href: '/templates', isComingSoon: false },
   {
-    id: 'atendimento',
-    name: 'CRM e Atendimentos',
-    href: '/atendimento',
-    badge: 'Em Breve',
-    isComingSoon: true,
+    id: 'contatos',
+    name: 'Contatos e Segmentação',
+    href: '/contatos',
+    isComingSoon: false,
   },
   {
     id: 'imoveis',
-    name: 'Imóveis e Leads',
+    name: 'Imóveis',
     href: '/imoveis',
     badge: 'Em Breve',
     isComingSoon: true,
     segments: ['imobiliario'],
+  },
+  {
+    id: 'atendimento',
+    name: 'Leads e Respostas',
+    href: '/atendimento',
+    badge: 'Em Breve',
+    isComingSoon: true,
   },
 ];
 
@@ -82,24 +104,32 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
 
 export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/': {
-    title: 'Dashboard de Análise e Performance',
-    subtitle: 'Métricas unificadas de disparos e automações no WhatsApp',
+    title: 'Dashboard',
+    subtitle: 'ROI do corretor: disparos, respostas, leads e visitas',
+  },
+  '/metricas': {
+    title: 'Métricas de ROI',
+    subtitle: 'Atingidos, taxa de resposta, leads qualificados e visitas agendadas',
+  },
+  '/contatos': {
+    title: 'Contatos e Segmentação',
+    subtitle: 'Importação e tags por interesse, região e faixa de preço',
   },
   '/disparos': {
-    title: 'Disparos em Massa',
-    subtitle: 'Crie e gerencie campanhas de mensagens via Meta Cloud API',
+    title: 'Disparo de Campanha',
+    subtitle: 'Imóvel → segmento → agendar → enviar com status Meta',
   },
   '/templates': {
     title: 'Templates de Mensagens',
     subtitle: 'Gerencie modelos aprovados pela Meta para seus disparos',
   },
   '/atendimento': {
-    title: 'CRM e Atendimentos',
-    subtitle: 'Central de atendimento multioperadores no WhatsApp',
+    title: 'Leads e Respostas',
+    subtitle: 'Quem respondeu às campanhas e em que etapa está',
   },
   '/imoveis': {
-    title: 'Imóveis e Leads',
-    subtitle: 'Catálogo de lançamentos e automação de alertas',
+    title: 'Imóveis',
+    subtitle: 'Cadastro enxuto para alimentar campanhas e busca por perfil',
   },
   '/relatorios': {
     title: 'Relatórios de Análise e Performance',
