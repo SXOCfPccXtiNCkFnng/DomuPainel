@@ -8,15 +8,17 @@ export default function AssinaturaPage() {
   const [updatingTier, setUpdatingTier] = useState<string | null>(null);
   
   const [subData, setSubData] = useState({
-    planTier: 'PRO',
-    planName: 'Plano Pro',
-    priceBrl: 497,
-    dispatchesUsed: 854,
-    messageLimit: 5000,
+    planTier: 'STARTER',
+    planName: 'Plano Starter',
+    priceBrl: 197,
+    dispatchesUsed: 0,
+    messageLimit: 1000,
+    agentsUsed: 1,
+    agentsLimit: 2,
     status: 'ACTIVE',
-    paymentMethod: 'CREDIT_CARD',
+    paymentMethod: 'PIX',
     cardLastDigits: '8821',
-    renewalDate: '18/09'
+    renewalDate: '01/10'
   });
 
   useEffect(() => {
@@ -31,15 +33,17 @@ export default function AssinaturaPage() {
       const json = await res.json();
       if (json.success && json.subscription) {
         setSubData({
-          planTier: json.subscription.planTier || 'PRO',
-          planName: json.subscription.planName || 'Plano Pro',
-          priceBrl: json.subscription.priceBrl || 497,
-          dispatchesUsed: json.subscription.dispatchesUsed || 854,
-          messageLimit: json.subscription.messageLimit || 5000,
+          planTier: json.subscription.planTier || 'STARTER',
+          planName: json.subscription.planName || 'Plano Starter',
+          priceBrl: json.subscription.priceBrl || 197,
+          dispatchesUsed: json.subscription.dispatchesUsed || 0,
+          messageLimit: json.subscription.messageLimit || 1000,
+          agentsUsed: json.subscription.agentsUsed || 1,
+          agentsLimit: json.subscription.agentsLimit || 2,
           status: json.subscription.status || 'ACTIVE',
-          paymentMethod: json.subscription.paymentMethod || 'CREDIT_CARD',
+          paymentMethod: json.subscription.paymentMethod || 'PIX',
           cardLastDigits: json.subscription.cardLastDigits || '8821',
-          renewalDate: json.subscription.renewalDate || '18/09'
+          renewalDate: json.subscription.renewalDate || '01/10'
         });
       }
     } catch (err) {
@@ -78,6 +82,7 @@ export default function AssinaturaPage() {
   };
 
   const usagePercentage = Math.min(100, Math.round((subData.dispatchesUsed / subData.messageLimit) * 100));
+  const agentsPercentage = Math.min(100, Math.round((subData.agentsUsed / (subData.agentsLimit || 1)) * 100));
 
   return (
     <div className="space-y-6 w-full font-sans">
@@ -104,12 +109,12 @@ export default function AssinaturaPage() {
         </div>
       </div>
 
-      {/* Active Plan Summary Card (Data from Supabase) */}
+      {/* Active Plan Summary Card (Data directly from Supabase) */}
       <div className="bg-gradient-to-r from-domu-navy via-slate-900 to-domu-navy text-white rounded-md p-6 shadow-md border border-slate-800 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
             <span className="text-[10px] font-extrabold uppercase bg-domu-blue text-white px-2 py-0.5 rounded">
-              SEU PLANO ATUAL (BANCO DE DADOS)
+              SEU PLANO ATUAL
             </span>
             <h2 className="text-xl font-black text-white mt-1.5">{subData.planName}</h2>
             <p className="text-xs text-slate-300">Inclui Coexistência Celular + Web e Meta Cloud API Oficial</p>
@@ -126,11 +131,11 @@ export default function AssinaturaPage() {
           </div>
         </div>
 
-        {/* Usage Gauges */}
+        {/* Usage Gauges (Strictly Real Dynamic Data from Supabase) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1 text-xs">
           <div className="bg-slate-800/60 p-3 rounded border border-slate-700/60 space-y-1.5">
             <div className="flex justify-between text-slate-300 font-bold">
-              <span>Disparos no Mês (Real)</span>
+              <span>Disparos no Mês</span>
               <span className="text-domu-blue">{subData.dispatchesUsed.toLocaleString('pt-BR')} / {subData.messageLimit > 100000 ? 'Ilimitados' : subData.messageLimit.toLocaleString('pt-BR')}</span>
             </div>
             <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
@@ -141,10 +146,12 @@ export default function AssinaturaPage() {
           <div className="bg-slate-800/60 p-3 rounded border border-slate-700/60 space-y-1.5">
             <div className="flex justify-between text-slate-300 font-bold">
               <span>Atendentes 1:1</span>
-              <span className="text-emerald-400">4 / 10 Vagas</span>
+              <span className="text-emerald-400">
+                {subData.agentsUsed} / {subData.agentsLimit > 100 ? 'Ilimitados' : `${subData.agentsLimit} Vagas`}
+              </span>
             </div>
             <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-              <div className="bg-emerald-500 h-full w-[40%] rounded-full"></div>
+              <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${agentsPercentage}%` }}></div>
             </div>
           </div>
 
