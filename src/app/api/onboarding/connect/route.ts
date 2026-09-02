@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
             token_encryption_iv: iv,
             verify_token: finalVerifyToken,
             app_id: appId?.trim() || null,
-            webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://portal.domutech.digital'}/api/webhooks/meta`,
+            webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://painel.domutech.digital'}/api/whatsapp/webhook`,
             is_verified: true,
             updated_at: new Date().toISOString(),
           },

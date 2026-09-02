@@ -232,7 +232,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-emerald-600',
       borderColor: 'border-emerald-500',
-      available: false,
+      available: true,
     },
     {
       id: 'saude',
@@ -247,7 +247,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-amber-600',
       borderColor: 'border-amber-500',
-      available: false,
+      available: true,
     },
     {
       id: 'alimentacao',
@@ -262,7 +262,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-orange-600',
       borderColor: 'border-orange-500',
-      available: false,
+      available: true,
     },
     {
       id: 'geral',
@@ -276,7 +276,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-indigo-600',
       borderColor: 'border-indigo-500',
-      available: false,
+      available: true,
     },
   ];
 

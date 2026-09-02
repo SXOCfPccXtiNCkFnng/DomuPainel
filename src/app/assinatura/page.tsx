@@ -204,15 +204,13 @@ export default function AssinaturaPage() {
               <span className="text-xs font-bold">Equipe / atendimento</span>
             </div>
             <p className="text-lg font-black text-slate-900">
-              {subData.agentsLimit === 0
-                ? 'Starter · sem inbox 1:1'
-                : `${subData.agentsUsed} / ${subData.agentsLimit > 100 ? '∞' : subData.agentsLimit}`}
+              {subData.agentsUsed}
+              <span className="text-sm font-semibold text-slate-400">
+                {' '}
+                / {subData.agentsLimit > 100 ? '∞' : subData.agentsLimit} usuários
+              </span>
             </p>
-            <p className="text-[11px] text-slate-400">
-              {subData.agentsLimit === 0
-                ? 'Upgrade Pro para multi-usuário'
-                : 'Vagas de operadores na conta'}
-            </p>
+            <p className="text-[11px] text-slate-400">Membros ativos na conta</p>
           </div>
           <div className="p-5 space-y-3">
             <div className="flex items-center gap-2 text-slate-600">

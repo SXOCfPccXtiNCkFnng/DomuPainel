@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMetaTemplate, sendMetaText } from '@/lib/metaClient';
 import { requireAuth } from '@/lib/requireAuth';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export async function POST(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
 
     const body = await req.json();
-    const { to, type = 'template', templateName, languageCode = 'en_US', textBody, components } = body;
+    const {
+      to,
+      type = 'template',
+      templateName,
+      languageCode = 'en_US',
+      textBody,
+      components,
+    } = body;
 
     if (!to) {
       return NextResponse.json(
@@ -17,10 +26,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const phoneDigits = String(to).replace(/\D/g, '');
+    const phones = [phoneDigits];
+    if (phoneDigits.startsWith('55') && phoneDigits.length > 11) phones.push(phoneDigits.slice(2));
+    else if (phoneDigits.length <= 11) phones.push(`55${phoneDigits}`);
+
+    const { data: lead } = await supabaseAdmin
+      .from('leads')
+      .select('id, opt_in')
+      .eq('tenant_id', tenantId)
+      .in('phone', phones)
+      .maybeSingle();
+
+    if (lead && lead.opt_in === false) {
+      return NextResponse.json(
+        { success: false, error: 'Este contato pediu para não receber mensagens (opt-out).' },
+        { status: 403 }
+      );
+    }
+
     if (type === 'template') {
       if (!templateName) {
         return NextResponse.json(
-          { success: false, error: 'O nome do template ("templateName") é obrigatório para disparos do tipo template.' },
+          {
+            success: false,
+            error: 'O nome do template ("templateName") é obrigatório para disparos do tipo template.',
+          },
           { status: 400 }
         );
       }
@@ -29,7 +60,8 @@ export async function POST(req: NextRequest) {
         to,
         templateName,
         languageCode,
-        components
+        components,
+        tenantId,
       });
 
       if (!result.success) {
@@ -40,7 +72,7 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Mensagem de template disparada com sucesso via Meta Cloud API!',
         messageId: result.messageId,
-        data: result.data
+        data: result.data,
       });
     }
 
@@ -52,7 +84,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const result = await sendMetaText({ to, textBody });
+      const result = await sendMetaText({ to, textBody, tenantId });
 
       if (!result.success) {
         return NextResponse.json(result, { status: result.status || 500 });
@@ -62,7 +94,7 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Mensagem de texto enviada com sucesso via Meta Cloud API!',
         messageId: result.messageId,
-        data: result.data
+        data: result.data,
       });
     }
 
@@ -70,7 +102,6 @@ export async function POST(req: NextRequest) {
       { success: false, error: 'Tipo de mensagem inválido. Use "template" ou "text".' },
       { status: 400 }
     );
-
   } catch (error: any) {
     console.error('[API Send Route Error]', error);
     return NextResponse.json(

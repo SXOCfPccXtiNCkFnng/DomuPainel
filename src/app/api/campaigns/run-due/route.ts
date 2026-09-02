@@ -12,14 +12,9 @@ function allowCron(req: NextRequest): boolean {
   if (!secret || secret.length < 16) return false;
 
   const header = req.headers.get('x-domu-cron-secret') || req.headers.get('authorization');
-  if (header) {
-    const token = header.startsWith('Bearer ') ? header.slice(7) : header;
-    if (token === secret) return true;
-  }
-
-  // Fallback p/ cron-job.org (URL com query). Prefira header quando possível.
-  const fromQuery = req.nextUrl.searchParams.get('cron_secret');
-  return Boolean(fromQuery && fromQuery === secret);
+  if (!header) return false;
+  const token = header.startsWith('Bearer ') ? header.slice(7) : header;
+  return token === secret;
 }
 
 async function handleRunDue(req: NextRequest, body: { campaignId?: string }) {

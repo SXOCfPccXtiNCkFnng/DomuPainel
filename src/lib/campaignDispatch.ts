@@ -1,10 +1,11 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { sendMetaTemplate } from '@/lib/metaClient';
+import { resolveMetaCredentials, sendMetaTemplate } from '@/lib/metaClient';
 
 export type DispatchResult = {
   processed: number;
   sent: number;
   failed: number;
+  skippedOptOut: number;
   skipped: boolean;
   reason?: string;
   campaignStatus: string;
@@ -25,7 +26,7 @@ function formatMetaError(err: unknown): string {
 
 /**
  * Envia logs PENDING de uma campanha via Meta e atualiza contadores.
- * Se ainda estiver SCHEDULED e scheduled_at > agora, não envia.
+ * Usa credenciais do tenant (fallback env). Respeita opt_in = false.
  */
 export async function dispatchCampaignPending(
   campaignId: string,
@@ -47,6 +48,7 @@ export async function dispatchCampaignPending(
       processed: 0,
       sent: 0,
       failed: 0,
+      skippedOptOut: 0,
       skipped: true,
       reason: 'Campanha não encontrada.',
       campaignStatus: 'MISSING',
@@ -59,6 +61,7 @@ export async function dispatchCampaignPending(
       processed: 0,
       sent: 0,
       failed: 0,
+      skippedOptOut: 0,
       skipped: true,
       reason: 'Campanha já finalizada.',
       campaignStatus: status,
@@ -72,6 +75,7 @@ export async function dispatchCampaignPending(
         processed: 0,
         sent: 0,
         failed: 0,
+        skippedOptOut: 0,
         skipped: true,
         reason: 'Ainda não chegou o horário agendado.',
         campaignStatus: 'SCHEDULED',
@@ -97,8 +101,33 @@ export async function dispatchCampaignPending(
       processed: 0,
       sent: 0,
       failed: 0,
+      skippedOptOut: 0,
       skipped: true,
       reason: 'Template não encontrado.',
+      campaignStatus: 'FAILED',
+    };
+  }
+
+  let credentials;
+  try {
+    credentials = await resolveMetaCredentials(campaign.tenant_id);
+  } catch (err: any) {
+    await supabaseAdmin
+      .from('campaigns')
+      .update({
+        status: 'FAILED',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', campaignId);
+
+    return {
+      processed: 0,
+      sent: 0,
+      failed: 0,
+      skippedOptOut: 0,
+      skipped: true,
+      reason: err?.message || 'Credenciais Meta ausentes.',
       campaignStatus: 'FAILED',
     };
   }
@@ -116,7 +145,7 @@ export async function dispatchCampaignPending(
 
   const { data: pendingLogs } = await supabaseAdmin
     .from('campaign_logs')
-    .select('id, lead_id, leads(phone, name)')
+    .select('id, lead_id, leads(phone, name, opt_in)')
     .eq('campaign_id', campaignId)
     .eq('tenant_id', campaign.tenant_id)
     .eq('status', 'PENDING')
@@ -125,12 +154,20 @@ export async function dispatchCampaignPending(
   const logs = pendingLogs || [];
   let sent = 0;
   let failed = 0;
+  let skippedOptOut = 0;
 
   for (const log of logs) {
-    const phone = (log as any).leads?.phone as string | undefined;
+    const lead = (log as any).leads;
+    const phone = lead?.phone as string | undefined;
+    const optIn = lead?.opt_in;
     const patch: Record<string, unknown> = {};
 
-    if (!phone) {
+    if (optIn === false) {
+      patch.status = 'FAILED';
+      patch.error_message = 'Opt-out: contato pediu para não receber.';
+      skippedOptOut += 1;
+      failed += 1;
+    } else if (!phone) {
       patch.status = 'FAILED';
       patch.error_message = 'Lead sem telefone.';
       failed += 1;
@@ -140,6 +177,7 @@ export async function dispatchCampaignPending(
           to: phone,
           templateName,
           languageCode: 'pt_BR',
+          credentials,
         });
         if (result.success && result.messageId) {
           patch.status = 'SENT';
@@ -193,6 +231,7 @@ export async function dispatchCampaignPending(
     processed: logs.length,
     sent,
     failed,
+    skippedOptOut,
     skipped: false,
     campaignStatus: finalStatus,
   };

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Building2, Send, Users, ArrowUpRight, MapPin, Plus } from 'lucide-react';
-import { mockProperties } from '@/lib/mockData';
 import { Property } from '@/types';
 import Link from 'next/link';
 
@@ -12,7 +11,11 @@ interface ImoveisDestaqueProps {
   onOpenAddPropertyModal?: () => void;
 }
 
-export default function ImoveisDestaque({ properties = mockProperties, onTriggerPropertyDispatch, onOpenAddPropertyModal }: ImoveisDestaqueProps) {
+export default function ImoveisDestaque({
+  properties = [],
+  onTriggerPropertyDispatch,
+  onOpenAddPropertyModal,
+}: ImoveisDestaqueProps) {
   return (
     <div className="bg-white rounded-md border border-slate-200/80 p-5 space-y-4 shadow-sm w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -47,6 +50,14 @@ export default function ImoveisDestaque({ properties = mockProperties, onTrigger
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {properties.length === 0 && (
+          <div className="md:col-span-3 py-10 text-center border border-dashed border-slate-200 rounded bg-slate-50/50">
+            <p className="text-xs font-bold text-slate-700">Nenhum imóvel cadastrado</p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Módulo em breve — o catálogo real será ligado ao banco.
+            </p>
+          </div>
+        )}
         {properties.map((prop) => (
           <div 
             key={prop.id}
