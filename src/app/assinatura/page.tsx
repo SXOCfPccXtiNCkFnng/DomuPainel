@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CreditCard, CheckCircle2, RefreshCw, ArrowUpRight, Sparkles, AlertCircle } from 'lucide-react';
+import { CreditCard, CheckCircle2, RefreshCw, ArrowUpRight, Sparkles, AlertCircle, XCircle } from 'lucide-react';
 
 export default function AssinaturaPage() {
   const [loading, setLoading] = useState(true);
@@ -13,8 +13,8 @@ export default function AssinaturaPage() {
     priceBrl: 197,
     dispatchesUsed: 0,
     messageLimit: 1000,
-    agentsUsed: 1,
-    agentsLimit: 2,
+    agentsUsed: 0,
+    agentsLimit: 0,
     status: 'ACTIVE',
     paymentMethod: 'PIX',
     cardLastDigits: '8821',
@@ -38,8 +38,8 @@ export default function AssinaturaPage() {
           priceBrl: json.subscription.priceBrl || 197,
           dispatchesUsed: json.subscription.dispatchesUsed || 0,
           messageLimit: json.subscription.messageLimit || 1000,
-          agentsUsed: json.subscription.agentsUsed || 1,
-          agentsLimit: json.subscription.agentsLimit || 2,
+          agentsUsed: json.subscription.agentsUsed || 0,
+          agentsLimit: json.subscription.agentsLimit ?? 0,
           status: json.subscription.status || 'ACTIVE',
           paymentMethod: json.subscription.paymentMethod || 'PIX',
           cardLastDigits: json.subscription.cardLastDigits || '8821',
@@ -82,7 +82,7 @@ export default function AssinaturaPage() {
   };
 
   const usagePercentage = Math.min(100, Math.round((subData.dispatchesUsed / subData.messageLimit) * 100));
-  const agentsPercentage = Math.min(100, Math.round((subData.agentsUsed / (subData.agentsLimit || 1)) * 100));
+  const agentsPercentage = subData.agentsLimit > 0 ? Math.min(100, Math.round((subData.agentsUsed / subData.agentsLimit) * 100)) : 0;
 
   return (
     <div className="space-y-6 w-full font-sans">
@@ -109,7 +109,7 @@ export default function AssinaturaPage() {
         </div>
       </div>
 
-      {/* Active Plan Summary Card (Data directly from Supabase) */}
+      {/* Active Plan Summary Card */}
       <div className="bg-gradient-to-r from-domu-navy via-slate-900 to-domu-navy text-white rounded-md p-6 shadow-md border border-slate-800 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
@@ -117,7 +117,11 @@ export default function AssinaturaPage() {
               SEU PLANO ATUAL
             </span>
             <h2 className="text-xl font-black text-white mt-1.5">{subData.planName}</h2>
-            <p className="text-xs text-slate-300">Inclui Coexistência Celular + Web e Meta Cloud API Oficial</p>
+            <p className="text-xs text-slate-300">
+              {subData.planTier === 'STARTER' 
+                ? 'Foco exclusivo em disparos automáticos via Meta Cloud API Oficial' 
+                : 'Inclui Coexistência Celular + Web, Atendimento Multi-Agente e Meta Cloud API'}
+            </p>
           </div>
 
           <div className="text-left md:text-right">
@@ -131,7 +135,7 @@ export default function AssinaturaPage() {
           </div>
         </div>
 
-        {/* Usage Gauges (Strictly Real Dynamic Data from Supabase) */}
+        {/* Usage Gauges */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1 text-xs">
           <div className="bg-slate-800/60 p-3 rounded border border-slate-700/60 space-y-1.5">
             <div className="flex justify-between text-slate-300 font-bold">
@@ -146,9 +150,13 @@ export default function AssinaturaPage() {
           <div className="bg-slate-800/60 p-3 rounded border border-slate-700/60 space-y-1.5">
             <div className="flex justify-between text-slate-300 font-bold">
               <span>Atendentes 1:1</span>
-              <span className="text-emerald-400">
-                {subData.agentsUsed} / {subData.agentsLimit > 100 ? 'Ilimitados' : `${subData.agentsLimit} Vagas`}
-              </span>
+              {subData.agentsLimit === 0 ? (
+                <span className="text-slate-400 font-normal italic">Sem Atendimento (0 Vagas)</span>
+              ) : (
+                <span className="text-emerald-400">
+                  {subData.agentsUsed} / {subData.agentsLimit > 100 ? 'Ilimitados' : `${subData.agentsLimit} Vagas`}
+                </span>
+              )}
             </div>
             <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
               <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${agentsPercentage}%` }}></div>
@@ -188,17 +196,21 @@ export default function AssinaturaPage() {
               </div>
 
               <ul className="space-y-2 text-xs text-slate-600 font-medium">
-                <li className="flex items-center gap-2">
+                <li className="flex items-center gap-2 font-bold text-slate-800">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>Até 1.000 disparos/mês</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>2 Atendentes no WhatsApp</span>
+                <li className="flex items-center gap-2 text-slate-400">
+                  <XCircle className="w-4 h-4 text-slate-300 shrink-0" />
+                  <span>Sem Atendimento 1:1 no WhatsApp</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>Meta Cloud API Oficial</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Coexistência Celular + Web</span>
                 </li>
               </ul>
             </div>
@@ -244,7 +256,11 @@ export default function AssinaturaPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0" />
-                  <span>Até 10 Atendentes 1:1</span>
+                  <span>Até 10 Atendentes 1:1 no WhatsApp</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0" />
+                  <span>Central de Atendimento Multi-Agente</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0" />
@@ -290,15 +306,19 @@ export default function AssinaturaPage() {
               <ul className="space-y-2 text-xs text-slate-600 font-medium">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Disparos Ilimitados</span>
+                  <span>Disparos em Massa Ilimitados</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Atendentes Ilimitados</span>
+                  <span>Atendentes 1:1 Ilimitados</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Integrações com CRMs Personalizadas</span>
+                  <span>Integrador e API Personalizada</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Gerente de Conta Dedicado</span>
                 </li>
               </ul>
             </div>
