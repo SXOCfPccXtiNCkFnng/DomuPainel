@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 1. Fetch Subscription from Supabase public.subscriptions
-    const { data: sub, error } = await supabaseAdmin
+    const { data: sub } = await supabaseAdmin
       .from('subscriptions')
       .select('*')
       .eq('tenant_id', activeTenantId)
@@ -32,19 +32,27 @@ export async function GET(req: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', activeTenantId);
 
-    // Default fallback values if subscription row not yet created
-    const planTier = sub?.plan_tier || 'PRO';
+    // 3. Count total active users/agents in public.users
+    const { count: usersCount } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', activeTenantId);
+
+    // Values from database (0 fallback for new tenants, NO fake 854 number)
+    const planTier = sub?.plan_tier || 'STARTER';
     const priceBrl = sub?.monthly_price_brl || (planTier === 'STARTER' ? 197 : planTier === 'ENTERPRISE' ? 997 : 497);
     const messageLimit = sub?.monthly_message_limit || (planTier === 'STARTER' ? 1000 : planTier === 'ENTERPRISE' ? 999999 : 5000);
-    const dispatchesUsed = dispatchesCount || 854;
+    const dispatchesUsed = dispatchesCount || 0;
+    const agentsUsed = usersCount || 1;
+    const agentsLimit = planTier === 'STARTER' ? 2 : planTier === 'ENTERPRISE' ? 999 : 10;
 
     // Calculate renewal date (current_period_end or +30 days)
-    const renewalDateObj = sub?.current_period_end ? new Date(sub.current_period_end) : new Date(Date.now() + 18 * 24 * 60 * 60 * 1000);
+    const renewalDateObj = sub?.current_period_end ? new Date(sub.current_period_end) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const renewalDateFormatted = `${String(renewalDateObj.getDate()).padStart(2, '0')}/${String(renewalDateObj.getMonth() + 1).padStart(2, '0')}`;
 
     // Plan Name mapping
-    let planName = 'Plano Pro';
-    if (planTier === 'STARTER') planName = 'Plano Starter';
+    let planName = 'Plano Starter';
+    if (planTier === 'PRO') planName = 'Plano Pro';
     if (planTier === 'ENTERPRISE') planName = 'Plano Enterprise';
 
     return NextResponse.json({
@@ -55,8 +63,10 @@ export async function GET(req: NextRequest) {
         priceBrl,
         messageLimit,
         dispatchesUsed,
+        agentsUsed,
+        agentsLimit,
         status: sub?.status || 'ACTIVE',
-        paymentMethod: sub?.payment_method || 'CREDIT_CARD',
+        paymentMethod: sub?.payment_method || 'PIX',
         cardLastDigits: '8821',
         renewalDate: renewalDateFormatted
       }
@@ -104,7 +114,7 @@ export async function POST(req: NextRequest) {
           monthly_price_brl: priceBrl,
           monthly_message_limit: limit,
           status: 'ACTIVE',
-          payment_method: 'CREDIT_CARD',
+          payment_method: 'PIX',
           updated_at: new Date().toISOString()
         },
         { onConflict: 'tenant_id' }
