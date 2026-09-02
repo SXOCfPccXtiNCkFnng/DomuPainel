@@ -47,8 +47,7 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
     ),
     disparos: (
       <>
-        <path d="M2 9L14 3L10 9L14 15L2 9Z" stroke={s} strokeWidth="1.4" strokeLinejoin="round" fill={active ? '#EFF6FF' : 'none'} />
-        <path d="M10 9H14" stroke={s} strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M2.5 15.5L15.5 2.5L9.5 15.5L7.5 9.5L1.5 7.5L15.5 2.5" stroke={s} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill={active ? '#EFF6FF' : 'none'} />
       </>
     ),
     templates: (
@@ -79,8 +78,8 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
     ),
     configuracoes: (
       <>
-        <path d="M9 11.5A2.5 2.5 0 1 0 9 6.5A2.5 2.5 0 0 0 9 11.5Z" stroke={s} strokeWidth="1.4" />
-        <path d="M14.5 8.2V9.8L13.1 10.3C13 10.7 12.8 11.1 12.5 11.4L13 12.8L11.8 14L10.4 13.5C10.1 13.8 9.7 14 9.3 14.1L8.8 15.5H7.2L6.7 14.1C6.3 14 5.9 13.8 5.6 13.5L4.2 14L3 12.8L3.5 11.4C3.2 11.1 3 10.7 2.9 10.3L1.5 9.8V8.2L2.9 7.7C3 7.3 3.2 6.9 3.5 6.6L3 5.2L4.2 4L5.6 4.5C5.9 4.2 6.3 4 6.7 3.9L7.2 2.5H8.8L9.3 3.9C9.7 4 10.1 4.2 10.4 4.5L11.8 4L13 5.2L12.5 6.6C12.8 6.9 13 7.3 13.1 7.7L14.5 8.2Z" stroke={s} strokeWidth="1.3" strokeLinejoin="round" />
+        <circle cx="9" cy="9" r="2.2" stroke={s} strokeWidth="1.4" fill={active ? '#EFF6FF' : 'none'} />
+        <path d="M9 1.8V3.4M9 14.6V16.2M1.8 9H3.4M14.6 9H16.2M3.9 3.9L5 5M13 13L14.1 14.1M3.9 14.1L5 13M13 5L14.1 3.9" stroke={s} strokeWidth="1.4" strokeLinecap="round" />
       </>
     ),
     assinatura: (
