@@ -30,27 +30,24 @@ export default function Sidebar() {
   return (
     <aside className="w-64 bg-white text-slate-800 min-h-screen flex flex-col border-r border-slate-200 fixed left-0 top-0 bottom-0 z-40 font-sans">
 
-      <div className="py-4 px-5 border-b border-slate-100">
-        <Link href="/" className="block">
+      <div className="py-4 px-5 border-b border-slate-100 flex items-center justify-center">
+        <Link href="/" className="flex items-center justify-center w-full">
           <Image
             src="/logo-com-nome.png"
             alt="DOMU TECH Logo"
-            width={120}
-            height={28}
+            width={155}
+            height={38}
             priority
-            className="h-7 w-auto object-contain"
+            className="h-9 w-auto object-contain mx-auto"
           />
         </Link>
       </div>
 
-      <div className="px-4 py-3 border-b border-slate-100 space-y-2">
+      <div className="px-4 py-2.5 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
-          <span className="text-xs font-bold text-slate-900 truncate">{companyName}</span>
+          <span className="text-xs font-bold text-slate-900 truncate">{companyName && companyName !== 'Domu' ? companyName : 'Minha Empresa'}</span>
         </div>
-        <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-50 text-domu-blue border border-blue-100">
-          {segmentName}
-        </span>
       </div>
 
       <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
