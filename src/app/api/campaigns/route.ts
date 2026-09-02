@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
 
     const { data: leads } = await supabaseAdmin
       .from('leads')
-      .select('id, phone, name')
+      .select('id, phone, name, opt_in')
       .eq('tenant_id', tenantId)
       .in('id', leadIds);
 
@@ -223,7 +223,8 @@ export async function POST(req: NextRequest) {
       tenant_id: tenantId,
       campaign_id: campaign.id,
       lead_id: lead.id,
-      status: 'PENDING',
+      status: lead.opt_in === false ? 'FAILED' : 'PENDING',
+      error_message: lead.opt_in === false ? 'Opt-out: contato pediu para não receber.' : null,
     }));
 
     if (logs.length > 0) {

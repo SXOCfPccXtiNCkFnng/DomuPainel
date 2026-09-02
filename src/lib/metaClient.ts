@@ -1,38 +1,101 @@
 /**
  * Domu Tech - Meta Cloud API Server Helper
- * Securely executes Meta Graph API calls exclusively on the Node.js server.
+ * Prefer tenant credentials; fallback to env global.
  */
+
+import { supabaseAdmin } from '@/lib/supabaseServer';
+import { decryptData } from '@/lib/crypto';
+import { logger } from '@/lib/logger';
+
+export type MetaCredentials = {
+  accessToken: string;
+  phoneNumberId: string;
+  source: 'tenant' | 'env';
+};
 
 export interface SendTemplateOptions {
   to: string;
   templateName: string;
   languageCode?: string;
   components?: any[];
+  credentials?: MetaCredentials;
+  tenantId?: string;
 }
 
 export interface SendTextOptions {
   to: string;
   textBody: string;
+  credentials?: MetaCredentials;
+  tenantId?: string;
 }
 
 const META_GRAPH_API_VERSION = 'v20.0';
+
+function envMetaCredentials(): MetaCredentials | null {
+  const accessToken = process.env.META_ACCESS_TOKEN || process.env.META_WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
+  if (!accessToken || !phoneNumberId) return null;
+  return { accessToken, phoneNumberId, source: 'env' };
+}
+
+/** Credenciais do tenant (criptografadas) com fallback para env global. */
+export async function resolveMetaCredentials(tenantId?: string): Promise<MetaCredentials> {
+  if (tenantId) {
+    const { data: cred } = await supabaseAdmin
+      .from('tenant_credentials')
+      .select('phone_number_id, encrypted_access_token, token_encryption_iv')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (
+      cred?.phone_number_id &&
+      cred.encrypted_access_token &&
+      cred.token_encryption_iv
+    ) {
+      try {
+        const accessToken = decryptData(cred.encrypted_access_token, cred.token_encryption_iv);
+        if (accessToken) {
+          return {
+            accessToken,
+            phoneNumberId: cred.phone_number_id,
+            source: 'tenant',
+          };
+        }
+      } catch (err: any) {
+        logger.warn('meta.decrypt_failed', {
+          tenantId,
+          message: err?.message,
+        });
+      }
+    }
+  }
+
+  const fromEnv = envMetaCredentials();
+  if (fromEnv) return fromEnv;
+
+  throw new Error(
+    'Credenciais Meta ausentes. Configure em Configurações do WhatsApp ou META_ACCESS_TOKEN / META_PHONE_NUMBER_ID no ambiente.'
+  );
+}
+
+async function resolveCreds(options: {
+  credentials?: MetaCredentials;
+  tenantId?: string;
+}): Promise<MetaCredentials> {
+  if (options.credentials) return options.credentials;
+  return resolveMetaCredentials(options.tenantId);
+}
 
 export async function sendMetaTemplate({
   to,
   templateName,
   languageCode = 'en_US',
-  components = []
+  components = [],
+  credentials,
+  tenantId,
 }: SendTemplateOptions) {
-  const token = process.env.META_ACCESS_TOKEN;
-  const phoneId = process.env.META_PHONE_NUMBER_ID;
-
-  if (!token || !phoneId) {
-    throw new Error('Meta API credentials (META_ACCESS_TOKEN or META_PHONE_NUMBER_ID) are missing from environment variables.');
-  }
-
-  const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${phoneId}/messages`;
-
-  // Sanitize phone number (remove +, spaces, dashes)
+  const creds = await resolveCreds({ credentials, tenantId });
+  const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${creds.phoneNumberId}/messages`;
   const sanitizedTo = to.replace(/\D/g, '');
 
   const payload: any = {
@@ -42,10 +105,8 @@ export async function sendMetaTemplate({
     type: 'template',
     template: {
       name: templateName,
-      language: {
-        code: languageCode
-      }
-    }
+      language: { code: languageCode },
+    },
   };
 
   if (components && components.length > 0) {
@@ -55,20 +116,24 @@ export async function sendMetaTemplate({
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${creds.accessToken}`,
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
-    console.error('[Meta API Error]', data);
+    logger.error('meta.template_failed', {
+      status: response.status,
+      source: creds.source,
+      error: data?.error?.message,
+    });
     return {
       success: false,
       status: response.status,
-      error: data.error || { message: 'Meta API call failed' }
+      error: data.error || { message: 'Meta API call failed' },
     };
   }
 
@@ -76,19 +141,19 @@ export async function sendMetaTemplate({
     success: true,
     status: response.status,
     messageId: data.messages?.[0]?.id,
-    data
+    data,
+    credentialsSource: creds.source,
   };
 }
 
-export async function sendMetaText({ to, textBody }: SendTextOptions) {
-  const token = process.env.META_ACCESS_TOKEN;
-  const phoneId = process.env.META_PHONE_NUMBER_ID;
-
-  if (!token || !phoneId) {
-    throw new Error('Meta API credentials are missing from environment variables.');
-  }
-
-  const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${phoneId}/messages`;
+export async function sendMetaText({
+  to,
+  textBody,
+  credentials,
+  tenantId,
+}: SendTextOptions) {
+  const creds = await resolveCreds({ credentials, tenantId });
+  const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${creds.phoneNumberId}/messages`;
   const sanitizedTo = to.replace(/\D/g, '');
 
   const payload = {
@@ -98,27 +163,31 @@ export async function sendMetaText({ to, textBody }: SendTextOptions) {
     type: 'text',
     text: {
       preview_url: false,
-      body: textBody
-    }
+      body: textBody,
+    },
   };
 
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${creds.accessToken}`,
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
-    console.error('[Meta API Error]', data);
+    logger.error('meta.text_failed', {
+      status: response.status,
+      source: creds.source,
+      error: data?.error?.message,
+    });
     return {
       success: false,
       status: response.status,
-      error: data.error || { message: 'Meta API call failed' }
+      error: data.error || { message: 'Meta API call failed' },
     };
   }
 
@@ -126,6 +195,21 @@ export async function sendMetaText({ to, textBody }: SendTextOptions) {
     success: true,
     status: response.status,
     messageId: data.messages?.[0]?.id,
-    data
+    data,
+    credentialsSource: creds.source,
   };
+}
+
+/** Detecta pedido de opt-out em texto inbound. */
+export function isOptOutMessage(text: string): boolean {
+  const t = (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return (
+    /nao quero receber/.test(t) ||
+    /parar de (receber|enviar)/.test(t) ||
+    /\b(stop|unsubscribe|sair|cancelar)\b/.test(t) ||
+    /remover (meu )?(numero|telefone)/.test(t)
+  );
 }

@@ -7,13 +7,12 @@ import CampaignWizardModal, {
 } from '@/components/disparos/CampaignWizardModal';
 import CampaignProgress from '@/components/disparos/CampaignProgress';
 import NovoImovelModal from '@/components/imoveis/NovoImovelModal';
-import { Building2, Users, Send, MapPin, Tag, Plus, CheckCircle2, MessageSquare } from 'lucide-react';
-import { mockProperties, mockLeads } from '@/lib/mockData';
+import { Users, Plus, CheckCircle2 } from 'lucide-react';
 import { Property } from '@/types';
 import { getAuthItem } from '@/lib/authStorage';
 
 export default function ImoveisPage() {
-  const [properties, setProperties] = useState<Property[]>(mockProperties);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedPropertyTitle, setSelectedPropertyTitle] = useState<string | undefined>(undefined);
@@ -143,32 +142,15 @@ export default function ImoveisPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {mockLeads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3 px-3">
-                    <p className="font-bold text-slate-900 text-xs">{lead.name}</p>
-                    <p className="text-[10.5px] text-slate-400">{lead.email}</p>
-                  </td>
-                  <td className="py-3 px-3 font-mono text-[11px] text-domu-blue font-bold">
-                    {lead.phone}
-                  </td>
-                  <td className="py-3 px-3">
-                    <p className="font-bold text-slate-800 text-xs">{lead.interestPropertyType}</p>
-                    <p className="text-[10.5px] text-slate-400">Até R$ {lead.budgetMax.toLocaleString('pt-BR')}</p>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="px-2 py-0.5 rounded text-[9.5px] font-extrabold uppercase bg-blue-50 text-domu-blue border border-blue-100">
-                      {lead.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <button className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors inline-flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3 text-domu-blue" />
-                      <span>Enviar Mensagem</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              <tr>
+                <td colSpan={5} className="py-10 text-center text-xs text-slate-400">
+                  Nenhum lead imobiliário ainda. Contatos reais ficam em{' '}
+                  <a href="/contatos" className="text-domu-blue font-semibold hover:underline">
+                    Contatos
+                  </a>
+                  .
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>

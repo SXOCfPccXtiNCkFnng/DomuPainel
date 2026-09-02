@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getMetaAppSecret, getMetaVerifyToken, isProduction } from '@/lib/envSecrets';
+import { isOptOutMessage } from '@/lib/metaClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,11 +145,11 @@ async function handleInboundMessage(message: any, tenantId: string | null, metad
   else if (from.length <= 11) phones.push(`55${from}`);
 
   const { data: leads } = await supabaseAdmin
-    .from('leads')
-    .select('id, tenant_id, status')
-    .eq('tenant_id', tenantId)
-    .in('phone', phones)
-    .limit(1);
+      .from('leads')
+      .select('id, tenant_id, status, opt_in')
+      .eq('tenant_id', tenantId)
+      .in('phone', phones)
+      .limit(1);
 
   const lead = leads?.[0];
   if (!lead) {
@@ -167,18 +168,25 @@ async function handleInboundMessage(message: any, tenantId: string | null, metad
     status: 'DELIVERED',
   });
 
+  const optedOut = isOptOutMessage(bodyText);
   const nextStatus =
     lead.status === 'NOVO' || lead.status === 'QUALIFIED'
       ? 'EM_ATENDIMENTO'
       : lead.status;
 
+  const leadPatch: Record<string, unknown> = {
+    status: nextStatus,
+    last_contact_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (optedOut) {
+    leadPatch.opt_in = false;
+    leadPatch.opt_in_updated_at = new Date().toISOString();
+  }
+
   await supabaseAdmin
     .from('leads')
-    .update({
-      status: nextStatus,
-      last_contact_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .update(leadPatch)
     .eq('id', lead.id)
     .eq('tenant_id', tenantId);
 }

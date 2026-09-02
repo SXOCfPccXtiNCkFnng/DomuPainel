@@ -159,15 +159,6 @@ export default function DashboardPage() {
             <h3 className="text-sm font-bold text-slate-900">Atalhos do dia a dia</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {isRealEstate && (
-              <Link
-                href="/imoveis"
-                className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
-              >
-                <PlusCircle className="w-4 h-4" />
-                Cadastrar imóvel
-              </Link>
-            )}
             <Link
               href="/contatos"
               className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
@@ -175,15 +166,14 @@ export default function DashboardPage() {
               <Tags className="w-4 h-4" />
               Importar contatos
             </Link>
-            <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
-              <span className="inline-flex items-center gap-2">
-                <Send className="w-4 h-4" />
-                Disparar campanha
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">
-                Em breve
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsWizardOpen(true)}
+              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2 text-left"
+            >
+              <Send className="w-4 h-4" />
+              Disparar campanha
+            </button>
             <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
               <span className="inline-flex items-center gap-2">
                 <MessageSquareReply className="w-4 h-4" />
@@ -193,6 +183,17 @@ export default function DashboardPage() {
                 Em breve
               </span>
             </div>
+            {isRealEstate && (
+              <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
+                <span className="inline-flex items-center gap-2">
+                  <PlusCircle className="w-4 h-4" />
+                  Cadastrar imóvel
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">
+                  Em breve
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
