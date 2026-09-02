@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/requireAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const phoneNumberId = searchParams.get('phoneNumberId') || process.env.META_PHONE_NUMBER_ID;
     const accessToken = process.env.META_WHATSAPP_TOKEN;

@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { requireAdmin } from '@/lib/requireAuth';
+
+function allowAdminDbRoute(req: NextRequest): boolean {
+  // Desligado por padrão — exige DOMU_ADMIN_SECRET (mín. 16) + header x-domu-admin-secret
+  const secret = process.env.DOMU_ADMIN_SECRET;
+  if (!secret || secret.length < 16) return false;
+  const header = req.headers.get('x-domu-admin-secret');
+  return Boolean(header && header === secret);
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAdmin(req);
+    if ('error' in auth) return auth.error;
+
+    if (!allowAdminDbRoute(req)) {
+      return NextResponse.json(
+        { success: false, error: 'Seed bloqueado. Defina DOMU_ADMIN_SECRET e envie x-domu-admin-secret.' },
+        { status: 403 }
+      );
+    }
+
     // 1. Create Default Tenant
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')

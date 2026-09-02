@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { 
@@ -10,17 +10,84 @@ import {
   Smartphone, 
   ShieldCheck, 
   Zap,
-  Send,
   MessageCircle,
   QrCode,
   CreditCard,
   CheckCircle2,
   RefreshCw,
   Lock,
-  Star
+  Star,
+  Key,
+  Info,
+  ExternalLink,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { TenantSegment } from '@/types';
 import { SegmentIcon } from '@/components/icons/DomuIcons';
+import { syncSessionToStorage } from '@/lib/sessionHelpers';
+import { getAuthItem, setAuthItem, syncSessionToActiveStorage } from '@/lib/authStorage';
+import { SEGMENT_LABELS } from '@/lib/segmentConfig';
+
+const STEPS = [
+  { id: 1, label: 'Segmento' },
+  { id: 2, label: 'Empresa' },
+  { id: 3, label: 'Conexão' },
+  { id: 4, label: 'WhatsApp' },
+  { id: 5, label: 'Plano' },
+] as const;
+
+const PLAN_OPTIONS = [
+  {
+    id: 'STARTER' as const,
+    name: 'Starter',
+    tagline: 'MVP completo',
+    audience: 'Tudo que o corretor precisa para disparar, qualificar e medir ROI no WhatsApp.',
+    price: 197,
+    highlight: false,
+    features: [
+      'Cadastro de imóveis (foto, preço, região, status)',
+      'Contatos + tags (interesse, região, faixa)',
+      'Campanha: imóvel → segmento → envio',
+      'Até 1.500 disparos/mês (limite DOMU)',
+      'Até 200 disparos/dia (trava de segurança)',
+      'Leads que responderam + métricas de ROI',
+    ],
+  },
+  {
+    id: 'PRO' as const,
+    name: 'Pro',
+    tagline: 'Mais popular',
+    audience: 'Para imobiliárias e equipes que precisam de mais volume e operação diária.',
+    price: 497,
+    highlight: true,
+    features: [
+      'Tudo do Starter',
+      'Até 6.000 disparos/mês (limite DOMU)',
+      'Sem teto diário no portal',
+      'Mais usuários na mesma conta',
+      'Relatórios avançados de campanha',
+      'CRM e atendimento (em breve)',
+      'Suporte prioritário DOMU',
+    ],
+  },
+  {
+    id: 'ENTERPRISE' as const,
+    name: 'Enterprise',
+    tagline: 'Alta escala',
+    audience: 'Para redes, franquias e operações com volume alto e acompanhamento dedicado.',
+    price: 997,
+    highlight: false,
+    features: [
+      'Tudo do Pro',
+      'Disparos ilimitados no portal*',
+      'Multi-operadores no mesmo canal',
+      'API direta / número dedicado',
+      'Onboarding assistido pela DOMU',
+      'Gerente de conta e SLA',
+    ],
+  },
+];
 
 interface SegmentOption {
   id: TenantSegment;
@@ -30,6 +97,7 @@ interface SegmentOption {
   features: string[];
   color: string;
   borderColor: string;
+  available: boolean;
 }
 
 export default function OnboardingPage() {
@@ -49,9 +117,78 @@ export default function OnboardingPage() {
   const [isConnecting, setIsConnecting] = useState(false);
 
   // Step 5 Pricing Plan States
-  const [selectedPlan, setSelectedPlan] = useState<'STARTER' | 'PRO' | 'ENTERPRISE'>('PRO');
+  const [selectedPlan, setSelectedPlan] = useState<'STARTER' | 'PRO' | 'ENTERPRISE'>('STARTER');
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsError, setTermsError] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [step2Error, setStep2Error] = useState('');
+  const [step4Error, setStep4Error] = useState('');
+  const [wabaId, setWabaId] = useState('');
+  const [phoneNumberId, setPhoneNumberId] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [verifyToken, setVerifyToken] = useState('');
+  const [appId, setAppId] = useState('');
+  const [showAccessToken, setShowAccessToken] = useState(false);
+
+  const validateStep2 = (): boolean => {
+    const trimmedCompany = companyName.trim();
+    const trimmedOwner = ownerName.trim();
+    const trimmedCity = cityState.trim();
+    const trimmedPhone = whatsappPhone.trim();
+    const phoneDigits = trimmedPhone.replace(/\D/g, '');
+
+    if (!trimmedCompany || !trimmedOwner || !trimmedCity || !trimmedPhone) {
+      setStep2Error('Preencha todos os campos para continuar.');
+      return false;
+    }
+
+    if (phoneDigits.length < 10) {
+      setStep2Error('Informe um WhatsApp válido com DDD.');
+      return false;
+    }
+
+    setStep2Error('');
+    return true;
+  };
+
+  const handleAdvanceFromStep2 = () => {
+    if (!validateStep2()) return;
+    setAuthItem('domu_company_name', companyName.trim());
+    setAuthItem('domu_user_name', ownerName.trim());
+    setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
+    setCurrentStep(3);
+  };
+
+  useEffect(() => {
+    async function verifyOnboardingStatus() {
+      const tenantId = getAuthItem('domu_tenant_id');
+      if (!tenantId) {
+        setIsCheckingSession(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/auth/session?tenantId=${tenantId}`);
+        const data = await res.json();
+        if (data.success) {
+          syncSessionToStorage(data);
+          if (data.isOnboarded) {
+            router.replace('/');
+            return;
+          }
+        }
+      } catch {
+        // allow onboarding to continue
+      }
+
+      setIsCheckingSession(false);
+    }
+
+    verifyOnboardingStatus();
+  }, [router]);
 
   const segments: SegmentOption[] = [
     {
@@ -59,62 +196,198 @@ export default function OnboardingPage() {
       title: 'Setor Imobiliário e Corretores',
       badge: 'Lançamentos e Imóveis',
       description: 'Automação de divulgação de imóveis, busca por perfil compatível e agendamento de visitas.',
-      features: ['Disparo de lançamentos por faixa de preço', 'Filtro de leads por bairro e perfil', 'IA de agendamento de visitas'],
+      features: [
+        'Disparo de lançamentos por faixa de preço',
+        'Filtro de leads por bairro e perfil',
+        'IA de agendamento de visitas',
+      ],
       color: 'text-domu-blue',
       borderColor: 'border-blue-500',
+      available: true,
+    },
+    {
+      id: 'marketing_apenas',
+      title: 'Apenas Disparo de Mensagens',
+      badge: 'Foco Total em Disparos',
+      description:
+        'Ideal para empresas que desejam focar 100% no disparo de campanhas, aviso de ofertas e atendimento direto no WhatsApp.',
+      features: [
+        'Envio de campanhas e ofertas em massa',
+        'Gestão de opt-in e histórico de mensagens',
+        'Sem cadastros complexos de produtos',
+      ],
+      color: 'text-purple-600',
+      borderColor: 'border-purple-500',
+      available: true,
     },
     {
       id: 'ecommerce',
       title: 'E-commerce e Varejo',
       badge: 'Vendas Online',
       description: 'Recuperação de carrinho abandonado, lançamento de coleções e rastreio de entregas.',
-      features: ['Recuperação de compras pendentes', 'Envio de cupons de desconto VIP', 'Notificação de produto em estoque'],
+      features: [
+        'Recuperação de compras pendentes',
+        'Envio de cupons de desconto VIP',
+        'Notificação de produto em estoque',
+      ],
       color: 'text-emerald-600',
       borderColor: 'border-emerald-500',
+      available: false,
     },
     {
       id: 'saude',
-      title: 'Saúde e Clínicas',
-      badge: 'Agendamentos',
-      description: 'Confirmação automática de consultas, lembretes de retorno e alertas de exames.',
-      features: ['Confirmação de agenda no WhatsApp', 'Instruções pré-exame automatizadas', 'Redução de faltas em até 80%'],
+      title: 'Saúde, Clínicas e Beleza',
+      badge: 'Agenda e Retornos',
+      description:
+        'Confirmação de consultas, horários de barbearia e salão, lembretes de retorno e redução de faltas.',
+      features: [
+        'Confirmação de agenda no WhatsApp',
+        'Lembretes de retorno e manutenção',
+        'Redução de faltas e no-shows',
+      ],
       color: 'text-amber-600',
       borderColor: 'border-amber-500',
+      available: false,
     },
     {
-      id: 'marketing_apenas',
-      title: 'Apenas Disparo de Mensagens',
-      badge: 'Foco Total em Disparos',
-      description: 'Ideal para empresas que desejam focar 100% no disparo de campanhas, aviso de ofertas e atendimento direto no WhatsApp.',
-      features: ['Envio de campanhas e ofertas em massa', 'Gestão de opt-in e histórico de mensagens', 'Sem cadastros complexos de produtos'],
-      color: 'text-purple-600',
-      borderColor: 'border-purple-500',
+      id: 'alimentacao',
+      title: 'Pizzarias, Restaurantes e Delivery',
+      badge: 'Pedidos e Cardápio',
+      description:
+        'Receba pedidos, envie cardápio, confirme entregas e fidelize clientes com campanhas no WhatsApp.',
+      features: [
+        'Cardápio e promoções pelo WhatsApp',
+        'Confirmação de pedidos e delivery',
+        'Campanhas de fidelização e recompra',
+      ],
+      color: 'text-orange-600',
+      borderColor: 'border-orange-500',
+      available: false,
     },
     {
       id: 'geral',
       title: 'Serviços, Jurídico e Outros',
       badge: 'Empresas e Negócios',
       description: 'Lembretes de vencimento, cobrança amigável e atendimento 1:1 ao cliente.',
-      features: ['Avisos de vencimento de contrato', 'Cobrança preventiva com PIX', 'Central multiatendentes no WhatsApp'],
+      features: [
+        'Avisos de vencimento de contrato',
+        'Cobrança preventiva com PIX',
+        'Central multiatendentes no WhatsApp',
+      ],
       color: 'text-indigo-600',
       borderColor: 'border-indigo-500',
-    }
+      available: false,
+    },
   ];
 
-  const handleSimulateConnection = () => {
+  const handleSimulateConnection = async () => {
+    setStep4Error('');
     setIsConnecting(true);
-    setTimeout(() => {
-      setIsConnecting(false);
+
+    try {
+      const storedTenantId = getAuthItem('domu_tenant_id') || '';
+      const res = await fetch('/api/onboarding/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: storedTenantId,
+          connectionType: 'COEXISTENCE',
+          whatsappPhone,
+          companyName,
+          segment: selectedSegment,
+          ownerName,
+          cityState,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setStep4Error(data.error || 'Não foi possível registrar a conexão.');
+        setIsConnecting(false);
+        return;
+      }
+
+      setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
       setIsConnectedSimulated(true);
-    }, 1200);
+    } catch {
+      setStep4Error('Erro ao salvar conexão no servidor. Tente novamente.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleSaveMetaCredentials = async () => {
+    setStep4Error('');
+
+    if (!wabaId.trim() || !phoneNumberId.trim() || !accessToken.trim()) {
+      setStep4Error('Preencha WABA ID, Phone Number ID e Access Token para continuar.');
+      return;
+    }
+
+    setIsConnecting(true);
+
+    try {
+      const storedTenantId = getAuthItem('domu_tenant_id') || '';
+      const res = await fetch('/api/onboarding/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: storedTenantId,
+          connectionType: 'DIRECT_API',
+          whatsappPhone,
+          companyName,
+          segment: selectedSegment,
+          ownerName,
+          cityState,
+          wabaId: wabaId.trim(),
+          phoneNumberId: phoneNumberId.trim(),
+          accessToken: accessToken.trim(),
+          verifyToken: verifyToken.trim(),
+          appId: appId.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setStep4Error(data.error || 'Não foi possível salvar as credenciais Meta.');
+        setIsConnecting(false);
+        return;
+      }
+
+      setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
+      setIsConnectedSimulated(true);
+    } catch {
+      setStep4Error('Erro ao salvar credenciais no servidor. Tente novamente.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleAdvanceFromStep4 = () => {
+    if (!isConnectedSimulated) {
+      setStep4Error(
+        connectionType === 'COEXISTENCE'
+          ? 'Conecte o WhatsApp pela Meta antes de continuar.'
+          : 'Salve as credenciais da Meta Cloud API antes de continuar.'
+      );
+      return;
+    }
+    setStep4Error('');
+    setCurrentStep(5);
   };
 
   const handleFinishOnboarding = async () => {
+    if (!acceptedTerms) {
+      setTermsError('Aceite os Termos de Uso e a Política de Privacidade para continuar.');
+      return;
+    }
+
+    setTermsError('');
     setIsProcessingPayment(true);
     try {
-      const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
+      const storedTenantId = getAuthItem('domu_tenant_id') || '';
 
-      await fetch('/api/onboarding/complete', {
+      const res = await fetch('/api/onboarding/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -124,61 +397,109 @@ export default function OnboardingPage() {
           whatsappPhone,
           connectionType,
           selectedPlan,
-          paymentMethod
-        })
+          paymentMethod,
+          ownerName,
+          cityState,
+          wabaId: wabaId.trim() || undefined,
+          phoneNumberId: phoneNumberId.trim() || undefined,
+          accessToken: accessToken.trim() || undefined,
+          verifyToken: verifyToken.trim() || undefined,
+          appId: appId.trim() || undefined,
+          acceptedTerms: true,
+          termsAcceptedAt: new Date().toISOString(),
+        }),
       });
 
-      localStorage.setItem('domu_is_onboarded', 'true');
-      localStorage.setItem('domu_selected_segment', selectedSegment);
-      if (companyName) localStorage.setItem('domu_company_name', companyName);
-      if (ownerName) localStorage.setItem('domu_user_name', ownerName);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setTermsError(data.error || 'Não foi possível ativar o plano. Tente novamente.');
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      const finalTenantId = data.tenantId || storedTenantId;
+
+      syncSessionToActiveStorage({
+        domu_is_logged_in: 'true',
+        domu_is_onboarded: 'true',
+        domu_selected_segment: selectedSegment,
+        domu_terms_accepted: 'true',
+        domu_tenant_id: finalTenantId,
+        ...(companyName ? { domu_company_name: companyName.trim() } : {}),
+        ...(ownerName ? { domu_user_name: ownerName.trim() } : {}),
+        ...(whatsappPhone ? { domu_whatsapp_phone: whatsappPhone.trim() } : {}),
+      });
+
+      if (finalTenantId) {
+        syncSessionToStorage({
+          isOnboarded: true,
+          segment: selectedSegment,
+          companyName: companyName || 'Empresa DOMU',
+          tenantId: finalTenantId,
+        });
+      }
+
       setIsProcessingPayment(false);
-      router.push('/');
+      router.replace('/');
     } catch (err) {
       console.error('Erro ao salvar onboarding no Supabase:', err);
-      localStorage.setItem('domu_is_onboarded', 'true');
+      setTermsError('Erro de conexão ao ativar o plano. Tente novamente.');
       setIsProcessingPayment(false);
-      router.push('/');
     }
   };
 
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-2 border-domu-blue/20 border-t-domu-blue rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-slate-500">Verificando sua conta...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans">
       
       {/* Header Bar */}
-      <header className="bg-white border-b border-slate-200 py-3.5 px-4 sm:px-12 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <Image 
-            src="/logo-com-nome.png" 
-            alt="DOMU Tech Logo" 
-            width={130} 
-            height={30} 
-            className="h-6 w-auto object-contain"
-          />
-          <span className="text-xs text-slate-400 font-medium hidden sm:inline">|</span>
-          <span className="text-xs font-bold text-slate-600 hidden sm:inline">Onboarding do Portal</span>
-        </div>
+      <header className="bg-white border-b border-slate-200 py-4 px-4 sm:px-10">
+        <div className="max-w-5xl mx-auto flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Image 
+                src="/logo-com-nome.png" 
+                alt="Domu Tech Logo" 
+                width={160} 
+                height={38} 
+                className="h-9 w-auto object-contain"
+              />
+              <span className="text-slate-300 hidden sm:inline">|</span>
+              <span className="text-sm font-semibold text-slate-600 hidden sm:inline">Configuração inicial</span>
+            </div>
+            <span className="text-xs font-bold uppercase tracking-wider text-domu-blue">
+              Passo {currentStep} de 5
+            </span>
+          </div>
 
-        {/* Step Progress Indicators */}
-        <div className="flex items-center gap-1.5 text-[11px] font-bold overflow-x-auto max-w-full pb-1 sm:pb-0">
-          <div className={`px-2.5 py-1 rounded-full ${currentStep === 1 ? 'bg-domu-blue text-white' : 'bg-slate-100 text-slate-500'}`}>
-            <span>1. Segmento</span>
-          </div>
-          <span className="text-slate-300">→</span>
-          <div className={`px-2.5 py-1 rounded-full ${currentStep === 2 ? 'bg-domu-blue text-white' : 'bg-slate-100 text-slate-500'}`}>
-            <span>2. Empresa</span>
-          </div>
-          <span className="text-slate-300">→</span>
-          <div className={`px-2.5 py-1 rounded-full ${currentStep === 3 ? 'bg-domu-blue text-white' : 'bg-slate-100 text-slate-500'}`}>
-            <span>3. Tipo</span>
-          </div>
-          <span className="text-slate-300">→</span>
-          <div className={`px-2.5 py-1 rounded-full ${currentStep === 4 ? 'bg-domu-blue text-white' : 'bg-slate-100 text-slate-500'}`}>
-            <span>4. Conexão</span>
-          </div>
-          <span className="text-slate-300">→</span>
-          <div className={`px-2.5 py-1 rounded-full ${currentStep === 5 ? 'bg-domu-blue text-white' : 'bg-slate-100 text-slate-500'}`}>
-            <span>5. Plano</span>
+          {/* Progress bar */}
+          <div className="flex items-center gap-2">
+            {STEPS.map((step) => (
+              <React.Fragment key={step.id}>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className={`h-1 transition-colors ${
+                      step.id <= currentStep ? 'bg-domu-blue' : 'bg-slate-200'
+                    }`}
+                  />
+                  <p
+                    className={`mt-1.5 text-[11px] font-semibold truncate hidden sm:block ${
+                      step.id === currentStep ? 'text-domu-blue' : 'text-slate-400'
+                    }`}
+                  >
+                    {step.label}
+                  </p>
+                </div>
+              </React.Fragment>
+            ))}
           </div>
         </div>
       </header>
@@ -189,15 +510,15 @@ export default function OnboardingPage() {
         {/* STEP 1: Segment Selection */}
         {currentStep === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="text-center max-w-2xl mx-auto space-y-2">
-              <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-blue-100 text-domu-blue border border-blue-200">
-                Passo 1 de 5
+            <div className="text-center max-w-2xl mx-auto space-y-3">
+              <span className="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider bg-blue-50 text-domu-blue border border-blue-100">
+                Passo 1 · Segmento
               </span>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Selecione o Segmento do seu Negócio
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                Qual é o foco do seu negócio?
               </h1>
-              <p className="text-xs text-slate-500">
-                O Portal DOMU Tech personaliza as ferramentas, modelos de disparo e automações para atender o seu nicho.
+              <p className="text-base text-slate-500 leading-relaxed">
+                Escolha o perfil que melhor representa sua operação. O portal adapta templates, automações e ferramentas para o seu dia a dia.
               </p>
             </div>
 
@@ -205,41 +526,49 @@ export default function OnboardingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               {segments.map((seg) => {
                 const isSelected = selectedSegment === seg.id;
+                const isLocked = !seg.available;
 
                 return (
                   <div
                     key={seg.id}
-                    onClick={() => setSelectedSegment(seg.id)}
-                    className={`p-5 rounded-xl border-2 cursor-pointer transition-all space-y-3 relative bg-white ${
-                      isSelected 
-                        ? `${seg.borderColor} shadow-md ring-2 ring-blue-500/20` 
-                        : 'border-slate-200/80 hover:border-slate-300 hover:shadow-xs'
+                    onClick={() => {
+                      if (!isLocked) setSelectedSegment(seg.id);
+                    }}
+                    className={`p-5 border-2 transition-all space-y-3 relative bg-white ${
+                      isLocked
+                        ? 'border-slate-200 opacity-60 cursor-not-allowed'
+                        : isSelected
+                          ? `${seg.borderColor} shadow-sm cursor-pointer`
+                          : 'border-slate-200 hover:border-slate-300 cursor-pointer'
                     }`}
                   >
-                    {isSelected && (
-                      <div className="absolute top-4 right-4 bg-domu-blue text-white rounded-full p-1 shadow-xs">
-                        <Check className="w-3.5 h-3.5" />
+                    {isLocked ? (
+                      <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 bg-slate-100 border border-slate-200 text-slate-500 text-[11px] font-bold uppercase tracking-wide">
+                        <Lock className="w-3 h-3" />
+                        Em breve
                       </div>
-                    )}
+                    ) : isSelected ? (
+                      <div className="absolute top-4 right-4 bg-domu-blue text-white p-1">
+                        <Check className="w-4 h-4" />
+                      </div>
+                    ) : null}
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 pr-20">
                       <SegmentIcon segment={seg.id} />
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-black text-slate-900">{seg.title}</h3>
-                        </div>
-                        <span className="text-[10px] font-extrabold uppercase text-slate-400">{seg.badge}</span>
+                        <h3 className="text-base font-bold text-slate-900">{seg.title}</h3>
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{seg.badge}</span>
                       </div>
                     </div>
 
-                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                    <p className="text-sm text-slate-600 leading-relaxed">
                       {seg.description}
                     </p>
 
-                    <div className="pt-2 border-t border-slate-100 space-y-1">
+                    <div className="pt-3 border-t border-slate-100 space-y-1.5">
                       {seg.features.map((feat, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                          <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <div key={idx} className="flex items-center gap-2 text-sm text-slate-500">
+                          <Check className={`w-3 h-3 shrink-0 ${isLocked ? 'text-slate-400' : 'text-emerald-600'}`} />
                           <span>{feat}</span>
                         </div>
                       ))}
@@ -250,14 +579,14 @@ export default function OnboardingPage() {
             </div>
 
             {/* Banner: Pedir Novo Segmento Personalizado */}
-            <div className="p-4 bg-slate-900 text-white rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="p-5 bg-[#0B132B] text-white border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/30">
+                <div className="w-10 h-10 bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/30">
                   <MessageCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-white">Não encontrou o segmento da sua empresa?</h4>
-                  <p className="text-[11px] text-slate-400">Solicite um segmento exclusivo para o seu nicho com nossa equipe técnica.</p>
+                  <h4 className="text-sm font-bold text-white">Não encontrou o seu perfil?</h4>
+                  <p className="text-sm text-slate-400">Fale com nossa equipe e montamos um segmento sob medida.</p>
                 </div>
               </div>
 
@@ -265,20 +594,19 @@ export default function OnboardingPage() {
                 href="https://wa.me/5511934430659?text=Olá!%20Gostaria%20de%20solicitar%20um%20segmento%20personalizado%20no%20Portal%20DOMU%20Tech"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shrink-0 flex items-center justify-center gap-2"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-all shrink-0 flex items-center justify-center gap-2"
               >
-                <span>Solicitar Novo Segmento</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Falar com a DOMU</span>
+                <ArrowRight className="w-4 h-4" />
               </a>
             </div>
 
-            {/* Step 1 Actions */}
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setCurrentStep(2)}
-                className="btn-domu-primary text-xs py-2.5 px-6 shadow-md flex items-center gap-2"
+                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2"
               >
-                <span>Avançar para Dados da Empresa</span>
+                <span>Continuar</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -288,69 +616,91 @@ export default function OnboardingPage() {
         {/* STEP 2: Company Details */}
         {currentStep === 2 && (
           <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="text-center space-y-2">
-              <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-blue-100 text-domu-blue border border-blue-200">
-                Passo 2 de 5
+            <div className="text-center space-y-3">
+              <span className="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider bg-blue-50 text-domu-blue border border-blue-100">
+                Passo 2 · Empresa
               </span>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Dados da sua Empresa e Marca
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                Dados da sua empresa
               </h1>
-              <p className="text-xs text-slate-500">
-                Informe o nome comercial da sua empresa e contatos para personalizar o cabeçalho das mensagens.
+              <p className="text-base text-slate-500 leading-relaxed">
+                Usamos essas informações para personalizar mensagens, relatórios e o painel do portal.
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div className="bg-white p-6 border border-slate-200 space-y-4">
+              {step2Error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {step2Error}
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Nome da Empresa
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Nome da Empresa <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white text-slate-900 placeholder-slate-400"
+                  onChange={(e) => {
+                    setCompanyName(e.target.value);
+                    if (step2Error) setStep2Error('');
+                  }}
+                  className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 bg-white text-slate-900 placeholder-slate-400"
                   placeholder="Nome da sua empresa"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nome do Responsável
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Nome do Responsável <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     value={ownerName}
-                    onChange={(e) => setOwnerName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="Seu Nome"
+                    onChange={(e) => {
+                      setOwnerName(e.target.value);
+                      if (step2Error) setStep2Error('');
+                    }}
+                    className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
+                    placeholder="Seu nome"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Cidade / Estado
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Cidade / Estado <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     value={cityState}
-                    onChange={(e) => setCityState(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    onChange={(e) => {
+                      setCityState(e.target.value);
+                      if (step2Error) setStep2Error('');
+                    }}
+                    className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                     placeholder="Ex: São Paulo, SP"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  WhatsApp Oficial para Disparos e Atendimento
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  WhatsApp para disparos e atendimento <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  required
                   value={whatsappPhone}
-                  onChange={(e) => setWhatsappPhone(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  onChange={(e) => {
+                    setWhatsappPhone(e.target.value);
+                    if (step2Error) setStep2Error('');
+                  }}
+                  className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                   placeholder="(11) 99999-9999"
                 />
               </div>
@@ -360,17 +710,18 @@ export default function OnboardingPage() {
             <div className="flex items-center justify-between pt-4">
               <button
                 onClick={() => setCurrentStep(1)}
-                className="px-4 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Voltar</span>
               </button>
 
               <button
-                onClick={() => setCurrentStep(3)}
-                className="btn-domu-primary text-xs py-2.5 px-6 shadow-md flex items-center gap-2"
+                type="button"
+                onClick={handleAdvanceFromStep2}
+                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2"
               >
-                <span>Avançar para Tipo de Conexão</span>
+                <span>Continuar</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -379,196 +730,452 @@ export default function OnboardingPage() {
 
         {/* STEP 3: Connection Type Selection */}
         {currentStep === 3 && (
-          <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="text-center space-y-2">
-              <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                Passo 3 de 5 — Tipo de Conexão
+          <div className="space-y-7 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="text-center space-y-3">
+              <span className="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider bg-blue-50 text-domu-blue border border-blue-100">
+                Passo 3 · Conexão
               </span>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Como deseja conectar seu WhatsApp?
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                Como você quer usar o WhatsApp?
               </h1>
-              <p className="text-xs text-slate-500">
-                O DOMU Tech oferece a tecnologia de Coexistência Oficial para você manter seu aplicativo de celular funcionando junto com a automação.
+              <p className="text-base text-slate-500 leading-relaxed max-w-xl mx-auto">
+                Escolha o modelo que combina com a sua operação. A maioria das empresas começa pela coexistência oficial.
               </p>
             </div>
 
-            {/* Connection Type Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              <div
-                onClick={() => setConnectionType('COEXISTENCE')}
-                className={`p-5 rounded-xl border-2 cursor-pointer transition-all space-y-3 bg-white ${
+              {/* Coexistence */}
+              <button
+                type="button"
+                onClick={() => {
+                  setConnectionType('COEXISTENCE');
+                  setIsConnectedSimulated(false);
+                  setStep4Error('');
+                }}
+                className={`text-left p-6 border-2 transition-all space-y-4 bg-white relative ${
                   connectionType === 'COEXISTENCE'
-                    ? 'border-domu-blue shadow-md ring-2 ring-blue-500/20'
+                    ? 'border-domu-blue shadow-sm'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-5 h-5 text-domu-blue" />
-                  <h3 className="text-sm font-black text-slate-900">Coexistência Oficial</h3>
-                </div>
-                <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                  Mantenha o aplicativo WhatsApp Business no celular funcionando normalmente enquanto o Portal DOMU envia as automações em massa.
-                </p>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 block w-fit">
-                  ✓ Recomendado (Mantém seu número atual)
-                </span>
-              </div>
+                {connectionType === 'COEXISTENCE' && (
+                  <div className="absolute top-4 right-4 bg-domu-blue text-white p-1">
+                    <Check className="w-4 h-4" />
+                  </div>
+                )}
 
-              <div
-                onClick={() => setConnectionType('DIRECT_API')}
-                className={`p-5 rounded-xl border-2 cursor-pointer transition-all space-y-3 bg-white ${
+                <div className="flex items-start gap-3 pr-8">
+                  <div className="w-11 h-11 border border-blue-100 bg-blue-50 text-domu-blue flex items-center justify-center shrink-0">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 mb-1">
+                      Recomendado
+                    </p>
+                    <h3 className="text-lg font-bold text-slate-900 leading-snug">
+                      Continuar com seu WhatsApp atual
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-400 mt-0.5 uppercase tracking-wide">
+                      Coexistência oficial Meta
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Use o WhatsApp Business no celular normalmente e dispare campanhas pelo portal no mesmo número.
+                </p>
+
+                <ul className="space-y-2 pt-1 border-t border-slate-100">
+                  {[
+                    'Mantém seu número atual',
+                    'Histórico e conversas no celular',
+                    'Ideal para a maioria das empresas',
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </button>
+
+              {/* Direct API */}
+              <button
+                type="button"
+                onClick={() => {
+                  setConnectionType('DIRECT_API');
+                  setIsConnectedSimulated(false);
+                  setStep4Error('');
+                }}
+                className={`text-left p-6 border-2 transition-all space-y-4 bg-white relative ${
                   connectionType === 'DIRECT_API'
-                    ? 'border-domu-blue shadow-md ring-2 ring-blue-500/20'
+                    ? 'border-domu-blue shadow-sm'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                  <h3 className="text-sm font-black text-slate-900">API Direta</h3>
-                </div>
-                <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                  Conexão direta com número dedicado de API exclusivo para grandes volumes e múltiplos operadores no mesmo canal.
-                </p>
-                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded block w-fit">
-                  Para alta escala corporativa
-                </span>
-              </div>
+                {connectionType === 'DIRECT_API' && (
+                  <div className="absolute top-4 right-4 bg-domu-blue text-white p-1">
+                    <Check className="w-4 h-4" />
+                  </div>
+                )}
 
+                <div className="flex items-start gap-3 pr-8">
+                  <div className="w-11 h-11 border border-indigo-100 bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 mb-1">
+                      Alta escala
+                    </p>
+                    <h3 className="text-lg font-bold text-slate-900 leading-snug">
+                      Número dedicado para automação
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-400 mt-0.5 uppercase tracking-wide">
+                      API direta Meta Cloud
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Número exclusivo para disparos e atendimento em volume, pensado para operações maiores e vários atendentes.
+                </p>
+
+                <ul className="space-y-2 pt-1 border-t border-slate-100">
+                  {[
+                    'Número separado para alto volume',
+                    'Vários operadores no mesmo canal',
+                    'Melhor para operações corporativas',
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                      <Check className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </button>
             </div>
 
-            {/* Summary Box */}
-            <div className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
-              <div className="flex items-center gap-2">
+            {/* Summary */}
+            <div className="bg-[#0B132B] text-white p-5 border border-slate-800">
+              <div className="flex items-center gap-2 mb-3">
                 <Zap className="w-4 h-4 text-amber-400" />
-                <h4 className="font-extrabold">Resumo da Configuração:</h4>
+                <h4 className="text-sm font-bold">Resumo da configuração</h4>
               </div>
-              <p className="text-slate-300">
-                Segmento: <strong className="text-blue-400 capitalize">{selectedSegment}</strong> • Empresa: <strong>{companyName}</strong> • Telefone: <strong>{whatsappPhone}</strong>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-0.5">Segmento</p>
+                  <p className="font-semibold text-blue-300">
+                    {SEGMENT_LABELS[selectedSegment] || selectedSegment}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-0.5">Empresa</p>
+                  <p className="font-semibold text-white truncate">{companyName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-0.5">WhatsApp</p>
+                  <p className="font-semibold text-white">{whatsappPhone || '—'}</p>
+                </div>
+              </div>
+              <p className="mt-3 pt-3 border-t border-slate-700 text-sm text-slate-400">
+                Modelo escolhido:{' '}
+                <strong className="text-white">
+                  {connectionType === 'COEXISTENCE'
+                    ? 'Continuar com WhatsApp atual'
+                    : 'Número dedicado (API Direta)'}
+                </strong>
               </p>
             </div>
 
-            {/* Step 3 Actions */}
-            <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center justify-between pt-2">
               <button
+                type="button"
                 onClick={() => setCurrentStep(2)}
-                className="px-4 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Voltar</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setCurrentStep(4)}
-                className="btn-domu-primary text-xs py-2.5 px-6 shadow-md flex items-center gap-2"
+                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2"
               >
-                <span>Avançar para Vinculação do WhatsApp</span>
+                <span>Continuar</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 4: Symbolic WhatsApp QR Code / Connection Simulation */}
+        {/* STEP 4: WhatsApp Connection */}
         {currentStep === 4 && (
-          <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="text-center space-y-2">
-              <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-blue-100 text-domu-blue border border-blue-200">
-                Passo 4 de 5 — Conexão Simbólica
+          <div className="space-y-7 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="text-center space-y-3">
+              <span className="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider bg-blue-50 text-domu-blue border border-blue-100">
+                Passo 4 · WhatsApp
               </span>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Vincule seu WhatsApp ao Portal DOMU Tech
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                {connectionType === 'COEXISTENCE'
+                  ? 'Conecte seu WhatsApp Business'
+                  : 'Configure a Meta Cloud API'}
               </h1>
-              <p className="text-xs text-slate-500">
-                {connectionType === 'COEXISTENCE' 
-                  ? 'Abra o WhatsApp no celular > Aparelhos Conectados > Conectar um Aparelho' 
-                  : 'Insira o Token de Acesso da Meta Cloud API para autenticar seu canal de produção'}
+              <p className="text-base text-slate-500 leading-relaxed max-w-xl mx-auto">
+                {connectionType === 'COEXISTENCE'
+                  ? 'Fluxo oficial de coexistência da Meta: você autoriza o número atual e continua usando o app no celular.'
+                  : 'Informe as credenciais do Meta Business Manager para vincular o número dedicado de API.'}
               </p>
             </div>
 
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-md text-center space-y-6">
-              
-              {!isConnectedSimulated ? (
-                <div className="space-y-6">
-                  {/* Symbolic QR Code Box */}
-                  <div className="relative w-56 h-56 mx-auto bg-slate-950 p-4 rounded-2xl border-2 border-slate-800 shadow-xl flex items-center justify-center group overflow-hidden">
-                    
-                    {/* Decorative Scanning Laser Effect */}
-                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent top-0 animate-bounce"></div>
+            {step4Error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
+                {step4Error}
+              </div>
+            )}
 
-                    {/* QR Code Illustration */}
-                    <div className="bg-white p-3 rounded-xl shadow-inner flex flex-col items-center justify-center">
-                      <QrCode className="w-36 h-36 text-slate-900" />
+            {!isConnectedSimulated ? (
+              connectionType === 'COEXISTENCE' ? (
+                <div className="bg-white border border-slate-200 overflow-hidden">
+                  <div className="grid grid-cols-1 lg:grid-cols-5">
+                    <div className="lg:col-span-3 p-6 sm:p-8 space-y-5 border-b lg:border-b-0 lg:border-r border-slate-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-blue-50 border border-blue-100 text-domu-blue flex items-center justify-center">
+                          <Smartphone className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">Coexistência oficial</h3>
+                          <p className="text-sm text-slate-500">Mesmo número no celular e no portal</p>
+                        </div>
+                      </div>
+
+                      <ol className="space-y-3">
+                        {[
+                          'Tenha o WhatsApp Business instalado no celular com o número informado.',
+                          'Clique em “Conectar com Meta” e autorize no Facebook Business / Meta.',
+                          'Confirme a coexistência no app do celular quando a Meta solicitar.',
+                          'Volte aqui: o canal fica pronto para disparos e atendimento.',
+                        ].map((step, idx) => (
+                          <li key={step} className="flex gap-3 text-sm text-slate-600">
+                            <span className="w-6 h-6 shrink-0 bg-[#0B132B] text-white text-xs font-bold flex items-center justify-center">
+                              {idx + 1}
+                            </span>
+                            <span className="leading-relaxed pt-0.5">{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+
+                      <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 text-sm text-slate-600">
+                        <Info className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
+                        <p>
+                          Número a vincular:{' '}
+                          <strong className="text-slate-900">{whatsappPhone || '—'}</strong>
+                          . Em produção, esta etapa abre o Embedded Signup oficial da Meta.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleSimulateConnection}
+                        disabled={isConnecting}
+                        className="w-full btn-domu-primary text-sm py-3 justify-center disabled:opacity-50"
+                      >
+                        {isConnecting ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Autorizando com a Meta...
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLink className="w-4 h-4" />
+                            Conectar com Meta
+                          </>
+                        )}
+                      </button>
                     </div>
-                  </div>
 
-                  <div className="space-y-1">
-                    <p className="text-xs font-extrabold text-slate-800">
-                      {isConnecting ? 'Verificando e sincronizando chave com o WhatsApp...' : 'Aguardando leitura do QR Code / Autenticação do Número'}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Número identificado: <strong className="text-domu-blue">{whatsappPhone}</strong>
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                    <button
-                      onClick={handleSimulateConnection}
-                      disabled={isConnecting}
-                      className="w-full sm:w-auto btn-domu-primary text-xs py-2.5 px-6 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Conectando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          <span>Simular Conexão Efetuada</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="lg:col-span-2 p-6 sm:p-8 bg-[#0B132B] text-white flex flex-col items-center justify-center gap-4">
+                      <div className="w-40 h-40 bg-white p-3 flex items-center justify-center">
+                        <QrCode className="w-full h-full text-slate-900" />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-sm font-semibold">Prévia do pareamento</p>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          A Meta pode pedir confirmação no celular após a autorização do Business Manager.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
-                /* Connected State Success Banner */
-                <div className="py-6 space-y-4 animate-in zoom-in-95 duration-300">
-                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-4 border-emerald-50">
-                    <CheckCircle2 className="w-10 h-10" />
+                <div className="bg-white border border-slate-200 p-6 sm:p-8 space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                      <Key className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">Credenciais Meta Cloud API</h3>
+                      <p className="text-sm text-slate-500">
+                        Dados do Meta Business Manager · Graph API
+                      </p>
+                    </div>
                   </div>
-                  
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-black text-slate-900">WhatsApp Conectado com Sucesso!</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      O número <strong className="text-slate-900">{whatsappPhone}</strong> foi vinculado via {connectionType === 'COEXISTENCE' ? 'Coexistência Oficial' : 'API Direta'}.
+
+                  <div className="flex items-start gap-2 p-3 bg-indigo-50 border border-indigo-100 text-sm text-indigo-900">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                    <p>
+                      Encontre esses IDs em{' '}
+                      <strong>developers.facebook.com</strong> → seu app WhatsApp → API Setup.
+                      O Access Token será criptografado antes de salvar no Supabase.
                     </p>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    <span>Canal de Disparos Ativo e Pronto</span>
-                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                        WhatsApp Business Account ID (WABA) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={wabaId}
+                        onChange={(e) => setWabaId(e.target.value)}
+                        className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
+                        placeholder="Ex: 102938475610293"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Phone Number ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={phoneNumberId}
+                        onChange={(e) => setPhoneNumberId(e.target.value)}
+                        className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
+                        placeholder="Ex: 109848492049281"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Access Token permanente <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showAccessToken ? 'text' : 'password'}
+                          value={accessToken}
+                          onChange={(e) => setAccessToken(e.target.value)}
+                          className="w-full px-3 py-3 pr-10 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
+                          placeholder="EAAG..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAccessToken(!showAccessToken)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                        >
+                          {showAccessToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                        App ID <span className="text-slate-400 font-normal">(opcional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={appId}
+                        onChange={(e) => setAppId(e.target.value)}
+                        className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
+                        placeholder="Meta App ID"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Verify Token <span className="text-slate-400 font-normal">(webhook)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={verifyToken}
+                        onChange={(e) => setVerifyToken(e.target.value)}
+                        className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
+                        placeholder="Gerado automaticamente se vazio"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-100 text-sm text-slate-500">
+                    Número informado no passo anterior:{' '}
+                    <strong className="text-slate-800">{whatsappPhone || '—'}</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveMetaCredentials}
+                    disabled={isConnecting}
+                    className="w-full btn-domu-primary text-sm py-3 justify-center disabled:opacity-50"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Salvando no Supabase...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        Validar e salvar credenciais
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
+              )
+            ) : (
+              <div className="bg-white border border-emerald-200 p-8 text-center space-y-4">
+                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-bold text-slate-900">
+                    {connectionType === 'COEXISTENCE'
+                      ? 'WhatsApp conectado com sucesso'
+                      : 'Credenciais Meta salvas com sucesso'}
+                  </h3>
+                  <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+                    {connectionType === 'COEXISTENCE'
+                      ? `O número ${whatsappPhone} foi vinculado via coexistência oficial e registrado no Supabase.`
+                      : `WABA ${wabaId} e Phone Number ID ${phoneNumberId} foram salvos com token criptografado no Supabase.`}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Canal pronto para o próximo passo
+                </span>
+              </div>
+            )}
 
-            </div>
-
-            {/* Step 4 Actions */}
             <div className="flex items-center justify-between pt-2">
               <button
-                onClick={() => setCurrentStep(3)}
-                className="px-4 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+                type="button"
+                onClick={() => {
+                  setIsConnectedSimulated(false);
+                  setStep4Error('');
+                  setCurrentStep(3);
+                }}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Voltar</span>
               </button>
 
               <button
-                onClick={() => setCurrentStep(5)}
-                className="btn-domu-primary text-xs py-2.5 px-6 shadow-md flex items-center gap-2"
+                type="button"
+                onClick={handleAdvanceFromStep4}
+                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2 disabled:opacity-50"
+                disabled={!isConnectedSimulated}
               >
-                <span>Avançar para Escolha do Plano</span>
+                <span>Continuar</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -576,237 +1183,372 @@ export default function OnboardingPage() {
         )}
 
         {/* STEP 5: Pricing Plan & Payment Selection */}
-        {currentStep === 5 && (
-          <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="text-center space-y-2 max-w-2xl mx-auto">
-              <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-200">
-                Passo 5 de 5 — Plano e Assinatura
+        {currentStep === 5 && (() => {
+          const activePlan = PLAN_OPTIONS.find((p) => p.id === selectedPlan) || PLAN_OPTIONS[1];
+          const pixPrice = Math.round(activePlan.price * 0.95);
+
+          return (
+          <div className="space-y-7 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="text-center space-y-3 max-w-2xl mx-auto">
+              <span className="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider bg-blue-50 text-domu-blue border border-blue-100">
+                Passo 5 · Plano
               </span>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Escolha o Plano Ideal para seu Negócio
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                Escolha o plano da sua operação
               </h1>
-              <p className="text-xs text-slate-500">
-                Selecione a assinatura para liberar acesso imediato ao Portal DOMU Tech e iniciar suas automações.
+              <p className="text-base text-slate-500 leading-relaxed">
+                Valores alinhados ao uso real do portal hoje: disparos, templates, coexistência Meta e evolução para CRM.
               </p>
             </div>
 
-            {/* Pricing Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
-              
-              {/* Plan Starter */}
-              <div 
-                onClick={() => setSelectedPlan('STARTER')}
-                className={`bg-white p-6 rounded-2xl border-2 transition-all space-y-4 relative cursor-pointer flex flex-col justify-between ${
-                  selectedPlan === 'STARTER' ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' : 'border-slate-200/80 hover:border-slate-300'
-                }`}
-              >
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900">Plano Starter</h3>
-                    <p className="text-[11px] text-slate-500">Para pequenos negócios e profissionais autônomos</p>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              {PLAN_OPTIONS.map((plan) => {
+                const isSelected = selectedPlan === plan.id;
+                const isPro = plan.highlight;
 
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-slate-900">R$ 197</span>
-                    <span className="text-xs text-slate-400 font-semibold">/mês</span>
-                  </div>
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => setSelectedPlan(plan.id)}
+                    className={`text-left p-6 border-2 transition-all flex flex-col relative ${
+                      isPro
+                        ? isSelected
+                          ? 'bg-[#0B132B] text-white border-domu-blue shadow-lg'
+                          : 'bg-[#0B132B] text-white border-slate-700 hover:border-slate-500'
+                        : isSelected
+                          ? 'bg-white border-domu-blue shadow-sm'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {isPro && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-domu-blue text-white px-3 py-1 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-amber-300 text-amber-300" />
+                        Recomendado
+                      </span>
+                    )}
 
-                  <ul className="space-y-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Até 2.500 mensagens/mês</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>1 Número WhatsApp Conectado</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Disparos em Lote e Relatórios</span>
-                    </li>
-                  </ul>
-                </div>
+                    {isSelected && !isPro && (
+                      <span className="absolute top-4 right-4 bg-domu-blue text-white p-1">
+                        <Check className="w-4 h-4" />
+                      </span>
+                    )}
+                    {isSelected && isPro && (
+                      <span className="absolute top-4 right-4 bg-domu-blue text-white p-1">
+                        <Check className="w-4 h-4" />
+                      </span>
+                    )}
 
-                <div className={`mt-4 w-full py-2 rounded-lg text-center text-xs font-extrabold border ${
-                  selectedPlan === 'STARTER' ? 'bg-domu-blue text-white border-domu-blue' : 'bg-slate-100 text-slate-700 border-slate-200'
-                }`}>
-                  {selectedPlan === 'STARTER' ? 'Plano Selecionado ✓' : 'Selecionar Starter'}
-                </div>
-              </div>
+                    <div className="space-y-4 flex-1">
+                      <div>
+                        <p
+                          className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${
+                            isPro ? 'text-blue-300' : 'text-slate-400'
+                          }`}
+                        >
+                          {plan.tagline}
+                        </p>
+                        <h3 className={`text-xl font-bold ${isPro ? 'text-white' : 'text-slate-900'}`}>
+                          {plan.name}
+                        </h3>
+                        <p className={`text-sm mt-2 leading-relaxed ${isPro ? 'text-slate-300' : 'text-slate-500'}`}>
+                          {plan.audience}
+                        </p>
+                      </div>
 
-              {/* Plan PRO (Featured) */}
-              <div 
-                onClick={() => setSelectedPlan('PRO')}
-                className={`bg-slate-900 text-white p-6 rounded-2xl border-2 transition-all space-y-4 relative cursor-pointer shadow-xl flex flex-col justify-between ${
-                  selectedPlan === 'PRO' ? 'border-blue-400 ring-2 ring-blue-400/30' : 'border-slate-800'
-                }`}
-              >
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
-                  <Star className="w-3 h-3 text-amber-300 fill-amber-300" />
-                  <span>Mais Popular</span>
-                </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className={`text-3xl font-bold tracking-tight ${isPro ? 'text-white' : 'text-slate-900'}`}>
+                          R$ {plan.price}
+                        </span>
+                        <span className={`text-sm font-medium ${isPro ? 'text-slate-400' : 'text-slate-400'}`}>
+                          /mês
+                        </span>
+                      </div>
 
-                <div className="space-y-3 pt-1">
-                  <div>
-                    <h3 className="text-sm font-black text-white">Plano Pro</h3>
-                    <p className="text-[11px] text-slate-400">Para empresas em expansão e equipes comerciais</p>
-                  </div>
+                      <ul
+                        className={`space-y-2.5 pt-4 border-t ${
+                          isPro ? 'border-slate-700' : 'border-slate-100'
+                        }`}
+                      >
+                        {plan.features.map((feature) => (
+                          <li
+                            key={feature}
+                            className={`flex items-start gap-2 text-sm ${
+                              isPro ? 'text-slate-200' : 'text-slate-600'
+                            }`}
+                          >
+                            <Check
+                              className={`w-4 h-4 mt-0.5 shrink-0 ${
+                                isPro ? 'text-blue-400' : 'text-emerald-600'
+                              }`}
+                            />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
 
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-white">R$ 497</span>
-                    <span className="text-xs text-slate-400 font-semibold">/mês</span>
-                  </div>
-
-                  <ul className="space-y-2 pt-2 border-t border-slate-800 text-xs text-slate-300">
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span><strong>Disparos Ilimitados</strong> (limite Meta)</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span>Coexistência Oficial no Celular</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span>IA de Qualificação de Leads</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span>Suporte Prioritário VIP</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className={`mt-4 w-full py-2.5 rounded-lg text-center text-xs font-extrabold ${
-                  selectedPlan === 'PRO' ? 'bg-domu-blue text-white shadow-md' : 'bg-slate-800 text-slate-200'
-                }`}>
-                  {selectedPlan === 'PRO' ? 'Plano Selecionado ✓' : 'Selecionar Pro'}
-                </div>
-              </div>
-
-              {/* Plan Enterprise */}
-              <div 
-                onClick={() => setSelectedPlan('ENTERPRISE')}
-                className={`bg-white p-6 rounded-2xl border-2 transition-all space-y-4 relative cursor-pointer flex flex-col justify-between ${
-                  selectedPlan === 'ENTERPRISE' ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' : 'border-slate-200/80 hover:border-slate-300'
-                }`}
-              >
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900">Plano Enterprise</h3>
-                    <p className="text-[11px] text-slate-500">Para grandes operações e redes corporativas</p>
-                  </div>
-
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-slate-900">R$ 997</span>
-                    <span className="text-xs text-slate-400 font-semibold">/mês</span>
-                  </div>
-
-                  <ul className="space-y-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Múltiplos Operadores no mesmo WhatsApp</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>API Direta Dedicada de Alta Escala</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Gerente de Conta Exclusivo e SLA</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className={`mt-4 w-full py-2 rounded-lg text-center text-xs font-extrabold border ${
-                  selectedPlan === 'ENTERPRISE' ? 'bg-domu-blue text-white border-domu-blue' : 'bg-slate-100 text-slate-700 border-slate-200'
-                }`}>
-                  {selectedPlan === 'ENTERPRISE' ? 'Plano Selecionado ✓' : 'Selecionar Enterprise'}
-                </div>
-              </div>
-
+                    <div
+                      className={`mt-6 w-full py-2.5 text-center text-sm font-bold border ${
+                        isSelected
+                          ? 'bg-domu-blue text-white border-domu-blue'
+                          : isPro
+                            ? 'bg-slate-800 text-slate-200 border-slate-700'
+                            : 'bg-slate-50 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {isSelected ? 'Plano selecionado' : `Escolher ${plan.name}`}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Payment Method Selector */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 max-w-xl mx-auto">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider text-center">
-                Forma de Pagamento da Mensalidade
-              </h3>
+            <p className="text-xs text-slate-400 text-center">
+              *Limites DOMU do plano. O envio também respeita qualidade e tier da Meta Cloud API — trocar para API dedicada não aumenta sozinho o teto da Meta.
+            </p>
+
+            <div className="bg-white border border-slate-200 p-6 space-y-5 max-w-2xl mx-auto">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Forma de pagamento</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Plano {activePlan.name} · cobrança mensal
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+                    {paymentMethod === 'PIX' ? 'Com PIX' : 'No cartão'}
+                  </p>
+                  <p className="text-xl font-bold text-slate-900">
+                    R$ {paymentMethod === 'PIX' ? pixPrice : activePlan.price}
+                    <span className="text-sm font-medium text-slate-400">/mês</span>
+                  </p>
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('PIX')}
-                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                    paymentMethod === 'PIX' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 ring-2 ring-emerald-500/20' : 'border-slate-200 text-slate-600'
+                  className={`p-3 border flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
+                    paymentMethod === 'PIX'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
                   }`}
                 >
                   <QrCode className="w-4 h-4 text-emerald-600" />
-                  <span>PIX (Aprovação Instantânea)</span>
+                  PIX · −5%
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('CREDIT_CARD')}
-                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                    paymentMethod === 'CREDIT_CARD' ? 'border-blue-500 bg-blue-50/50 text-blue-900 ring-2 ring-blue-500/20' : 'border-slate-200 text-slate-600'
+                  className={`p-3 border flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
+                    paymentMethod === 'CREDIT_CARD'
+                      ? 'border-domu-blue bg-blue-50 text-blue-900'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
                   }`}
                 >
-                  <CreditCard className="w-4 h-4 text-blue-600" />
-                  <span>Cartão de Crédito</span>
+                  <CreditCard className="w-4 h-4 text-domu-blue" />
+                  Cartão
                 </button>
               </div>
 
               {paymentMethod === 'PIX' ? (
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center space-y-2 text-xs">
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full inline-block">
-                    ✓ Desconto de 5% aplicado no PIX
-                  </span>
-                  <p className="text-slate-600">Ao clicar abaixo, a assinatura do plano <strong className="text-slate-900 uppercase">{selectedPlan}</strong> será ativada instantaneamente para teste.</p>
+                <div className="p-4 bg-emerald-50 border border-emerald-100 text-sm text-emerald-900 space-y-1">
+                  <p className="font-semibold">Desconto de 5% no PIX aplicado</p>
+                  <p className="text-emerald-800/80">
+                    De R$ {activePlan.price} por <strong>R$ {pixPrice}/mês</strong>. Ativação imediata para teste neste ambiente.
+                  </p>
                 </div>
               ) : (
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="text" placeholder="Número do Cartão" defaultValue="4532 •••• •••• 8892" className="col-span-2 px-3 py-1.5 border border-slate-300 rounded text-xs font-medium" />
-                    <input type="text" placeholder="MM/AA" defaultValue="08/29" className="px-3 py-1.5 border border-slate-300 rounded text-xs font-medium" />
-                    <input type="text" placeholder="CVV" defaultValue="782" className="px-3 py-1.5 border border-slate-300 rounded text-xs font-medium" />
-                  </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Número do cartão"
+                    defaultValue="4532 •••• •••• 8892"
+                    className="col-span-2 px-3 py-2.5 border border-slate-200 text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="MM/AA"
+                    defaultValue="08/29"
+                    className="px-3 py-2.5 border border-slate-200 text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="CVV"
+                    defaultValue="782"
+                    className="px-3 py-2.5 border border-slate-200 text-sm"
+                  />
                 </div>
               )}
+
+              <div className="pt-4 border-t border-slate-100 space-y-2">
+                <label className="flex items-start gap-3 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => {
+                      setAcceptedTerms(e.target.checked);
+                      if (e.target.checked) setTermsError('');
+                    }}
+                    className="mt-0.5 border-slate-300 text-domu-blue focus:ring-domu-blue"
+                  />
+                  <span>
+                    Li e aceito os{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowTermsModal(true);
+                      }}
+                      className="font-semibold text-domu-blue hover:underline"
+                    >
+                      Termos de Uso
+                    </button>{' '}
+                    e a{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowTermsModal(true);
+                      }}
+                      className="font-semibold text-domu-blue hover:underline"
+                    >
+                      Política de Privacidade
+                    </button>{' '}
+                    da Domu Tech.
+                  </span>
+                </label>
+                {termsError && (
+                  <p className="text-sm text-red-600">{termsError}</p>
+                )}
+              </div>
             </div>
 
-            {/* Step 5 Actions */}
-            <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center justify-between pt-2">
               <button
+                type="button"
                 onClick={() => setCurrentStep(4)}
-                className="px-4 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Voltar</span>
               </button>
 
               <button
+                type="button"
                 onClick={handleFinishOnboarding}
-                disabled={isProcessingPayment}
-                className="btn-domu-primary text-xs py-3 px-8 shadow-lg flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 cursor-pointer disabled:opacity-50"
+                disabled={isProcessingPayment || !acceptedTerms}
+                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2 disabled:opacity-50"
               >
                 {isProcessingPayment ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Ativando Assinatura...</span>
+                    <span>Ativando plano...</span>
                   </>
                 ) : (
                   <>
-                    <span>Ativar Plano {selectedPlan} e Entrar no Portal</span>
+                    <span>Ativar {activePlan.name} e entrar</span>
                     <Check className="w-4 h-4" />
                   </>
                 )}
               </button>
             </div>
           </div>
-        )}
+          );
+        })()}
 
       </main>
+
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50">
+          <div className="bg-white w-full max-w-2xl max-h-[85vh] flex flex-col border border-slate-200 shadow-xl">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Termos de Uso e Privacidade</h3>
+                <p className="text-sm text-slate-500">Domu Tech · Portal SaaS</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="text-sm font-semibold text-slate-500 hover:text-slate-800"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="px-6 py-5 overflow-y-auto space-y-4 text-sm text-slate-600 leading-relaxed">
+              <section className="space-y-2">
+                <h4 className="font-bold text-slate-900">1. Objeto</h4>
+                <p>
+                  O Portal Domu Tech oferece ferramentas de disparo, automação e gestão de atendimento via WhatsApp
+                  utilizando a Meta Cloud API oficial, sob responsabilidade do contratante quanto ao uso dos dados
+                  e ao cumprimento das regras da Meta e da LGPD.
+                </p>
+              </section>
+              <section className="space-y-2">
+                <h4 className="font-bold text-slate-900">2. Conta e responsabilidade</h4>
+                <p>
+                  O usuário declara ser responsável pelas informações cadastradas, pelos contatos importados e pelo
+                  conteúdo das mensagens enviadas. É obrigatório obter opt-in válido antes de disparos comerciais.
+                </p>
+              </section>
+              <section className="space-y-2">
+                <h4 className="font-bold text-slate-900">3. Dados e privacidade</h4>
+                <p>
+                  Tratamos dados de conta, empresa, WhatsApp e métricas de campanha para operação do serviço.
+                  Credenciais da Meta são armazenadas de forma criptografada. Não vendemos dados de clientes a terceiros.
+                </p>
+              </section>
+              <section className="space-y-2">
+                <h4 className="font-bold text-slate-900">4. Planos e cobrança</h4>
+                <p>
+                  A assinatura é mensal conforme o plano escolhido. Limites de disparo e recursos seguem a tabela
+                  vigente. Taxas da Meta (conversas/templates) são de responsabilidade do contratante junto à Meta.
+                </p>
+              </section>
+              <section className="space-y-2">
+                <h4 className="font-bold text-slate-900">5. Uso aceitável</h4>
+                <p>
+                  É proibido spam, conteúdo ilegal, phishing ou qualquer prática que viole as políticas do WhatsApp
+                  Business Platform. Contas que gerarem risco de bloqueio poderão ser suspensas.
+                </p>
+              </section>
+              <section className="space-y-2">
+                <h4 className="font-bold text-slate-900">6. Aceite</h4>
+                <p>
+                  Ao marcar a opção de aceite e ativar o plano, você confirma que leu e concorda com estes Termos
+                  de Uso e com a Política de Privacidade da Domu Tech.
+                </p>
+              </section>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAcceptedTerms(true);
+                  setTermsError('');
+                  setShowTermsModal(false);
+                }}
+                className="btn-domu-primary text-sm py-2.5 px-5"
+              >
+                Aceitar e continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

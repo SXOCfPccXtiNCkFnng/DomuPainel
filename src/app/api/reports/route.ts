@@ -1,30 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { requireAuth } from '@/lib/requireAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get('tenantId');
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
 
     // 1. Fetch Campaigns for Tenant from Supabase
-    let campaignQuery = supabaseAdmin
+    const { data: campaigns } = await supabaseAdmin
       .from('campaigns')
-      .select('*, hsm_templates(name)');
-
-    if (tenantId) {
-      campaignQuery = campaignQuery.eq('tenant_id', tenantId);
-    }
-
-    const { data: campaigns } = await campaignQuery.order('created_at', { ascending: false });
+      .select('*, hsm_templates(name)')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
 
     // 2. Fetch Leads Count
-    let leadsQuery = supabaseAdmin.from('leads').select('*', { count: 'exact', head: true });
-    if (tenantId) {
-      leadsQuery = leadsQuery.eq('tenant_id', tenantId);
-    }
-    const { count: totalLeads } = await leadsQuery;
+    const { count: totalLeads } = await supabaseAdmin
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId);
 
     // Calculate aggregated metrics from real database rows
     let totalSent = 0;

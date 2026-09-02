@@ -1,18 +1,19 @@
 import crypto from 'crypto';
+import { getEncryptionSecret } from '@/lib/envSecrets';
 
 /**
- * DOMU Tech - Sensitive Data Encryption Helper (AES-256-GCM)
+ * Domu Tech - Sensitive Data Encryption Helper (AES-256-GCM)
  * Encrypts Meta Access Tokens and secret credentials before storing in PostgreSQL.
  */
 
 const ALGORITHM = 'aes-256-gcm';
 
-// Fallback secret key for local development
-const ENCRYPTION_KEY = process.env.ENCRYPTION_SECRET_KEY || 'domu_tech_master_encryption_key_32bytes_secret!';
+function getKey(): Buffer {
+  return crypto.createHash('sha256').update(getEncryptionSecret()).digest();
+}
 
 export function encryptData(text: string): { encryptedText: string; iv: string } {
-  // Ensure key is exactly 32 bytes
-  const key = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
+  const key = getKey();
   const iv = crypto.randomBytes(16);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -20,18 +21,16 @@ export function encryptData(text: string): { encryptedText: string; iv: string }
   encrypted += cipher.final('hex');
 
   const authTag = cipher.getAuthTag().toString('hex');
-  
-  // Combine encrypted data with authTag
   const finalEncryptedText = `${encrypted}:${authTag}`;
 
   return {
     encryptedText: finalEncryptedText,
-    iv: iv.toString('hex')
+    iv: iv.toString('hex'),
   };
 }
 
 export function decryptData(encryptedText: string, ivHex: string): string {
-  const key = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
+  const key = getKey();
   const iv = Buffer.from(ivHex, 'hex');
 
   const [encrypted, authTagHex] = encryptedText.split(':');

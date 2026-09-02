@@ -107,6 +107,14 @@ export default function AtendimentoPage() {
   const activeLead = mockLeads.find(l => l.id === activeLeadId) || mockLeads[0];
   const activeChatMessages = messages[activeLeadId] || [];
 
+  const respondedCount = Object.values(messages).filter((thread) =>
+    thread.some((m) => m.sender === 'lead')
+  ).length;
+  const totalContacted = 48;
+  const notRespondedCount = Math.max(0, totalContacted - respondedCount);
+  const responseRate =
+    totalContacted > 0 ? Math.round((respondedCount / totalContacted) * 100) : 0;
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMessage.trim()) return;
@@ -132,18 +140,40 @@ export default function AtendimentoPage() {
     <div className="space-y-3 w-full">
       
       {/* Compact Status Banner */}
-      <div className="bg-slate-900 text-white py-2 px-4 rounded-md border border-slate-800 flex items-center justify-between text-xs shadow-sm">
+      <div className="bg-slate-900 text-white py-2 px-4 border border-slate-800 flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded text-[9.5px] font-extrabold uppercase bg-amber-500 text-slate-950">
-            Em Breve • Versão 2.0
+          <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase bg-amber-500 text-slate-950">
+            Em Breve
           </span>
-          <span className="font-bold text-slate-200">WhatsApp Multiatendente (Central 1:1)</span>
-          <span className="hidden sm:inline text-slate-400">• Responda leads diretamente pelo Portal DOMU com histórico unificado</span>
+          <span className="font-bold text-slate-200">Leads que responderam</span>
+          <span className="hidden sm:inline text-slate-400">
+            • Métrica simples: quem respondeu vs quem ainda não respondeu
+          </span>
         </div>
 
         <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
           <ShieldCheck className="w-3.5 h-3.5" />
           <span>WhatsApp Cloud API Sync</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200 p-4">
+          <p className="text-xs font-semibold text-slate-500">Responderam</p>
+          <p className="text-2xl font-bold text-emerald-600 tracking-tight mt-1">{respondedCount}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Leads com resposta no WhatsApp</p>
+        </div>
+        <div className="bg-white border border-slate-200 p-4">
+          <p className="text-xs font-semibold text-slate-500">Não responderam</p>
+          <p className="text-2xl font-bold text-slate-900 tracking-tight mt-1">{notRespondedCount}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Contatos atingidos sem resposta</p>
+        </div>
+        <div className="bg-white border border-slate-200 p-4">
+          <p className="text-xs font-semibold text-slate-500">Taxa de resposta</p>
+          <p className="text-2xl font-bold text-domu-blue tracking-tight mt-1">{responseRate}%</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            {respondedCount} de {totalContacted} contatos da base de disparos
+          </p>
         </div>
       </div>
 

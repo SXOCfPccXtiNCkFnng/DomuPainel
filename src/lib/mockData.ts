@@ -13,7 +13,7 @@ export const mockTenants: Tenant[] = [
   },
   {
     id: 'tenant-2',
-    name: 'DOMU Tech HQ',
+    name: 'Domu Tech HQ',
     slug: 'domu-hq',
     segment: 'geral',
     whatsappNumber: '+55 16 99123-4567',

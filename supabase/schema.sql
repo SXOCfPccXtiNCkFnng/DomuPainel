@@ -1,5 +1,5 @@
 -- ==============================================================================
--- DOMU TECH - SAAS MULTI-TENANT COMPLETE DATABASE SCHEMA (SUPABASE / POSTGRESQL)
+-- Domu Tech - SAAS MULTI-TENANT COMPLETE DATABASE SCHEMA (SUPABASE / POSTGRESQL)
 -- Production Ready Schema for Dispatches, CRM, Inventory, Billing & AI
 -- ==============================================================================
 
@@ -113,12 +113,14 @@ CREATE TABLE IF NOT EXISTS public.leads (
     interest_segment VARCHAR(50),
     interest_property_type VARCHAR(50),
     budget_max NUMERIC(14, 2),
+    region VARCHAR(100),
     opt_in BOOLEAN DEFAULT TRUE, -- Rastreamento de Opt-In Anti-Ban
     opt_in_updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_contact_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     status VARCHAR(40) DEFAULT 'NOVO', -- 'NOVO', 'EM_ATENDIMENTO', 'VISITA_AGENDADA', 'PROPOSTA', 'FECHADO'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (tenant_id, phone)
 );
 
 -- ==============================================================================
@@ -148,9 +150,10 @@ CREATE TABLE IF NOT EXISTS public.campaigns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
     template_id UUID REFERENCES public.hsm_templates(id),
+    property_id UUID REFERENCES public.properties(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     segment VARCHAR(50) NOT NULL,
-    status VARCHAR(30) DEFAULT 'DRAFT', -- 'DRAFT', 'RUNNING', 'COMPLETED', 'PAUSED', 'FAILED'
+    status VARCHAR(30) DEFAULT 'DRAFT', -- 'DRAFT', 'RUNNING', 'COMPLETED', 'PAUSED', 'FAILED', 'SCHEDULED'
     scheduled_at TIMESTAMP WITH TIME ZONE,
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
@@ -253,7 +256,35 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_lead ON public.chat_messages(lead_i
 CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON public.notifications(tenant_id);
 
 -- ==============================================================================
+-- 14. PASSWORD RESET + TEAM INVITES
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.password_reset_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.user_invites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    role VARCHAR(30) NOT NULL DEFAULT 'ATTENDANT',
+    token_hash TEXT NOT NULL UNIQUE,
+    invited_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    accepted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (tenant_id, email)
+);
+
+-- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES FOR MULTI-TENANT ISOLATION
+-- Architecture: Next.js APIs use SUPABASE_SERVICE_ROLE_KEY (bypasses RLS).
+-- Explicit deny for PostgREST anon/authenticated — never expose anon writes.
 -- ==============================================================================
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
@@ -268,3 +299,28 @@ ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.media_storage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.access_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.password_reset_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_invites ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'tenants','users','tenant_credentials','subscriptions','properties','leads',
+    'hsm_templates','campaigns','campaign_logs','chat_messages','media_storage',
+    'access_logs','notifications','password_reset_tokens','user_invites'
+  ]
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_deny_anon', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO anon USING (false) WITH CHECK (false)',
+      t || '_deny_anon', t
+    );
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_deny_authenticated', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO authenticated USING (false) WITH CHECK (false)',
+      t || '_deny_authenticated', t
+    );
+  END LOOP;
+END $$;

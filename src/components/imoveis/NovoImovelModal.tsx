@@ -47,8 +47,17 @@ export default function NovoImovelModal({ isOpen, onClose, onAddProperty }: Novo
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-md border border-slate-200 shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in duration-200"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         
         {/* Modal Header */}
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">

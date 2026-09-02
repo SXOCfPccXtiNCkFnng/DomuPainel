@@ -65,8 +65,17 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200 shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="bg-white border border-slate-200 shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
 
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div>

@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown } from 'lucide-react';
 import { getPageTitle } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
+import { clearAuthSession, getAuthItem } from '@/lib/authStorage';
 
 interface HeaderProps {
   onOpenNewDispatchModal?: () => void;
@@ -32,7 +33,7 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
   const [notifications, setNotifications] = useState([
     {
       id: '1',
-      title: 'Bem-vindo ao Portal DOMU Tech',
+      title: 'Bem-vindo ao Portal Domu Tech',
       message: 'Sua empresa e conta foram ativadas com sucesso.',
       time: 'Agora',
       type: 'SUCCESS',
@@ -53,9 +54,9 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
 
   useEffect(() => {
     // Read real user data saved in localStorage
-    const savedName = localStorage.getItem('domu_user_name');
-    const savedEmail = localStorage.getItem('domu_user_email');
-    const savedCompany = localStorage.getItem('domu_company_name');
+    const savedName = getAuthItem('domu_user_name');
+    const savedEmail = getAuthItem('domu_user_email');
+    const savedCompany = getAuthItem('domu_company_name');
     const isRead = localStorage.getItem('domu_notifications_read') === 'true';
 
     if (savedName) setUserName(savedName);
@@ -79,12 +80,13 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('domu_is_logged_in');
-    localStorage.removeItem('domu_is_onboarded');
-    localStorage.removeItem('domu_user_name');
-    localStorage.removeItem('domu_user_email');
-    localStorage.removeItem('domu_tenant_id');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      /* ignore */
+    }
+    clearAuthSession();
     router.push('/login');
   };
 
@@ -264,9 +266,13 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
       <CampaignWizardModal
         isOpen={isHeaderWizardOpen}
         onClose={() => setIsHeaderWizardOpen(false)}
-        onStartCampaign={() => {
+        onStartCampaign={(payload) => {
           setIsHeaderWizardOpen(false);
-          router.push('/disparos');
+          if (payload.campaignId) {
+            router.push(`/disparos?campaign=${payload.campaignId}`);
+          } else {
+            router.push('/disparos');
+          }
         }}
       />
     </>

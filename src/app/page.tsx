@@ -2,40 +2,45 @@
 
 import React, { useState, useEffect } from 'react';
 import OverviewStats from '@/components/dashboard/OverviewStats';
-import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
-import QueueSimulator from '@/components/disparos/QueueSimulator';
+import CampaignWizardModal, {
+  CampaignStartPayload,
+} from '@/components/disparos/CampaignWizardModal';
+import CampaignProgress from '@/components/disparos/CampaignProgress';
 import Link from 'next/link';
 import {
   Send,
   PlusCircle,
-  ArrowUpRight,
   Smartphone,
-  Clock,
-  Zap,
+  Users,
+  MessageSquareReply,
+  Tags,
 } from 'lucide-react';
 import { TenantSegment } from '@/types';
 import {
   getSegmentFromStorage,
-  SEGMENT_LABELS,
   SEGMENT_WELCOME,
   isRealEstateSegment,
 } from '@/lib/segmentConfig';
+import { getAuthItem } from '@/lib/authStorage';
 
 export default function DashboardPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [activeQueue, setActiveQueue] = useState<{ title: string; count: number } | null>(null);
-  const [activeTab, setActiveTab] = useState<'funil' | 'disparos' | 'atendimento'>('funil');
+  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
 
   const [userName, setUserName] = useState('Gestor');
   const [companyName, setCompanyName] = useState('Sua Empresa');
   const [whatsappPhone, setWhatsappPhone] = useState('(11) 99999-9999');
-  const [totalLeads, setTotalLeads] = useState(0);
-  const [totalSent, setTotalSent] = useState(0);
   const [segment, setSegment] = useState<TenantSegment>('geral');
+  const [roiMetrics, setRoiMetrics] = useState([
+    { label: 'Contatos atingidos', value: '0', hint: 'Entregas no período' },
+    { label: 'Taxa de resposta', value: '0%', hint: 'Quem engajou' },
+    { label: 'Leads qualificados', value: '0', hint: 'No funil ativo' },
+    { label: 'Visitas agendadas', value: '0', hint: 'ROI do corretor' },
+  ]);
 
   useEffect(() => {
-    const savedName = localStorage.getItem('domu_user_name');
-    const savedCompany = localStorage.getItem('domu_company_name');
+    const savedName = getAuthItem('domu_user_name');
+    const savedCompany = getAuthItem('domu_company_name');
     if (savedName) setUserName(savedName);
     if (savedCompany && savedCompany !== 'Domu' && savedCompany !== 'Empresa DOMU') {
       setCompanyName(savedCompany);
@@ -46,8 +51,8 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
-      const res = await fetch(`/api/dashboard/stats?tenantId=${storedTenantId}`);
+      const storedTenantId = getAuthItem('domu_tenant_id') || '';
+      const res = await fetch(`/api/dashboard/stats?tenantId=${storedTenantId}&period=30d`);
       const json = await res.json();
 
       if (json.success && json.metrics) {
@@ -57,249 +62,162 @@ export default function DashboardPage() {
         if (json.metrics.whatsappPhone && json.metrics.whatsappPhone !== 'Não cadastrado') {
           setWhatsappPhone(json.metrics.whatsappPhone);
         }
-        setTotalLeads(json.metrics.totalLeads || 0);
-        setTotalSent(json.metrics.totalDispatches || 0);
+        setRoiMetrics([
+          {
+            label: 'Contatos atingidos',
+            value: String(json.metrics.atingidos ?? 0),
+            hint: 'Entregas no período',
+          },
+          {
+            label: 'Taxa de resposta',
+            value: `${json.metrics.taxaResposta ?? 0}%`,
+            hint: 'Quem engajou',
+          },
+          {
+            label: 'Leads qualificados',
+            value: String(json.metrics.leadsQualificados ?? 0),
+            hint: 'No funil ativo',
+          },
+          {
+            label: 'Visitas agendadas',
+            value: String(json.metrics.visitasAgendadas ?? 0),
+            hint: 'ROI do corretor',
+          },
+        ]);
       }
     } catch (err) {
       console.error('Erro ao buscar dados do dashboard:', err);
     }
   };
 
-  const handleStartCampaign = (title: string, templateName: string, count: number) => {
-    setActiveQueue({ title, count });
+  const handleStartCampaign = (payload: CampaignStartPayload) => {
+    if (payload.campaignId) setActiveCampaignId(payload.campaignId);
   };
 
   const welcomeMessage = SEGMENT_WELCOME[segment] || SEGMENT_WELCOME.geral;
+  const isRealEstate = isRealEstateSegment(segment);
 
   return (
     <div className="space-y-5 w-full font-sans">
-
-      {/* Welcome banner */}
       <div className="bg-[#0B132B] p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800">
         <div className="space-y-1">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-blue-300">
-            PORTAL DOMU TECH
+            Plano Starter
           </p>
-          <h2 className="text-base font-black">Olá, {userName}</h2>
-          <p className="text-xs text-slate-300 max-w-lg">Automatize suas mensagens, leads e atendimentos no WhatsApp.</p>
+          <h2 className="text-lg font-bold">Olá, {userName}</h2>
+          <p className="text-sm text-slate-300 max-w-xl leading-relaxed">{welcomeMessage}</p>
         </div>
         <button
           onClick={() => setIsWizardOpen(true)}
-          className="btn-domu-primary text-xs py-2.5 px-5 shrink-0 flex items-center gap-2 self-start sm:self-center"
+          className="btn-domu-primary text-sm py-2.5 px-5 shrink-0 flex items-center gap-2 self-start sm:self-center"
         >
           <Send className="w-4 h-4" />
           <span>Novo Disparo</span>
         </button>
       </div>
 
+      {/* ROI metrics — Starter promise */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Indicadores de ROI
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Retorno das campanhas: quem foi atingido, respondeu e avançou no funil
+            </p>
+          </div>
+          <Link href="/metricas" className="text-[11px] font-semibold text-domu-blue hover:underline">
+            Ver painel de ROI →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {roiMetrics.map((metric) => (
+            <div key={metric.label} className="bg-white border border-slate-200 p-4 space-y-1">
+              <p className="text-xs font-semibold text-slate-500">{metric.label}</p>
+              <p className="text-2xl font-bold text-slate-900 tracking-tight">{metric.value}</p>
+              <p className="text-[11px] text-slate-400">{metric.hint}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <OverviewStats />
 
-      {activeQueue && (
-        <QueueSimulator
-          campaignTitle={activeQueue.title}
-          totalRecipients={activeQueue.count}
+      {activeCampaignId && (
+        <CampaignProgress
+          campaignId={activeCampaignId}
+          onClose={() => setActiveCampaignId(null)}
         />
       )}
 
-      <div className="bg-white border border-slate-200 p-5 space-y-5 w-full">
-
-        <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-3 gap-2.5">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab('funil')}
-              className={`px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'funil'
-                  ? 'bg-domu-blue text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-              }`}
-            >
-              Funil de Vendas e Conversão
-            </button>
-
-            <button
-              onClick={() => setActiveTab('disparos')}
-              className={`px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'disparos'
-                  ? 'bg-domu-blue text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-              }`}
-            >
-              Desempenho de Disparos
-            </button>
-
-            <button
-              onClick={() => setActiveTab('atendimento')}
-              className={`px-3 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'atendimento'
-                  ? 'bg-domu-blue text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-              }`}
-            >
-              <span>Atendimentos 1:1</span>
-              <span className="text-[8px] px-1.5 py-0.5 bg-amber-100 text-amber-800 font-extrabold rounded">Em Breve</span>
-            </button>
+      {/* Quick actions + WhatsApp */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
+        <div className="lg:col-span-6 bg-white p-5 border border-slate-200 space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+            <Users className="w-4 h-4 text-domu-blue" />
+            <h3 className="text-sm font-bold text-slate-900">Atalhos do dia a dia</h3>
           </div>
-
-          <Link
-            href="/disparos"
-            className="text-xs font-bold text-domu-blue hover:underline flex items-center gap-1"
-          >
-            Ver Detalhes dos Disparos <ArrowUpRight className="w-3 h-3" />
-          </Link>
-        </div>
-
-        {activeTab === 'funil' && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-xs font-black text-slate-900">Funil de Vendas e Etapas de Conversão</h3>
-              <p className="text-[11px] text-slate-500">Distribuição automatizada de contatos por etapa do processo comercial</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
-
-              <div className="p-3.5 bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-700">1. Novos Contatos</span>
-                  <span className="text-domu-blue font-black">{totalLeads}</span>
-                </div>
-                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-domu-blue h-full rounded-full transition-all duration-300" style={{ width: totalLeads > 0 ? '100%' : '0%' }}></div>
-                </div>
-                <p className="text-[10.5px] text-slate-500">Contatos cadastrados no sistema</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-700">2. Mensagem Enviada</span>
-                  <span className="text-domu-blue font-black">{totalSent}</span>
-                </div>
-                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-domu-blue h-full rounded-full transition-all duration-300" style={{ width: totalSent > 0 ? '85%' : '0%' }}></div>
-                </div>
-                <p className="text-[10.5px] text-slate-500">Campanhas disparadas via Meta API</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-700">3. Em Atendimento</span>
-                  <span className="text-domu-blue font-black">{totalLeads > 0 ? Math.floor(totalLeads * 0.4) : 0}</span>
-                </div>
-                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-domu-blue h-full rounded-full transition-all duration-300" style={{ width: totalLeads > 0 ? '40%' : '0%' }}></div>
-                </div>
-                <p className="text-[10.5px] text-slate-500">Conversas ativas no WhatsApp</p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-700">4. Concluído</span>
-                  <span className="text-emerald-600 font-black">{totalLeads > 0 ? Math.floor(totalLeads * 0.15) : 0}</span>
-                </div>
-                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: totalLeads > 0 ? '15%' : '0%' }}></div>
-                </div>
-                <p className="text-[10.5px] text-slate-500">Negócios finalizados</p>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'disparos' && (
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-xs font-black text-slate-900">Campanhas executadas na Meta Cloud API</h3>
-              <p className="text-[11px] text-slate-500">Envios processados com controle de taxa de entrega e zero risco de bloqueio</p>
-            </div>
-
-            <div className="p-8 text-center bg-slate-50 border border-slate-200 space-y-3">
-              <div className="w-10 h-10 bg-blue-100 text-domu-blue rounded-full flex items-center justify-center mx-auto">
-                <Send className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-xs font-black text-slate-900">Disparos em Massa Prontos</h4>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                  Crie sua primeira campanha para enviar ofertas, avisos e mensagens automatizadas para seus contatos.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsWizardOpen(true)}
-                className="btn-domu-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {isRealEstate && (
+              <Link
+                href="/imoveis"
+                className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>Criar Primeira Campanha</span>
-              </button>
-            </div>
+                Cadastrar imóvel
+              </Link>
+            )}
+            <Link
+              href="/contatos"
+              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
+            >
+              <Tags className="w-4 h-4" />
+              Importar contatos
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsWizardOpen(true)}
+              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2 text-left"
+            >
+              <Send className="w-4 h-4" />
+              Disparar campanha
+            </button>
+            <Link
+              href="/atendimento"
+              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
+            >
+              <MessageSquareReply className="w-4 h-4" />
+              Ver quem respondeu
+            </Link>
           </div>
-        )}
-
-        {activeTab === 'atendimento' && (
-          <div className="p-6 text-center space-y-3 bg-slate-50 border border-slate-200 max-w-xl mx-auto">
-            <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div className="space-y-1">
-              <h4 className="text-xs font-black text-slate-900">Central Multiatendentes 1:1 (Em Breve)</h4>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Em breve você poderá distribuir atendimentos do WhatsApp entre operadores da sua empresa com histórico unificado.
-              </p>
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
+        </div>
 
         <div className="lg:col-span-6 bg-white p-5 border border-slate-200 space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
             <div className="flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-domu-blue" />
-              <h3 className="text-xs font-black text-slate-900">Status do WhatsApp</h3>
+              <h3 className="text-sm font-bold text-slate-900">Status do WhatsApp</h3>
             </div>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5">
               Conectado
             </span>
           </div>
 
-          <p className="text-xs text-slate-600 leading-relaxed font-medium">
-            Número <strong className="text-slate-900">{whatsappPhone}</strong> cadastrado para a empresa <strong>{companyName}</strong>. Atendimentos manuais e disparos automáticos funcionam em simultâneo.
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Número <strong className="text-slate-900">{whatsappPhone}</strong> · empresa{' '}
+            <strong>{companyName}</strong>. Limite Starter: 1.500/mês e 200/dia (DOMU), sujeito à Meta.
           </p>
 
-          <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
-            <span>Sessão de Atendimento: <strong className="text-emerald-600 font-bold">Ativa</strong></span>
-            <span className="text-domu-blue font-bold">Coexistência Oficial OK</span>
-          </div>
-        </div>
-
-        <div className="lg:col-span-6 bg-white p-5 border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-domu-blue" />
-              <h3 className="text-xs font-black text-slate-900">
-                Disparos e Campanhas
-              </h3>
-            </div>
-            <Link href="/disparos" className="text-[11px] font-bold text-domu-blue hover:underline flex items-center gap-1">
-              Ver Módulo <ArrowUpRight className="w-3 h-3" />
+          <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
+            <span>
+              Sessão: <strong className="text-emerald-600">Ativa</strong>
+            </span>
+            <Link href="/configuracoes" className="text-domu-blue font-semibold hover:underline">
+              Configurações
             </Link>
           </div>
-
-          <p className="text-xs text-slate-600 leading-relaxed font-medium">
-            Inicie uma nova campanha de mensagens em massa para comunicar novidades e ofertas para sua base de clientes no WhatsApp.
-          </p>
-
-          <div className="pt-1">
-            <button
-              onClick={() => setIsWizardOpen(true)}
-              className="w-full btn-domu-primary text-xs py-2.5 px-4 justify-center flex items-center gap-2 shadow-xs"
-            >
-              <Send className="w-4 h-4" />
-              <span>Iniciar Novo Disparo em Massa</span>
-            </button>
-          </div>
         </div>
-
       </div>
 
       <CampaignWizardModal

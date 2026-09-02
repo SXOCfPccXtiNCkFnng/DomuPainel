@@ -255,8 +255,17 @@ export default function TemplatesPage() {
 
       {/* Modal: Criar Novo Template Meta com Live WhatsApp Preview de 2 Colunas */}
       {isModalOpen && mounted && createPortal(
-        <div className="fixed inset-0 z-[99999] bg-slate-900/50 flex items-center justify-center p-4 font-sans">
-          <div className="bg-white border border-slate-200 shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div
+          className="fixed inset-0 z-[99999] bg-slate-900/50 flex items-center justify-center p-4 font-sans"
+          onClick={() => setIsModalOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="bg-white border border-slate-200 shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
 
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div>

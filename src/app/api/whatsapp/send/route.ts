@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMetaTemplate, sendMetaText } from '@/lib/metaClient';
+import { requireAuth } from '@/lib/requireAuth';
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if ('error' in auth) return auth.error;
+
     const body = await req.json();
     const { to, type = 'template', templateName, languageCode = 'en_US', textBody, components } = body;
 

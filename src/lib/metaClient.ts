@@ -1,5 +1,5 @@
 /**
- * DOMU Tech - Meta Cloud API Server Helper
+ * Domu Tech - Meta Cloud API Server Helper
  * Securely executes Meta Graph API calls exclusively on the Node.js server.
  */
 

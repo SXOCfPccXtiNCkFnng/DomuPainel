@@ -1,4 +1,4 @@
-# WhatsApp Cloud API: Coexistence & Guia Anti-Ban (DOMU Tech)
+# WhatsApp Cloud API: Coexistence & Guia Anti-Ban (Domu Tech)
 
 Este documento descreve as diretrizes técnicas e operacionais para disparos de alta performance via WhatsApp, prevenindo bloqueios ("bans") e permitindo o uso simultâneo do aplicativo móvel com a API Oficial (Coexistência).
 
