@@ -32,19 +32,21 @@ export async function GET(req: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', activeTenantId);
 
-    // 3. Count total active users/agents in public.users
+    // 3. Count additional agents in public.users
     const { count: usersCount } = await supabaseAdmin
       .from('users')
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', activeTenantId);
 
-    // Values from database (0 fallback for new tenants, NO fake 854 number)
+    // Values from database (0 default for agents & dispatches)
     const planTier = sub?.plan_tier || 'STARTER';
     const priceBrl = sub?.monthly_price_brl || (planTier === 'STARTER' ? 197 : planTier === 'ENTERPRISE' ? 997 : 497);
     const messageLimit = sub?.monthly_message_limit || (planTier === 'STARTER' ? 1000 : planTier === 'ENTERPRISE' ? 999999 : 5000);
     const dispatchesUsed = dispatchesCount || 0;
-    const agentsUsed = usersCount || 1;
-    const agentsLimit = planTier === 'STARTER' ? 2 : planTier === 'ENTERPRISE' ? 999 : 10;
+    
+    // Default 0 agents used for 1:1 support
+    const agentsUsed = 0;
+    const agentsLimit = planTier === 'STARTER' ? 0 : planTier === 'ENTERPRISE' ? 999 : 10;
 
     // Calculate renewal date (current_period_end or +30 days)
     const renewalDateObj = sub?.current_period_end ? new Date(sub.current_period_end) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
