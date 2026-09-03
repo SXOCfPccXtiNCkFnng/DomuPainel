@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/campaigns/run-due",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
