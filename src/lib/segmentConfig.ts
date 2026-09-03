@@ -7,7 +7,7 @@ export const SEGMENT_LABELS: Record<TenantSegment, string> = {
   saude: 'Saúde e Beleza',
   alimentacao: 'Alimentação',
   juridico: 'Jurídico',
-  marketing_apenas: 'Marketing',
+  marketing_apenas: 'Somente Disparos',
   geral: 'Geral',
 };
 
@@ -23,6 +23,11 @@ export const SEGMENT_WELCOME: Record<TenantSegment, string> = {
 
 export function isRealEstateSegment(segment: TenantSegment | string | null): boolean {
   return segment === 'imobiliario';
+}
+
+/** Segmento focado só em campanhas — sem imóveis/leads/CRM. */
+export function isDispatchOnlySegment(segment: TenantSegment | string | null): boolean {
+  return segment === 'marketing_apenas';
 }
 
 export function getSegmentFromStorage(): TenantSegment {
@@ -87,6 +92,7 @@ export const PLATFORM_NAV: NavItemConfig[] = [
     href: '/atendimento',
     badge: 'Em Breve',
     isComingSoon: true,
+    segments: ['imobiliario'],
   },
 ];
 
@@ -97,9 +103,21 @@ export const ADMIN_NAV: NavItemConfig[] = [
 ];
 
 export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[] {
-  return PLATFORM_NAV.filter(
-    (item) => !item.segments || item.segments.includes(segment)
-  );
+  const dispatchOnly = isDispatchOnlySegment(segment);
+
+  return PLATFORM_NAV.filter((item) => {
+    if (item.segments && !item.segments.includes(segment)) return false;
+    if (dispatchOnly && (item.id === 'imoveis' || item.id === 'atendimento')) return false;
+    return true;
+  }).map((item) => {
+    if (dispatchOnly && item.id === 'metricas') {
+      return { ...item, name: 'Métricas de Campanha' };
+    }
+    if (dispatchOnly && item.id === 'contatos') {
+      return { ...item, name: 'Contatos' };
+    }
+    return item;
+  });
 }
 
 export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
@@ -145,11 +163,46 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   },
 };
 
-export function getPageTitle(pathname: string): { title: string; subtitle: string } {
-  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  const match = Object.keys(PAGE_TITLES).find(
+const DISPATCH_ONLY_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  '/': {
+    title: 'Dashboard de Disparos',
+    subtitle: 'Campanhas, entregas e performance no WhatsApp',
+  },
+  '/metricas': {
+    title: 'Métricas de Campanha',
+    subtitle: 'Disparos, entregas, respostas e base de contatos',
+  },
+  '/contatos': {
+    title: 'Contatos',
+    subtitle: 'Importação e listas para suas campanhas',
+  },
+  '/disparos': {
+    title: 'Disparo de Campanha',
+    subtitle: 'Monte, agende e acompanhe envios com status Meta',
+  },
+  '/templates': {
+    title: 'Templates de Mensagens',
+    subtitle: 'Modelos aprovados pela Meta para seus disparos',
+  },
+  '/relatorios': {
+    title: 'Relatórios de Campanha',
+    subtitle: 'Histórico de envios e entregas',
+  },
+};
+
+export function getPageTitle(
+  pathname: string,
+  segment?: TenantSegment | string | null
+): { title: string; subtitle: string } {
+  const titles =
+    isDispatchOnlySegment(segment || null) && DISPATCH_ONLY_PAGE_TITLES[pathname]
+      ? { ...PAGE_TITLES, ...DISPATCH_ONLY_PAGE_TITLES }
+      : PAGE_TITLES;
+
+  if (titles[pathname]) return titles[pathname];
+  const match = Object.keys(titles).find(
     (key) => key !== '/' && pathname.startsWith(key)
   );
-  if (match) return PAGE_TITLES[match];
-  return PAGE_TITLES['/'];
+  if (match) return titles[match];
+  return titles['/'] || PAGE_TITLES['/'];
 }

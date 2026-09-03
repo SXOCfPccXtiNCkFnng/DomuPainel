@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowRight, AlertCircle, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import AuthShell from '@/components/auth/AuthShell';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { persistLoginSession } from '@/lib/authStorage';
@@ -11,18 +11,27 @@ import { persistLoginSession } from '@/lib/authStorage';
 const inputClass =
   'block w-full px-3 py-3 border border-slate-200 bg-white text-slate-900 text-base placeholder-slate-400 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('registered') === '1') {
+      setSuccessMessage('Conta criada! Entre com seu e-mail e senha para continuar o onboarding.');
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setSuccessMessage('');
 
     if (!email || !password) {
       setErrorMessage('Preencha o e-mail e a senha.');
@@ -93,6 +102,13 @@ export default function LoginPage() {
         </div>
       )}
 
+      {successMessage && (
+        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {successMessage}
+        </div>
+      )}
+
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
@@ -156,5 +172,19 @@ export default function LoginPage() {
         </button>
       </form>
     </AuthShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-domu-blue/20 border-t-domu-blue rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

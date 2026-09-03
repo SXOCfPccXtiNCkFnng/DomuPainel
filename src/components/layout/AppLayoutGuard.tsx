@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
-import { isRealEstateSegment, getSegmentFromStorage } from '@/lib/segmentConfig';
+import { isRealEstateSegment, isDispatchOnlySegment, getSegmentFromStorage } from '@/lib/segmentConfig';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
 
@@ -13,12 +13,25 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
   const router = useRouter();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
-  const isAuthPage = pathname === '/login' || pathname === '/onboarding' || pathname === '/cadastro';
+  const isAuthPage =
+    pathname === '/login' ||
+    pathname === '/onboarding' ||
+    pathname === '/cadastro' ||
+    pathname === '/recuperar-senha' ||
+    pathname === '/redefinir-senha' ||
+    pathname === '/convite';
 
   useEffect(() => {
     let cancelled = false;
 
     async function checkAuth() {
+      // Cadastro/login: não redirecionar para onboarding só porque existe cookie antigo em sync.
+      const isPublicAuthEntry =
+        pathname === '/login' ||
+        pathname === '/cadastro' ||
+        pathname === '/recuperar-senha' ||
+        pathname === '/redefinir-senha';
+
       const loggedIn = isLoggedIn();
       let isOnboarded = getAuthItem('domu_is_onboarded') === 'true';
 
@@ -46,7 +59,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
             setAuthItem('domu_tenant_id', data.tenantId);
           }
         } else if (!loggedIn) {
-          if (pathname !== '/login' && pathname !== '/cadastro') {
+          if (!isPublicAuthEntry && pathname !== '/convite') {
             router.replace('/login');
           } else if (!cancelled) {
             setIsAuthChecked(true);
@@ -55,7 +68,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         }
       } catch {
         if (!loggedIn) {
-          if (pathname !== '/login' && pathname !== '/cadastro') {
+          if (!isPublicAuthEntry && pathname !== '/convite') {
             router.replace('/login');
           } else if (!cancelled) {
             setIsAuthChecked(true);
@@ -67,6 +80,8 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
       if (cancelled) return;
 
       if (!isOnboarded) {
+        // Com sessão válida e onboarding pendente: onboarding (não login/cadastro).
+        // Middleware já manda /login+/cadastro com cookie para /.
         if (pathname !== '/onboarding') {
           router.replace('/onboarding');
         } else {
@@ -75,7 +90,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         return;
       }
 
-      if (pathname === '/login' || pathname === '/onboarding' || pathname === '/cadastro') {
+      if (isPublicAuthEntry || pathname === '/onboarding' || pathname === '/convite') {
         router.replace('/');
         return;
       }
@@ -85,13 +100,26 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         router.replace('/');
         return;
       }
+      if (
+        (pathname === '/imoveis' || pathname === '/atendimento') &&
+        isDispatchOnlySegment(segment)
+      ) {
+        router.replace('/');
+        return;
+      }
 
       setIsAuthChecked(true);
     }
 
     function clearClientAndGoLogin() {
       clearAuthSession();
-      if (pathname !== '/login' && pathname !== '/cadastro') {
+      const stay =
+        pathname === '/login' ||
+        pathname === '/cadastro' ||
+        pathname === '/recuperar-senha' ||
+        pathname === '/redefinir-senha' ||
+        pathname === '/convite';
+      if (!stay) {
         router.replace('/login');
       } else if (!cancelled) {
         setIsAuthChecked(true);

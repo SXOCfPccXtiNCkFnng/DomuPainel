@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown } from 'lucide-react';
-import { getPageTitle } from '@/lib/segmentConfig';
+import { getPageTitle, getSegmentFromStorage } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
 import { clearAuthSession, getAuthItem } from '@/lib/authStorage';
 
@@ -15,7 +15,7 @@ interface HeaderProps {
 export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const pageInfo = getPageTitle(pathname);
+  const pageInfo = getPageTitle(pathname, getSegmentFromStorage());
   
   // State for user & company
   const [userName, setUserName] = useState('Gestor DOMU');
