@@ -12,9 +12,12 @@ export function isTenantOnboarded(
   subscription: { status?: string } | null | undefined,
   tenant?: { status?: string } | null
 ): boolean {
-  // Subscription ACTIVE = finished plan step
-  if (subscription?.status === 'ACTIVE') return true;
-  // Tenant ACTIVE = onboarding completed (register creates TRIAL)
+  const subStatus = subscription?.status;
+  // Ainda não pagou o plano do onboarding
+  if (subStatus === 'PENDING_PAYMENT') return false;
+  if (subStatus === 'ACTIVE' || subStatus === 'TRIAL') return true;
+  // Já foi cliente: painel liberado; disparos bloqueados na API de campanhas
+  if (subStatus === 'PAST_DUE' || subStatus === 'CANCELED') return true;
   if (tenant?.status === 'ACTIVE') return true;
   return false;
 }

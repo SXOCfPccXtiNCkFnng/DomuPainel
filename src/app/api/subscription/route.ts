@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getPlanMonthlyLimit, getPlanPrice, PLAN_DISPATCH_LIMITS, PlanTier } from '@/lib/planLimits';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireAuth, requireAdmin } from '@/lib/requireAuth';
+import { syncTenantSubscriptionFromAsaas } from '@/lib/billing';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,19 @@ export async function GET(req: NextRequest) {
     const auth = requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
+    const userId = auth.session.userId;
+
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .maybeSingle();
+
+    try {
+      await syncTenantSubscriptionFromAsaas(tenantId, user?.email);
+    } catch (syncErr) {
+      console.warn('[Subscription GET] Asaas sync failed:', syncErr);
+    }
 
     const { data: sub } = await supabaseAdmin
       .from('subscriptions')
@@ -24,7 +38,6 @@ export async function GET(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    // Uso real: soma sent_count das campanhas do mês
     const { data: camps } = await supabaseAdmin
       .from('campaigns')
       .select('sent_count')
@@ -72,9 +85,11 @@ export async function GET(req: NextRequest) {
         dispatchesUsed,
         agentsUsed,
         agentsLimit,
-        status: sub?.status || 'ACTIVE',
+        status: sub?.status || 'TRIAL',
         paymentMethod,
         renewalDate: renewalDateFormatted,
+        asaasSubscriptionId: sub?.asaas_subscription_id || null,
+        pendingPaymentId: sub?.pending_payment_id || null,
       },
     });
   } catch (error: any) {
@@ -83,48 +98,101 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+/**
+ * Troca de plano exige checkout Asaas (não ativa de graça).
+ * Use POST /api/billing/checkout com planTier + acceptedTerms.
+ */
+export async function POST() {
+  return NextResponse.json(
+    {
+      success: false,
+      error:
+        'Para alterar o plano, use o checkout Asaas em /api/billing/checkout (pagamento confirmado).',
+      checkoutPath: '/api/billing/checkout',
+    },
+    { status: 400 }
+  );
+}
+
+/** DELETE — cancela no Asaas (para cobranças futuras) e no banco. */
+export async function DELETE(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
-    const tenantId = auth.session.tenantId;
+    const { tenantId, userId } = auth.session;
 
-    const body = await req.json();
-    const { planTier } = body;
+    const { data: sub } = await supabaseAdmin
+      .from('subscriptions')
+      .select('id, status, asaas_subscription_id')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
 
-    if (!planTier) {
-      return NextResponse.json({ success: false, error: 'Parâmetros inválidos.' }, { status: 400 });
+    if (!sub) {
+      return NextResponse.json(
+        { success: false, error: 'Nenhuma assinatura encontrada.' },
+        { status: 404 }
+      );
     }
 
-    const priceBrl = getPlanPrice(planTier);
-    const limit = getPlanMonthlyLimit(planTier);
+    if (sub.status === 'CANCELED') {
+      return NextResponse.json(
+        { success: false, error: 'A assinatura já está cancelada.' },
+        { status: 400 }
+      );
+    }
 
-    const { data: updatedSub, error } = await supabaseAdmin
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .maybeSingle();
+
+    try {
+      const {
+        asaasCancelSubscription,
+        asaasFindCustomerByEmail,
+        asaasListCustomerSubscriptions,
+        getAsaasApiKey,
+      } = await import('@/lib/asaasClient');
+
+      if (getAsaasApiKey()) {
+        const idsToCancel = new Set<string>();
+        if (sub.asaas_subscription_id) idsToCancel.add(sub.asaas_subscription_id);
+
+        if (user?.email) {
+          const customer = await asaasFindCustomerByEmail(user.email);
+          if (customer) {
+            const asaasSubs = await asaasListCustomerSubscriptions(customer.id);
+            asaasSubs
+              .filter((s) => s.status !== 'INACTIVE' && s.status !== 'EXPIRED')
+              .forEach((s) => idsToCancel.add(s.id));
+          }
+        }
+
+        for (const id of idsToCancel) {
+          try {
+            await asaasCancelSubscription(id);
+          } catch (err) {
+            console.warn('[Subscription DELETE] Asaas cancel failed for', id, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Subscription DELETE] Asaas cancel skipped:', err);
+    }
+
+    await supabaseAdmin
       .from('subscriptions')
-      .upsert(
-        {
-          tenant_id: tenantId,
-          plan_tier: planTier,
-          monthly_price_brl: priceBrl,
-          monthly_message_limit: limit,
-          status: 'ACTIVE',
-          payment_method: 'PIX',
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'tenant_id' }
-      )
-      .select('*')
-      .single();
-
-    if (error) throw error;
+      .update({ status: 'CANCELED', updated_at: new Date().toISOString() })
+      .eq('tenant_id', tenantId);
 
     return NextResponse.json({
       success: true,
-      message: `Plano alterado para ${planTier} com sucesso!`,
-      subscription: updatedSub,
+      message:
+        'Assinatura cancelada. As cobranças mensais foram encerradas. Você pode assinar de novo quando quiser.',
     });
   } catch (error: any) {
-    console.error('[Subscription API POST Error]', error);
+    console.error('[Subscription DELETE Error]', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

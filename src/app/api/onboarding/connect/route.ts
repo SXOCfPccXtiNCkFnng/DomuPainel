@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { encryptData } from '@/lib/crypto';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireAdmin } from '@/lib/requireAuth';
+import { generateSecureToken } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     if (connectionType === 'DIRECT_API') {
       const { encryptedText, iv } = encryptData(accessToken.trim());
       const finalVerifyToken =
-        verifyToken?.trim() || `domu_verify_${tenantId.slice(0, 8)}`;
+        verifyToken?.trim() || generateSecureToken(16);
 
       const { error: credError } = await supabaseAdmin
         .from('tenant_credentials')

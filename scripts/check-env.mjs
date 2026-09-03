@@ -67,7 +67,10 @@ const checks = [
   { key: 'META_VERIFY_TOKEN', min: 8, required: false },
   { key: 'RESEND_API_KEY', min: 8, required: false },
   { key: 'CRON_SECRET', min: 16, required: false },
+  { key: 'PLATFORM_ADMIN_EMAILS', min: 5, required: false },
   { key: 'NEXT_PUBLIC_APP_URL', min: 8, required: false },
+  { key: 'ASAAS_WEBHOOK_TOKEN', min: 8, required: false, prodImportant: true },
+  { key: 'ASAAS_API_KEY', min: 10, required: false, prodImportant: true },
 ];
 
 for (const c of checks) {
@@ -88,6 +91,12 @@ for (const c of checks) {
   } else {
     console.log(`${c.key}: OK (len=${val.length})`);
   }
+}
+
+if (map.BILLING_MOCK === 'true' || map.BILLING_MOCK === '1') {
+  console.log('BILLING_MOCK: WARN (ativo — ok só em local; bloqueado em NODE_ENV=production)');
+} else {
+  console.log('BILLING_MOCK: OK (false/ausente)');
 }
 
 if (failed > 0) {

@@ -42,3 +42,28 @@ describe('email tokens', () => {
     expect(hashToken(token)).not.toBe(token);
   });
 });
+
+describe('100% coupon', () => {
+  it('zeros the price', async () => {
+    const { computeSubscriptionPrice } = await import('../billing');
+    const price = computeSubscriptionPrice({
+      planTier: 'STARTER',
+      paymentMethod: 'PIX',
+      coupon: { code: 'TESTE100', percent_off: 100, amount_off_brl: null },
+    });
+    expect(price.finalPrice).toBe(0);
+  });
+});
+
+describe('platformAdmin emails', () => {
+  it('parses allowlist and ignores junk', async () => {
+    const prev = process.env.PLATFORM_ADMIN_EMAILS;
+    const { parsePlatformAdminEmails, isPlatformAdminEmail } = await import('../platformAdmin');
+    expect(parsePlatformAdminEmails('A@X.com, b@y.com ;')).toEqual(['a@x.com', 'b@y.com']);
+    process.env.PLATFORM_ADMIN_EMAILS = 'ops@domutech.digital';
+    expect(isPlatformAdminEmail('OPS@domutech.digital')).toBe(true);
+    expect(isPlatformAdminEmail('outro@empresa.com')).toBe(false);
+    if (prev === undefined) delete process.env.PLATFORM_ADMIN_EMAILS;
+    else process.env.PLATFORM_ADMIN_EMAILS = prev;
+  });
+});

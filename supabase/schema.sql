@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     plan_tier VARCHAR(30) NOT NULL DEFAULT 'PRO', -- 'STARTER', 'PRO', 'ENTERPRISE'
     monthly_price_brl NUMERIC(10, 2) NOT NULL DEFAULT 497.00,
     monthly_message_limit INT DEFAULT 10000, -- Limite mensal de disparos do plano
-    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE', -- 'TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELED'
+    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE', -- 'TRIAL', 'ACTIVE', 'PENDING_PAYMENT', 'PAST_DUE', 'CANCELED'
     payment_method VARCHAR(30) DEFAULT 'PIX', -- 'PIX', 'CREDIT_CARD'
     asaas_customer_id VARCHAR(100),
     asaas_subscription_id VARCHAR(100),

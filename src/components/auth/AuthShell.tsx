@@ -14,7 +14,7 @@ interface AuthShellProps {
 const HIGHLIGHTS = [
   {
     title: 'Disparos em massa',
-    desc: 'Campanhas via Meta Cloud API com controle total de entrega.',
+    desc: 'Campanhas pelo WhatsApp oficial da Meta, com controle de entrega.',
   },
   {
     title: 'Automação inteligente',

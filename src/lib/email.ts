@@ -18,19 +18,29 @@ export type SendEmailInput = {
 
 /**
  * Envia e-mail via Resend se RESEND_API_KEY estiver configurado.
- * Em desenvolvimento sem chave, registra no log (não falha).
+ * Em produção sem chave, falha. Em dev, loga sem o link/token completo.
  */
 export async function sendEmail(
   input: SendEmailInput
 ): Promise<{ ok: boolean; mode: 'resend' | 'dev'; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || 'Domu Tech <onboarding@resend.dev>';
+  const isProd = process.env.NODE_ENV === 'production';
 
   if (!apiKey) {
+    if (isProd) {
+      logger.error('email.missing_resend_key');
+      return {
+        ok: false,
+        mode: 'resend',
+        error: 'Envio de e-mail não configurado (RESEND_API_KEY).',
+      };
+    }
     logger.info('email.dev_fallback', {
       to: input.to,
       subject: input.subject,
-      text: input.text.slice(0, 500),
+      // Não logar URL com token
+      textPreview: input.text.replace(/https?:\/\/\S+/g, '[link]').slice(0, 200),
     });
     return { ok: true, mode: 'dev' };
   }

@@ -45,7 +45,7 @@ export default function RecentCampaigns() {
             Histórico de Campanhas de Disparo
           </h3>
           <p className="text-[11px] text-slate-500">
-            Envios em massa via Meta Cloud API com acompanhamento em tempo real
+            Envios em massa pelo WhatsApp oficial, com acompanhamento em tempo real
           </p>
         </div>
         <Link

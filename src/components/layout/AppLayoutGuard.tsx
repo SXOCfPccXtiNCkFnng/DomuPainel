@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
@@ -13,7 +14,9 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
   const router = useRouter();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isPlatformOps, setIsPlatformOps] = useState(false);
 
+  const isInternoPage = pathname === '/interno' || pathname.startsWith('/interno/');
   const isAuthPage =
     pathname === '/login' ||
     pathname === '/onboarding' ||
@@ -56,22 +59,29 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
           return;
         }
         const data = await res.json();
-        if (data.success) {
-          if (!loggedIn) {
-            setAuthItem('domu_is_logged_in', 'true');
-          }
-          if (data.isOnboarded) {
-            syncSessionToStorage(data);
-            isOnboarded = true;
-          } else if (!isOnboarded) {
-            syncSessionToStorage(data);
-            isOnboarded = false;
-          } else {
-            setAuthItem('domu_selected_segment', data.segment);
-            setAuthItem('domu_company_name', data.companyName);
-            setAuthItem('domu_tenant_id', data.tenantId);
-          }
-        } else if (!loggedIn) {
+          if (data.success) {
+            if (!loggedIn) {
+              setAuthItem('domu_is_logged_in', 'true');
+            }
+            if (data.isPlatformAdmin) {
+              setAuthItem('domu_platform_ops', 'true');
+              setIsPlatformOps(true);
+            } else {
+              setAuthItem('domu_platform_ops', 'false');
+              setIsPlatformOps(false);
+            }
+            if (data.isOnboarded) {
+              syncSessionToStorage(data);
+              isOnboarded = true;
+            } else if (!isOnboarded) {
+              syncSessionToStorage(data);
+              isOnboarded = false;
+            } else {
+              setAuthItem('domu_selected_segment', data.segment);
+              setAuthItem('domu_company_name', data.companyName);
+              setAuthItem('domu_tenant_id', data.tenantId);
+            }
+          } else if (!loggedIn) {
           if (!isPublicAuthEntry && pathname !== '/convite') {
             router.replace('/login');
           } else if (!cancelled) {
@@ -93,6 +103,11 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
       if (cancelled) return;
 
       if (!isOnboarded) {
+        // Painel interno: não exige onboarding da empresa.
+        if (isInternoPage) {
+          setIsAuthChecked(true);
+          return;
+        }
         // Com sessão válida e onboarding pendente: onboarding (não login/cadastro).
         // Middleware já manda /login+/cadastro com cookie para /.
         if (pathname !== '/onboarding') {
@@ -158,6 +173,23 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-50 w-full">{children}</div>;
+  }
+
+  if (isInternoPage) {
+    if (!isPlatformOps) {
+      return <div className="min-h-screen bg-slate-50 w-full">{children}</div>;
+    }
+    return (
+      <div className="min-h-screen bg-slate-50 w-full">
+        <header className="bg-[#0B132B] text-white px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+          <p className="text-sm font-black tracking-tight">DOMU · interno</p>
+          <Link href="/" className="text-xs font-bold text-slate-300 hover:text-white">
+            Voltar ao portal
+          </Link>
+        </header>
+        <main className="px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      </div>
+    );
   }
 
   return (

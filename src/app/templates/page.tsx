@@ -139,7 +139,7 @@ export default function TemplatesPage() {
             <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-domu-blue border border-blue-200 uppercase">
               TEMPLATES DE MENSAGENS
             </span>
-            <span className="text-xs text-slate-500 font-medium">Padrão Meta Cloud API v20.0</span>
+            <span className="text-xs text-slate-500 font-medium">Modelos oficiais do WhatsApp</span>
           </div>
           <h1 className="text-lg font-black text-slate-900 tracking-tight">
             Modelos de Mensagem do WhatsApp (HSM)
@@ -169,7 +169,7 @@ export default function TemplatesPage() {
       <div className="p-4 bg-blue-50 border border-blue-200 text-xs text-slate-700 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-domu-blue shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <h4 className="font-extrabold text-slate-900">Regras Oficiais da Meta Cloud API (HSM)</h4>
+          <h4 className="font-extrabold text-slate-900">Regras oficiais da Meta para templates</h4>
           <p className="text-[11.5px] leading-relaxed text-slate-600">
             Para garantir a entrega de disparos no WhatsApp sem bloqueios, a Meta exige que toda mensagem iniciada pela empresa utilize um <strong>Template HSM pré-aprovado</strong> nas categorias <em>MARKETING</em> ou <em>UTILITY</em>. Você pode cadastrar modelos com Imagem de Destaque ou apenas texto. Variáveis são marcadas entre chaves duplas como <code className="font-mono text-domu-blue bg-white px-1.5 py-0.5 rounded border border-blue-200">{"{{nome}}"}</code>.
           </p>

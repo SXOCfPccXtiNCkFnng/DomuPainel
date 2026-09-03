@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireDispatcher } from '@/lib/requireAuth';
 import { isProduction } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
 
@@ -10,7 +10,7 @@ const BUCKET = 'campaign-media';
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireDispatcher(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 

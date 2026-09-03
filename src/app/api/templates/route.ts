@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
 // POST: Submit a new Meta Cloud API Template to Supabase (Bound to Tenant Account)
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireDispatcher(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 

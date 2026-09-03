@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = requireAdmin(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAdmin(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
     const base = appBaseUrl(req.nextUrl.origin);
     const inviteUrl = `${base}/convite?token=${rawToken}`;
 
-    await sendEmail({
+    const mailed = await sendEmail({
       to: email,
       subject: 'Convite para o Portal Domu Tech',
       text: `Olá ${name},\n\nVocê foi convidado como ${role} no Portal Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}`,
@@ -157,11 +157,18 @@ export async function POST(req: NextRequest) {
 
     logger.info('team.invite_created', { tenantId, email, role });
 
+    const isProd = process.env.NODE_ENV === 'production';
     return NextResponse.json({
       success: true,
       invite,
-      inviteUrl,
-      message: 'Convite criado. Enviamos o e-mail (ou veja o link abaixo em modo dev).',
+      // Em produção nunca devolver o token cru; em dev ajuda o teste local
+      ...(isProd || !mailed.ok ? {} : { inviteUrl }),
+      message: mailed.ok
+        ? isProd
+          ? 'Convite criado e e-mail enviado.'
+          : 'Convite criado. Enviamos o e-mail (ou veja o link abaixo em modo dev).'
+        : mailed.error || 'Convite criado, mas o e-mail não foi enviado.',
+      emailSent: mailed.ok,
     });
   } catch (error: any) {
     logger.error('team.invite_error', { message: error?.message });
@@ -171,7 +178,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = requireAdmin(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
     const body = await req.json();
@@ -184,7 +191,7 @@ export async function PATCH(req: NextRequest) {
 
     if (userId === auth.session.userId && role !== 'ADMIN') {
       return NextResponse.json(
-        { success: false, error: 'Você não pode remover seu próprio papel de ADMIN.' },
+        { success: false, error: 'Você não pode remover sua própria função de administrador.' },
         { status: 400 }
       );
     }
@@ -204,7 +211,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = requireAdmin(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
     const { searchParams } = new URL(req.url);

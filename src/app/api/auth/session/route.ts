@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isTenantOnboarded } from '@/lib/sessionHelpers';
 import { getSessionFromRequest, requireAuth } from '@/lib/requireAuth';
+import { isPlatformAdminEmail } from '@/lib/platformAdmin';
 import { TenantSegment } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
       user: user
         ? { id: user.id, name: user.name, email: user.email, role: user.role }
         : null,
+      isPlatformAdmin: isPlatformAdminEmail(user?.email),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erro interno.';
