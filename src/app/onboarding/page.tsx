@@ -28,6 +28,11 @@ import { SegmentIcon } from '@/components/icons/DomuIcons';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, setAuthItem, syncSessionToActiveStorage } from '@/lib/authStorage';
 import { SEGMENT_LABELS } from '@/lib/segmentConfig';
+import {
+  formatWhatsAppMask,
+  validateCityState,
+  validateWhatsAppPhone,
+} from '@/lib/onboardingValidation';
 
 const STEPS = [
   { id: 1, label: 'Segmento' },
@@ -136,29 +141,46 @@ export default function OnboardingPage() {
   const validateStep2 = (): boolean => {
     const trimmedCompany = companyName.trim();
     const trimmedOwner = ownerName.trim();
-    const trimmedCity = cityState.trim();
-    const trimmedPhone = whatsappPhone.trim();
-    const phoneDigits = trimmedPhone.replace(/\D/g, '');
+    const cityCheck = validateCityState(cityState);
+    const phoneCheck = validateWhatsAppPhone(whatsappPhone);
 
-    if (!trimmedCompany || !trimmedOwner || !trimmedCity || !trimmedPhone) {
-      setStep2Error('Preencha todos os campos para continuar.');
+    if (!trimmedCompany || !trimmedOwner) {
+      setStep2Error('Preencha o nome da empresa e do responsável.');
       return false;
     }
 
-    if (phoneDigits.length < 10) {
-      setStep2Error('Informe um WhatsApp válido com DDD.');
+    if (trimmedCompany.length < 2) {
+      setStep2Error('Informe um nome de empresa válido.');
       return false;
     }
 
+    if (!cityCheck.ok) {
+      setStep2Error(cityCheck.error);
+      return false;
+    }
+
+    if (!phoneCheck.ok) {
+      setStep2Error(phoneCheck.error);
+      return false;
+    }
+
+    setCityState(cityCheck.formatted);
+    setWhatsappPhone(phoneCheck.formatted);
     setStep2Error('');
     return true;
   };
 
   const handleAdvanceFromStep2 = () => {
     if (!validateStep2()) return;
+    const cityCheck = validateCityState(cityState);
+    const phoneCheck = validateWhatsAppPhone(whatsappPhone);
+    const formattedCity = cityCheck.ok ? cityCheck.formatted : cityState.trim();
+    const formattedPhone = phoneCheck.ok ? phoneCheck.formatted : whatsappPhone.trim();
+
     setAuthItem('domu_company_name', companyName.trim());
     setAuthItem('domu_user_name', ownerName.trim());
-    setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
+    setAuthItem('domu_whatsapp_phone', formattedPhone);
+    setAuthItem('domu_city_state', formattedCity);
     setCurrentStep(3);
   };
 
@@ -232,7 +254,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-emerald-600',
       borderColor: 'border-emerald-500',
-      available: true,
+      available: false,
     },
     {
       id: 'saude',
@@ -247,7 +269,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-amber-600',
       borderColor: 'border-amber-500',
-      available: true,
+      available: false,
     },
     {
       id: 'alimentacao',
@@ -262,7 +284,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-orange-600',
       borderColor: 'border-orange-500',
-      available: true,
+      available: false,
     },
     {
       id: 'geral',
@@ -276,7 +298,7 @@ export default function OnboardingPage() {
       ],
       color: 'text-indigo-600',
       borderColor: 'border-indigo-500',
-      available: true,
+      available: false,
     },
   ];
 
@@ -682,9 +704,17 @@ export default function OnboardingPage() {
                       setCityState(e.target.value);
                       if (step2Error) setStep2Error('');
                     }}
+                    onBlur={() => {
+                      const check = validateCityState(cityState);
+                      if (check.ok) setCityState(check.formatted);
+                    }}
                     className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                     placeholder="Ex: São Paulo, SP"
+                    autoComplete="address-level2"
                   />
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    Use cidade + UF. Ex: Curitiba, PR
+                  </p>
                 </div>
               </div>
 
@@ -695,14 +725,20 @@ export default function OnboardingPage() {
                 <input
                   type="tel"
                   required
+                  inputMode="numeric"
                   value={whatsappPhone}
                   onChange={(e) => {
-                    setWhatsappPhone(e.target.value);
+                    setWhatsappPhone(formatWhatsAppMask(e.target.value));
                     if (step2Error) setStep2Error('');
                   }}
                   className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                   placeholder="(11) 99999-9999"
+                  maxLength={15}
+                  autoComplete="tel-national"
                 />
+                <p className="mt-1.5 text-[11px] text-slate-400">
+                  Somente número brasileiro com DDD
+                </p>
               </div>
             </div>
 

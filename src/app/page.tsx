@@ -14,12 +14,14 @@ import {
   Users,
   MessageSquareReply,
   Tags,
+  FileText,
 } from 'lucide-react';
 import { TenantSegment } from '@/types';
 import {
   getSegmentFromStorage,
   SEGMENT_WELCOME,
   isRealEstateSegment,
+  isDispatchOnlySegment,
 } from '@/lib/segmentConfig';
 import { getAuthItem } from '@/lib/authStorage';
 
@@ -52,6 +54,8 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     try {
       const storedTenantId = getAuthItem('domu_tenant_id') || '';
+      const currentSegment = getSegmentFromStorage();
+      const dispatchOnly = isDispatchOnlySegment(currentSegment);
       const res = await fetch(`/api/dashboard/stats?tenantId=${storedTenantId}&period=30d`);
       const json = await res.json();
 
@@ -62,28 +66,54 @@ export default function DashboardPage() {
         if (json.metrics.whatsappPhone && json.metrics.whatsappPhone !== 'Não cadastrado') {
           setWhatsappPhone(json.metrics.whatsappPhone);
         }
-        setRoiMetrics([
-          {
-            label: 'Contatos atingidos',
-            value: String(json.metrics.atingidos ?? 0),
-            hint: 'Entregas no período',
-          },
-          {
-            label: 'Taxa de resposta',
-            value: `${json.metrics.taxaResposta ?? 0}%`,
-            hint: 'Quem engajou',
-          },
-          {
-            label: 'Leads qualificados',
-            value: String(json.metrics.leadsQualificados ?? 0),
-            hint: 'No funil ativo',
-          },
-          {
-            label: 'Visitas agendadas',
-            value: String(json.metrics.visitasAgendadas ?? 0),
-            hint: 'ROI do corretor',
-          },
-        ]);
+
+        if (dispatchOnly) {
+          setRoiMetrics([
+            {
+              label: 'Total de disparos',
+              value: String(json.metrics.totalDispatches ?? 0),
+              hint: 'Envios no período',
+            },
+            {
+              label: 'Taxa de entrega',
+              value: String(json.metrics.deliveryRate ?? '0.0%'),
+              hint: 'Confirmadas pela Meta',
+            },
+            {
+              label: 'Contatos atingidos',
+              value: String(json.metrics.atingidos ?? 0),
+              hint: 'Mensagens entregues',
+            },
+            {
+              label: 'Taxa de resposta',
+              value: `${json.metrics.taxaResposta ?? 0}%`,
+              hint: 'Quem respondeu',
+            },
+          ]);
+        } else {
+          setRoiMetrics([
+            {
+              label: 'Contatos atingidos',
+              value: String(json.metrics.atingidos ?? 0),
+              hint: 'Entregas no período',
+            },
+            {
+              label: 'Taxa de resposta',
+              value: `${json.metrics.taxaResposta ?? 0}%`,
+              hint: 'Quem engajou',
+            },
+            {
+              label: 'Leads qualificados',
+              value: String(json.metrics.leadsQualificados ?? 0),
+              hint: 'No funil ativo',
+            },
+            {
+              label: 'Visitas agendadas',
+              value: String(json.metrics.visitasAgendadas ?? 0),
+              hint: 'ROI do corretor',
+            },
+          ]);
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar dados do dashboard:', err);
@@ -96,13 +126,14 @@ export default function DashboardPage() {
 
   const welcomeMessage = SEGMENT_WELCOME[segment] || SEGMENT_WELCOME.geral;
   const isRealEstate = isRealEstateSegment(segment);
+  const dispatchOnly = isDispatchOnlySegment(segment);
 
   return (
     <div className="space-y-5 w-full font-sans">
       <div className="bg-[#0B132B] p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800">
         <div className="space-y-1">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-blue-300">
-            Plano Starter
+            {dispatchOnly ? 'Modo Somente Disparos' : 'Plano Starter'}
           </p>
           <h2 className="text-lg font-bold">Olá, {userName}</h2>
           <p className="text-sm text-slate-300 max-w-xl leading-relaxed">{welcomeMessage}</p>
@@ -116,19 +147,20 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* ROI metrics — Starter promise */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-              Indicadores de ROI
+              {dispatchOnly ? 'Indicadores de Campanha' : 'Indicadores de ROI'}
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Retorno das campanhas: quem foi atingido, respondeu e avançou no funil
+              {dispatchOnly
+                ? 'Acompanhe envios, entregas e engajamento das suas campanhas'
+                : 'Retorno das campanhas: quem foi atingido, respondeu e avançou no funil'}
             </p>
           </div>
           <Link href="/metricas" className="text-[11px] font-semibold text-domu-blue hover:underline">
-            Ver painel de ROI →
+            {dispatchOnly ? 'Ver métricas →' : 'Ver painel de ROI →'}
           </Link>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -151,7 +183,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Quick actions + WhatsApp */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
         <div className="lg:col-span-6 bg-white p-5 border border-slate-200 space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
@@ -174,15 +205,24 @@ export default function DashboardPage() {
               <Send className="w-4 h-4" />
               Disparar campanha
             </button>
-            <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
-              <span className="inline-flex items-center gap-2">
-                <MessageSquareReply className="w-4 h-4" />
-                Ver quem respondeu
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">
-                Em breve
-              </span>
-            </div>
+            <Link
+              href="/templates"
+              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Templates
+            </Link>
+            {!dispatchOnly && (
+              <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
+                <span className="inline-flex items-center gap-2">
+                  <MessageSquareReply className="w-4 h-4" />
+                  Ver quem respondeu
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">
+                  Em breve
+                </span>
+              </div>
+            )}
             {isRealEstate && (
               <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
                 <span className="inline-flex items-center gap-2">
@@ -193,6 +233,15 @@ export default function DashboardPage() {
                   Em breve
                 </span>
               </div>
+            )}
+            {dispatchOnly && (
+              <Link
+                href="/disparos"
+                className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                Histórico de campanhas
+              </Link>
             )}
           </div>
         </div>

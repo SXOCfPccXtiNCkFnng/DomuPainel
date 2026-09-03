@@ -11,8 +11,12 @@ import {
   RefreshCw,
   BarChart3,
   ArrowUpRight,
+  Send,
+  CheckCheck,
+  Users,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
+import { getSegmentFromStorage, isDispatchOnlySegment } from '@/lib/segmentConfig';
 
 interface RoiMetrics {
   atingidos: number;
@@ -90,36 +94,69 @@ export default function MetricasRoiPage() {
     fetchMetrics();
   }, [period]);
 
-  const cards = [
-    {
-      title: 'Atingidos',
-      value: metrics.atingidos.toLocaleString('pt-BR'),
-      hint: 'Entregas confirmadas no período',
-      icon: Target,
-      tone: 'text-domu-blue bg-blue-50 border-blue-100',
-    },
-    {
-      title: 'Respostas reais',
-      value: metrics.respostasReais.toLocaleString('pt-BR'),
-      hint: `Taxa ${metrics.taxaResposta}% · WhatsApp inbound`,
-      icon: MessageSquareReply,
-      tone: 'text-emerald-700 bg-emerald-50 border-emerald-100',
-    },
-    {
-      title: 'Leads qualificados',
-      value: metrics.leadsQualificados.toLocaleString('pt-BR'),
-      hint: 'Contatos em funil ativo',
-      icon: UserCheck,
-      tone: 'text-amber-700 bg-amber-50 border-amber-100',
-    },
-    {
-      title: 'Visitas agendadas',
-      value: metrics.visitasAgendadas.toLocaleString('pt-BR'),
-      hint: 'Status visita no CRM',
-      icon: CalendarCheck,
-      tone: 'text-violet-700 bg-violet-50 border-violet-100',
-    },
-  ];
+  const cards = isDispatchOnlySegment(getSegmentFromStorage())
+    ? [
+        {
+          title: 'Total de disparos',
+          value: metrics.totalDisparos.toLocaleString('pt-BR'),
+          hint: 'Envios no período',
+          icon: Send,
+          tone: 'text-domu-blue bg-blue-50 border-blue-100',
+        },
+        {
+          title: 'Atingidos',
+          value: metrics.atingidos.toLocaleString('pt-BR'),
+          hint: 'Entregas confirmadas',
+          icon: CheckCheck,
+          tone: 'text-emerald-700 bg-emerald-50 border-emerald-100',
+        },
+        {
+          title: 'Respostas',
+          value: metrics.respostasReais.toLocaleString('pt-BR'),
+          hint: `Taxa ${metrics.taxaResposta}% · inbound`,
+          icon: MessageSquareReply,
+          tone: 'text-amber-700 bg-amber-50 border-amber-100',
+        },
+        {
+          title: 'Base de contatos',
+          value: metrics.baseContatos.toLocaleString('pt-BR'),
+          hint: 'Lista disponível para campanhas',
+          icon: Users,
+          tone: 'text-violet-700 bg-violet-50 border-violet-100',
+        },
+      ]
+    : [
+        {
+          title: 'Atingidos',
+          value: metrics.atingidos.toLocaleString('pt-BR'),
+          hint: 'Entregas confirmadas no período',
+          icon: Target,
+          tone: 'text-domu-blue bg-blue-50 border-blue-100',
+        },
+        {
+          title: 'Respostas reais',
+          value: metrics.respostasReais.toLocaleString('pt-BR'),
+          hint: `Taxa ${metrics.taxaResposta}% · WhatsApp inbound`,
+          icon: MessageSquareReply,
+          tone: 'text-emerald-700 bg-emerald-50 border-emerald-100',
+        },
+        {
+          title: 'Leads qualificados',
+          value: metrics.leadsQualificados.toLocaleString('pt-BR'),
+          hint: 'Contatos em funil ativo',
+          icon: UserCheck,
+          tone: 'text-amber-700 bg-amber-50 border-amber-100',
+        },
+        {
+          title: 'Visitas agendadas',
+          value: metrics.visitasAgendadas.toLocaleString('pt-BR'),
+          hint: 'Status visita no CRM',
+          icon: CalendarCheck,
+          tone: 'text-violet-700 bg-violet-50 border-violet-100',
+        },
+      ];
+
+  const dispatchOnly = isDispatchOnlySegment(getSegmentFromStorage());
 
   return (
     <div className="space-y-6 w-full font-sans">
@@ -127,13 +164,17 @@ export default function MetricasRoiPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-domu-blue border border-blue-200 uppercase">
-              ROI Comercial
+              {dispatchOnly ? 'Campanhas' : 'ROI Comercial'}
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Respostas do WhatsApp + visitas do funil
+              {dispatchOnly
+                ? 'Performance de disparos no WhatsApp'
+                : 'Respostas do WhatsApp + visitas do funil'}
             </span>
           </div>
-          <h1 className="text-lg font-black text-slate-900 tracking-tight">Métricas de ROI</h1>
+          <h1 className="text-lg font-black text-slate-900 tracking-tight">
+            {dispatchOnly ? 'Métricas de Campanha' : 'Métricas de ROI'}
+          </h1>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

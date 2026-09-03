@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import AuthShell from '@/components/auth/AuthShell';
+import { clearAuthSession } from '@/lib/authStorage';
 
 const inputClass =
   'block w-full px-3 py-3 border border-slate-200 bg-white text-slate-900 text-base placeholder-slate-400 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors';
@@ -61,8 +62,9 @@ export default function CadastroPage() {
         return;
       }
 
-      setSuccessMessage('Conta criada com sucesso!');
-      setTimeout(() => router.push('/login'), 1500);
+      clearAuthSession();
+      setSuccessMessage('Conta criada com sucesso! Faça login para continuar.');
+      setTimeout(() => router.push('/login?registered=1'), 1500);
     } catch {
       setErrorMessage('Falha na comunicação com o servidor.');
       setIsLoading(false);

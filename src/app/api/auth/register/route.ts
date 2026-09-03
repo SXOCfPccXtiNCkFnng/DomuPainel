@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isPasswordStrong, hashPassword } from '@/lib/authHelpers';
-import { applySessionCookie } from '@/lib/requireAuth';
+import { clearSessionCookie } from '@/lib/requireAuth';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
       throw new Error('Falha ao registrar usuário no banco de dados.');
     }
 
+    // Sem login automático: limpa cookie antigo e manda o usuário autenticar no /login.
     const res = NextResponse.json({
       success: true,
       message: 'Conta criada com sucesso!',
@@ -117,17 +118,7 @@ export async function POST(req: NextRequest) {
         isOnboarded: false,
       },
     });
-
-    applySessionCookie(
-      res,
-      {
-        userId: newUser.id,
-        tenantId: newTenant.id,
-        role: 'ADMIN',
-      },
-      true
-    );
-
+    clearSessionCookie(res);
     return res;
   } catch (error: any) {
     console.error('[Register API Error]', error);
