@@ -536,7 +536,7 @@ export default function OnboardingPage() {
               <span className="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider bg-blue-50 text-domu-blue border border-blue-100">
                 Passo 1 · Segmento
               </span>
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 Qual é o foco do seu negócio?
               </h1>
               <p className="text-base text-slate-500 leading-relaxed">
@@ -556,7 +556,7 @@ export default function OnboardingPage() {
                     onClick={() => {
                       if (!isLocked) setSelectedSegment(seg.id);
                     }}
-                    className={`p-5 border-2 transition-all space-y-3 relative bg-white ${
+                    className={`p-4 sm:p-5 border-2 transition-all space-y-3 relative bg-white ${
                       isLocked
                         ? 'border-slate-200 opacity-60 cursor-not-allowed'
                         : isSelected
@@ -642,7 +642,7 @@ export default function OnboardingPage() {
               <span className="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider bg-blue-50 text-domu-blue border border-blue-100">
                 Passo 2 · Empresa
               </span>
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 Dados da sua empresa
               </h1>
               <p className="text-base text-slate-500 leading-relaxed">
