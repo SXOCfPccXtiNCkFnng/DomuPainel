@@ -8,6 +8,7 @@ const AUTH_KEYS = [
   'domu_company_name',
   'domu_whatsapp_phone',
   'domu_terms_accepted',
+  'domu_platform_ops',
 ] as const;
 
 export type AuthStorageKey = (typeof AUTH_KEYS)[number];

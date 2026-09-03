@@ -137,6 +137,16 @@ export default function OnboardingPage() {
   const [verifyToken, setVerifyToken] = useState('');
   const [appId, setAppId] = useState('');
   const [showAccessToken, setShowAccessToken] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponMessage, setCouponMessage] = useState('');
+  const [couponDiscountLabel, setCouponDiscountLabel] = useState('');
+  const [awaitingPayment, setAwaitingPayment] = useState(false);
+  const [pixPayload, setPixPayload] = useState<string | null>(null);
+  const [pixImage, setPixImage] = useState<string | null>(null);
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+  const [checkoutPriceLabel, setCheckoutPriceLabel] = useState<string | null>(null);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [billingCpfCnpj, setBillingCpfCnpj] = useState<string>('');
 
   const validateStep2 = (): boolean => {
     const trimmedCompany = companyName.trim();
@@ -398,6 +408,64 @@ export default function OnboardingPage() {
     setCurrentStep(5);
   };
 
+  const finishAndEnter = (tenantId: string) => {
+    if (billingCpfCnpj.trim()) {
+      setAuthItem('domu_billing_cpf_cnpj', billingCpfCnpj.trim());
+    }
+    syncSessionToActiveStorage({
+      domu_is_logged_in: 'true',
+      domu_is_onboarded: 'true',
+      domu_selected_segment: selectedSegment,
+      domu_terms_accepted: 'true',
+      domu_tenant_id: tenantId,
+      ...(companyName ? { domu_company_name: companyName.trim() } : {}),
+      ...(ownerName ? { domu_user_name: ownerName.trim() } : {}),
+      ...(whatsappPhone ? { domu_whatsapp_phone: whatsappPhone.trim() } : {}),
+    });
+    syncSessionToStorage({
+      isOnboarded: true,
+      segment: selectedSegment,
+      companyName: companyName || 'Empresa DOMU',
+      tenantId,
+    });
+    router.replace('/');
+  };
+
+  const handleApplyCoupon = async () => {
+    setCouponMessage('');
+    setCouponDiscountLabel('');
+    if (!couponCode.trim()) {
+      setCouponMessage('Digite um cupom.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/billing/coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          couponCode,
+          planTier: selectedPlan,
+          paymentMethod,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setCouponMessage(data.error || 'Cupom inválido.');
+        return;
+      }
+      setCouponDiscountLabel(
+        data.coupon.percentOff
+          ? `${data.coupon.percentOff}% off`
+          : `R$ ${data.coupon.amountOffBrl} off`
+      );
+      setCouponMessage(
+        `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
+      );
+    } catch {
+      setCouponMessage('Não foi possível validar o cupom.');
+    }
+  };
+
   const handleFinishOnboarding = async () => {
     if (!acceptedTerms) {
       setTermsError('Aceite os Termos de Uso e a Política de Privacidade para continuar.');
@@ -408,18 +476,27 @@ export default function OnboardingPage() {
     setIsProcessingPayment(true);
     try {
       const storedTenantId = getAuthItem('domu_tenant_id') || '';
+      const billingDigits = billingCpfCnpj.replace(/\D/g, '');
+      if (billingDigits.length !== 11 && billingDigits.length !== 14) {
+        setTermsError('Informe um CPF (11) ou CNPJ (14) válido para o pagador.');
+        setIsProcessingPayment(false);
+        return;
+      }
+      setAuthItem('domu_billing_cpf_cnpj', billingCpfCnpj.trim());
 
-      const res = await fetch('/api/onboarding/complete', {
+      const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantId: storedTenantId,
+          planTier: selectedPlan,
+          selectedPlan,
+          paymentMethod,
+          couponCode: couponCode.trim() || undefined,
           segment: selectedSegment,
           companyName,
           whatsappPhone,
           connectionType,
-          selectedPlan,
-          paymentMethod,
           ownerName,
           cityState,
           wabaId: wabaId.trim() || undefined,
@@ -428,47 +505,64 @@ export default function OnboardingPage() {
           verifyToken: verifyToken.trim() || undefined,
           appId: appId.trim() || undefined,
           acceptedTerms: true,
-          termsAcceptedAt: new Date().toISOString(),
+          cpfCnpj: billingCpfCnpj.trim(),
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setTermsError(data.error || 'Não foi possível ativar o plano. Tente novamente.');
+        setTermsError(data.error || 'Não foi possível iniciar o pagamento.');
         setIsProcessingPayment(false);
         return;
       }
 
-      const finalTenantId = data.tenantId || storedTenantId;
+      const finalTenantId = storedTenantId;
 
-      syncSessionToActiveStorage({
-        domu_is_logged_in: 'true',
-        domu_is_onboarded: 'true',
-        domu_selected_segment: selectedSegment,
-        domu_terms_accepted: 'true',
-        domu_tenant_id: finalTenantId,
-        ...(companyName ? { domu_company_name: companyName.trim() } : {}),
-        ...(ownerName ? { domu_user_name: ownerName.trim() } : {}),
-        ...(whatsappPhone ? { domu_whatsapp_phone: whatsappPhone.trim() } : {}),
-      });
-
-      if (finalTenantId) {
-        syncSessionToStorage({
-          isOnboarded: true,
-          segment: selectedSegment,
-          companyName: companyName || 'Empresa DOMU',
-          tenantId: finalTenantId,
-        });
+      if (data.mock || data.status === 'ACTIVE' || data.isOnboarded) {
+        setIsProcessingPayment(false);
+        finishAndEnter(finalTenantId);
+        return;
       }
 
+      setCheckoutPriceLabel(
+        data.price?.finalPrice != null ? `R$ ${data.price.finalPrice}` : null
+      );
+      setPaymentId(data.asaas?.paymentId || null);
+      setInvoiceUrl(data.asaas?.invoiceUrl || null);
+      setPixPayload(data.asaas?.pix?.payload || null);
+      setPixImage(data.asaas?.pix?.encodedImage || null);
+      setAwaitingPayment(true);
       setIsProcessingPayment(false);
-      router.replace('/');
     } catch (err) {
-      console.error('Erro ao salvar onboarding no Supabase:', err);
-      setTermsError('Erro de conexão ao ativar o plano. Tente novamente.');
+      console.error('Erro no checkout Asaas:', err);
+      setTermsError('Erro de conexão ao iniciar o pagamento. Tente novamente.');
       setIsProcessingPayment(false);
     }
   };
+
+  useEffect(() => {
+    if (!awaitingPayment) return;
+    const timer = setInterval(async () => {
+      try {
+        const qs = paymentId ? `?paymentId=${encodeURIComponent(paymentId)}` : '';
+        const res = await fetch(`/api/billing/status${qs}`);
+        const data = await res.json();
+        if (data.success && data.isOnboarded) {
+          clearInterval(timer);
+          finishAndEnter(getAuthItem('domu_tenant_id') || '');
+        } else if (data.pix?.payload && !pixPayload) {
+          setPixPayload(data.pix.payload);
+          setPixImage(data.pix.encodedImage || null);
+        } else if (data.invoiceUrl && !invoiceUrl) {
+          setInvoiceUrl(data.invoiceUrl);
+        }
+      } catch {
+        /* ignore poll errors */
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingPayment, paymentId]);
 
   if (isCheckingSession) {
     return (
@@ -1363,6 +1457,23 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  CPF ou CNPJ do pagador <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={billingCpfCnpj}
+                  onChange={(e) => setBillingCpfCnpj(e.target.value)}
+                  placeholder="Ex: 123.456.789-00 ou 12.345.678/0001-00"
+                  className="w-full px-3 py-2.5 border border-slate-200 text-sm bg-white focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Usado pelo Asaas para emitir a cobrança (documento do pagador).
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -1393,31 +1504,105 @@ export default function OnboardingPage() {
 
               {paymentMethod === 'PIX' ? (
                 <div className="p-4 bg-emerald-50 border border-emerald-100 text-sm text-emerald-900 space-y-1">
-                  <p className="font-semibold">Desconto de 5% no PIX aplicado</p>
+                  <p className="font-semibold">Desconto de 5% no PIX</p>
                   <p className="text-emerald-800/80">
-                    De R$ {activePlan.price} por <strong>R$ {pixPrice}/mês</strong>. Ativação imediata para teste neste ambiente.
+                    De R$ {activePlan.price} por <strong>R$ {pixPrice}/mês</strong>
+                    {couponDiscountLabel ? ` · cupom ${couponDiscountLabel}` : ''}.
+                    A ativação ocorre após a confirmação do pagamento no Asaas.
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="p-4 bg-blue-50 border border-blue-100 text-sm text-blue-900">
+                  Você será direcionado ao checkout seguro do Asaas para pagar com cartão.
+                  A assinatura ativa automaticamente após a confirmação.
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Cupom de desconto (opcional)
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
-                    placeholder="Número do cartão"
-                    defaultValue="4532 •••• •••• 8892"
-                    className="col-span-2 px-3 py-2.5 border border-slate-200 text-sm"
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      setCouponMessage('');
+                      setCouponDiscountLabel('');
+                    }}
+                    placeholder="Ex: DOMU20"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 text-sm uppercase"
                   />
-                  <input
-                    type="text"
-                    placeholder="MM/AA"
-                    defaultValue="08/29"
-                    className="px-3 py-2.5 border border-slate-200 text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="CVV"
-                    defaultValue="782"
-                    className="px-3 py-2.5 border border-slate-200 text-sm"
-                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+                {couponMessage && (
+                  <p
+                    className={`text-sm ${
+                      couponDiscountLabel ? 'text-emerald-700' : 'text-red-600'
+                    }`}
+                  >
+                    {couponMessage}
+                  </p>
+                )}
+              </div>
+
+              {awaitingPayment && (
+                <div className="p-4 border border-domu-blue/30 bg-blue-50/50 space-y-3">
+                  <p className="text-sm font-bold text-slate-900">
+                    Aguardando pagamento
+                    {checkoutPriceLabel ? ` · ${checkoutPriceLabel}/mês` : ''}
+                  </p>
+                  {paymentMethod === 'PIX' && (pixImage || pixPayload) ? (
+                    <div className="space-y-3">
+                      {pixImage && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`data:image/png;base64,${pixImage}`}
+                          alt="QR Code PIX"
+                          className="w-48 h-48 mx-auto bg-white border border-slate-200 p-2"
+                        />
+                      )}
+                      {pixPayload && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-slate-600">PIX copia e cola</p>
+                          <textarea
+                            readOnly
+                            value={pixPayload}
+                            className="w-full text-[11px] font-mono p-2 border border-slate-200 bg-white h-20"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(pixPayload)}
+                            className="text-xs font-bold text-domu-blue hover:underline"
+                          >
+                            Copiar código PIX
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                  {invoiceUrl && (
+                    <a
+                      href={invoiceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-bold text-domu-blue hover:underline"
+                    >
+                      Abrir página de pagamento Asaas
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Confirmando automaticamente quando o Asaas avisar o pagamento…
+                  </p>
                 </div>
               )}
 
@@ -1483,11 +1668,16 @@ export default function OnboardingPage() {
                 {isProcessingPayment ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Ativando plano...</span>
+                    <span>Gerando cobrança...</span>
+                  </>
+                ) : awaitingPayment ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Aguardando pagamento...</span>
                   </>
                 ) : (
                   <>
-                    <span>Ativar {activePlan.name} e entrar</span>
+                    <span>Pagar e ativar {activePlan.name}</span>
                     <Check className="w-4 h-4" />
                   </>
                 )}

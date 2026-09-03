@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { encryptData } from '@/lib/crypto';
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
+import { generateSecureToken } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAdmin(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -77,8 +78,7 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         waba_id: wabaId.trim(),
         phone_number_id: phoneNumberId.trim(),
-        verify_token:
-          verifyToken?.trim() || `domu_verify_${String(tenantId).slice(0, 8)}`,
+        verify_token: verifyToken?.trim() || generateSecureToken(16),
         app_id: appId?.trim() || null,
         webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://portal.domutech.digital'}/api/whatsapp/webhook`,
         is_verified: true,

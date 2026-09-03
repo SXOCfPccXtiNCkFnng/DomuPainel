@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown, Menu } from 'lucide-react';
+import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown, Menu, LineChart } from 'lucide-react';
 import { getPageTitle, getSegmentFromStorage } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
 import { clearAuthSession, getAuthItem } from '@/lib/authStorage';
+import { redirectIfDispatchBlocked } from '@/lib/billingGuard';
 
 interface HeaderProps {
   onOpenNewDispatchModal?: () => void;
@@ -22,6 +23,7 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
   const [userName, setUserName] = useState('Gestor DOMU');
   const [userEmail, setUserEmail] = useState('contato@domutech.digital');
   const [companyName, setCompanyName] = useState('Empresa DOMU');
+  const [showInterno, setShowInterno] = useState(false);
   
   // Header Modal State (Global Dispatch Wizard)
   const [isHeaderWizardOpen, setIsHeaderWizardOpen] = useState(false);
@@ -63,6 +65,7 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
     if (savedName) setUserName(savedName);
     if (savedEmail) setUserEmail(savedEmail);
     if (savedCompany) setCompanyName(savedCompany);
+    setShowInterno(getAuthItem('domu_platform_ops') === 'true');
     if (isRead) {
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     }
@@ -91,7 +94,8 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
     router.push('/login');
   };
 
-  const handleQuickDispatchClick = () => {
+  const handleQuickDispatchClick = async () => {
+    if (await redirectIfDispatchBlocked()) return;
     if (onOpenNewDispatchModal) {
       onOpenNewDispatchModal();
     } else {
@@ -259,6 +263,17 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
                     <CreditCard className="w-4 h-4 text-slate-500" />
                     <span>Minha Assinatura e Plano</span>
                   </Link>
+
+                  {showInterno ? (
+                    <Link
+                      href="/interno"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 font-medium text-slate-700 transition-colors"
+                    >
+                      <LineChart className="w-4 h-4 text-slate-500" />
+                      <span>Painel interno</span>
+                    </Link>
+                  ) : null}
                 </div>
 
                 {/* Logout Action */}

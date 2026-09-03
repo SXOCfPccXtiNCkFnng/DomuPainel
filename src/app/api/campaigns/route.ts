@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
+import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import {
   getPlanDailyLimit,
   getPlanMonthlyLimit,
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireDispatcher(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -122,9 +123,15 @@ export async function POST(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (subscription?.status && !['ACTIVE', 'TRIAL'].includes(subscription.status)) {
+    if (!isSubscriptionAllowedToDispatch(subscription?.status)) {
       return NextResponse.json(
-        { success: false, error: 'Assinatura inativa. Atualize o plano para disparar.' },
+        {
+          success: false,
+          error:
+            subscription?.status === 'PENDING_PAYMENT'
+              ? 'Conclua o pagamento da assinatura para disparar campanhas.'
+              : 'Assinatura inativa ou vencida. Atualize o plano em Assinatura.',
+        },
         { status: 402 }
       );
     }

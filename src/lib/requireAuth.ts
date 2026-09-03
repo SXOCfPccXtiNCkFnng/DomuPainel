@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionSecret } from '@/lib/envSecrets';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export const SESSION_COOKIE = 'domu_session';
 
@@ -100,12 +101,49 @@ export function requireAuth(
   return { session };
 }
 
-export function requireAdmin(
+async function resolveRoleFromDb(
+  session: AuthSession
+): Promise<{ ok: true; role: string } | { ok: false; error: NextResponse }> {
+  const { data: user, error } = await supabaseAdmin
+    .from('users')
+    .select('role, tenant_id')
+    .eq('id', session.userId)
+    .maybeSingle();
+
+  if (error || !user) {
+    return {
+      ok: false,
+      error: NextResponse.json(
+        { success: false, error: 'Sessão inválida. Faça login novamente.' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (user.tenant_id !== session.tenantId) {
+    return {
+      ok: false,
+      error: NextResponse.json(
+        { success: false, error: 'Sessão inválida para esta conta.' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  return { ok: true, role: String(user.role || 'ATTENDANT').toUpperCase() };
+}
+
+/** Admin com role revalidada no banco (não só no cookie). */
+export async function requireAdmin(
   req: NextRequest
-): { session: AuthSession } | { error: NextResponse } {
+): Promise<{ session: AuthSession } | { error: NextResponse }> {
   const auth = requireAuth(req);
   if ('error' in auth) return auth;
-  if (auth.session.role !== 'ADMIN' && auth.session.role !== 'SUPER_ADMIN') {
+
+  const resolved = await resolveRoleFromDb(auth.session);
+  if (!resolved.ok) return { error: resolved.error };
+
+  if (resolved.role !== 'ADMIN' && resolved.role !== 'SUPER_ADMIN') {
     return {
       error: NextResponse.json(
         { success: false, error: 'Acesso restrito a administradores.' },
@@ -113,16 +151,25 @@ export function requireAdmin(
       ),
     };
   }
-  return auth;
+
+  return {
+    session: { ...auth.session, role: resolved.role },
+  };
 }
 
-export function requireRole(
+/** Role revalidada no banco. */
+export async function requireRole(
   req: NextRequest,
   roles: string[]
-): { session: AuthSession } | { error: NextResponse } {
+): Promise<{ session: AuthSession } | { error: NextResponse }> {
   const auth = requireAuth(req);
   if ('error' in auth) return auth;
-  if (!roles.includes(auth.session.role)) {
+
+  const resolved = await resolveRoleFromDb(auth.session);
+  if (!resolved.ok) return { error: resolved.error };
+
+  const allowed = roles.map((r) => r.toUpperCase());
+  if (!allowed.includes(resolved.role)) {
     return {
       error: NextResponse.json(
         { success: false, error: 'Você não tem permissão para esta ação.' },
@@ -130,7 +177,17 @@ export function requireRole(
       ),
     };
   }
-  return auth;
+
+  return {
+    session: { ...auth.session, role: resolved.role },
+  };
+}
+
+/** Admin ou corretor — operações de campanha/template. */
+export async function requireDispatcher(
+  req: NextRequest
+): Promise<{ session: AuthSession } | { error: NextResponse }> {
+  return requireRole(req, ['ADMIN', 'SUPER_ADMIN', 'BROKER']);
 }
 
 export const TEAM_ROLES = ['ADMIN', 'BROKER', 'ATTENDANT'] as const;

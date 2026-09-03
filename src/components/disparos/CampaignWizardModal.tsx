@@ -20,6 +20,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
+import { BILLING_PAY_PATH, redirectIfDispatchBlocked } from '@/lib/billingGuard';
 import {
   INTEREST_OPTIONS,
   REGION_OPTIONS,
@@ -198,6 +199,9 @@ export default function CampaignWizardModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    void redirectIfDispatchBlocked().then((blocked) => {
+      if (blocked) onClose();
+    });
     fetchLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterInterest, filterRegion, filterType, filterBudget]);
@@ -287,6 +291,10 @@ export default function CampaignWizardModal({
         }),
       });
       const json = await res.json();
+      if (res.status === 402) {
+        window.location.assign(BILLING_PAY_PATH);
+        return;
+      }
       if (!json.success) {
         alert(json.error || 'Erro ao criar campanha.');
         setIsSubmitting(false);

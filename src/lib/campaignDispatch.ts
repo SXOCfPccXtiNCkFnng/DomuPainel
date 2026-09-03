@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { resolveMetaCredentials, sendMetaTemplate } from '@/lib/metaClient';
+import { logOpsAlert } from '@/lib/opsAlert';
 
 export type DispatchResult = {
   processed: number;
@@ -97,6 +98,12 @@ export async function dispatchCampaignPending(
       })
       .eq('id', campaignId);
 
+    await logOpsAlert({
+      source: 'campanha',
+      message: `Template não encontrado (${campaign.name || campaignId}).`,
+      tenantId: campaign.tenant_id,
+    });
+
     return {
       processed: 0,
       sent: 0,
@@ -121,6 +128,12 @@ export async function dispatchCampaignPending(
       })
       .eq('id', campaignId);
 
+    await logOpsAlert({
+      source: 'campanha',
+      message: err?.message || 'Credenciais Meta ausentes.',
+      tenantId: campaign.tenant_id,
+    });
+
     return {
       processed: 0,
       sent: 0,
@@ -133,15 +146,41 @@ export async function dispatchCampaignPending(
   }
 
   const nowIso = new Date().toISOString();
-  await supabaseAdmin
-    .from('campaigns')
-    .update({
-      status: 'RUNNING',
-      started_at: nowIso,
-      updated_at: nowIso,
-    })
-    .eq('id', campaignId)
-    .eq('tenant_id', campaign.tenant_id);
+  // Claim atômico: só um worker passa SCHEDULED/DRAFT → RUNNING.
+  if (status === 'SCHEDULED' || status === 'DRAFT') {
+    const { data: claimed, error: claimError } = await supabaseAdmin
+      .from('campaigns')
+      .update({
+        status: 'RUNNING',
+        started_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq('id', campaignId)
+      .eq('tenant_id', campaign.tenant_id)
+      .eq('status', status)
+      .select('id')
+      .maybeSingle();
+
+    if (claimError) throw claimError;
+    if (!claimed) {
+      return {
+        processed: 0,
+        sent: 0,
+        failed: 0,
+        skippedOptOut: 0,
+        skipped: true,
+        reason: 'Campanha já reivindicada por outro processo.',
+        campaignStatus: 'RUNNING',
+      };
+    }
+  } else if (status === 'RUNNING') {
+    await supabaseAdmin
+      .from('campaigns')
+      .update({ updated_at: nowIso })
+      .eq('id', campaignId)
+      .eq('tenant_id', campaign.tenant_id)
+      .eq('status', 'RUNNING');
+  }
 
   const { data: pendingLogs } = await supabaseAdmin
     .from('campaign_logs')
@@ -227,6 +266,14 @@ export async function dispatchCampaignPending(
     .eq('id', campaignId)
     .eq('tenant_id', campaign.tenant_id);
 
+  if (finalStatus === 'FAILED') {
+    await logOpsAlert({
+      source: 'campanha',
+      message: `Campanha falhou (${campaign.name || campaignId}): ${failed} envios com erro.`,
+      tenantId: campaign.tenant_id,
+    });
+  }
+
   return {
     processed: logs.length,
     sent,
@@ -270,6 +317,33 @@ export async function recountCampaignLogs(campaignId: string, tenantId: string) 
   return counts;
 }
 
+/**
+ * Tenta reivindicar uma campanha SCHEDULED vencida (SCHEDULED → RUNNING).
+ * Retorna false se outro worker já pegou.
+ */
+export async function claimDueScheduledCampaign(
+  campaignId: string,
+  tenantId: string
+): Promise<boolean> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseAdmin
+    .from('campaigns')
+    .update({
+      status: 'RUNNING',
+      started_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', campaignId)
+    .eq('tenant_id', tenantId)
+    .eq('status', 'SCHEDULED')
+    .lte('scheduled_at', nowIso)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data?.id);
+}
+
 /** Processa campanhas SCHEDULED cujo horário já passou. */
 export async function processDueScheduledCampaigns(options?: {
   tenantId?: string;
@@ -293,8 +367,24 @@ export async function processDueScheduledCampaigns(options?: {
 
   const results: DispatchResult[] = [];
   for (const camp of due || []) {
+    const claimed = await claimDueScheduledCampaign(camp.id, camp.tenant_id);
+    if (!claimed) {
+      results.push({
+        processed: 0,
+        sent: 0,
+        failed: 0,
+        skippedOptOut: 0,
+        skipped: true,
+        reason: 'Campanha já reivindicada por outro processo.',
+        campaignStatus: 'RUNNING',
+      });
+      continue;
+    }
+
+    // Já está RUNNING — force evita revalidar scheduled_at; claim já foi feito.
     const result = await dispatchCampaignPending(camp.id, {
       tenantId: camp.tenant_id,
+      force: true,
     });
     results.push(result);
   }

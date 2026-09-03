@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { encryptData } from '@/lib/crypto';
-import { getPlanMonthlyLimit, getPlanPrice } from '@/lib/planLimits';
-import { requireAuth } from '@/lib/requireAuth';
+import { generateSecureToken } from '@/lib/email';
+import { requireAdmin } from '@/lib/requireAuth';
 
+/**
+ * Salva dados de onboarding (empresa / credenciais Meta).
+ * NÃO ativa assinatura — ativação só via /api/billing/checkout + pagamento Asaas.
+ */
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -16,8 +20,6 @@ export async function POST(req: NextRequest) {
       companyName,
       whatsappPhone,
       connectionType,
-      selectedPlan,
-      paymentMethod,
       ownerName,
       cityState,
       wabaId,
@@ -30,18 +32,10 @@ export async function POST(req: NextRequest) {
 
     if (!acceptedTerms) {
       return NextResponse.json(
-        { success: false, error: 'É necessário aceitar os Termos de Uso para ativar o plano.' },
+        { success: false, error: 'É necessário aceitar os Termos de Uso para continuar.' },
         { status: 400 }
       );
     }
-
-    const prices: Record<string, number> = {
-      STARTER: getPlanPrice('STARTER'),
-      PRO: getPlanPrice('PRO'),
-      ENTERPRISE: getPlanPrice('ENTERPRISE'),
-    };
-
-    const monthlyPrice = prices[selectedPlan] || getPlanPrice('PRO');
 
     const { error: tenantError } = await supabaseAdmin
       .from('tenants')
@@ -49,8 +43,7 @@ export async function POST(req: NextRequest) {
         name: companyName || 'Empresa DOMU',
         segment: segment || 'imobiliario',
         whatsapp_number: whatsappPhone || '',
-        coexistence_status: 'CONNECTED',
-        status: 'ACTIVE',
+        coexistence_status: connectionType ? 'CONNECTED' : undefined,
         updated_at: new Date().toISOString(),
       })
       .eq('id', tenantId);
@@ -91,7 +84,7 @@ export async function POST(req: NextRequest) {
             phone_number_id: phoneNumberId,
             encrypted_access_token: encryptedText,
             token_encryption_iv: iv,
-            verify_token: verifyToken || `domu_verify_${String(tenantId).slice(0, 8)}`,
+            verify_token: verifyToken || generateSecureToken(16),
             app_id: appId || null,
             webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://painel.domutech.digital'}/api/whatsapp/webhook`,
             is_verified: true,
@@ -105,45 +98,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { error: subError } = await supabaseAdmin
-      .from('subscriptions')
-      .upsert(
-        {
-          tenant_id: tenantId,
-          plan_tier: selectedPlan || 'PRO',
-          monthly_price_brl: monthlyPrice,
-          monthly_message_limit: getPlanMonthlyLimit(selectedPlan),
-          status: 'ACTIVE',
-          payment_method: paymentMethod || 'PIX',
-          current_period_start: new Date().toISOString(),
-          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'tenant_id' }
-      );
-
-    if (subError) {
-      console.error('[Onboarding Subscription Error]', subError);
-      return NextResponse.json(
-        { success: false, error: 'Falha ao ativar a assinatura. Tente novamente.' },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({
       success: true,
-      message: 'Dados do onboarding salvos no banco de dados Supabase com sucesso!',
+      message:
+        'Dados salvos. Para liberar o plano, conclua o pagamento em Assinatura / checkout Asaas.',
       tenantId,
       segment,
-      selectedPlan,
       cityState: cityState || null,
       connectionType,
-      isOnboarded: true,
+      isOnboarded: false,
+      requiresPayment: true,
     });
   } catch (error: any) {
     console.error('[Onboarding Complete API Error]', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Erro interno ao salvar onboarding no banco.' },
+      { success: false, error: error.message || 'Erro interno ao salvar onboarding.' },
       { status: 500 }
     );
   }

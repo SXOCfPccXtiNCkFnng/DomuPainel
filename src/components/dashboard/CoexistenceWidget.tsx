@@ -109,7 +109,7 @@ export default function CoexistenceWidget() {
       <div className="p-3 bg-blue-50/80 border border-blue-200/90 rounded-sm text-xs text-slate-800 flex items-center gap-2">
         <Info className="w-4 h-4 text-domu-blue shrink-0" />
         <span>
-          <strong>Consulta Direta Meta Cloud API:</strong> Sua conta está no <strong>{dailyLimitTier}</strong> (limite oficial retornado pelos servidores da Meta de até {numericLimit.toLocaleString('pt-BR')} disparos/24h). O limite é controlado automaticamente na hora dos envios.
+          <strong>Consulta oficial da Meta:</strong> Sua conta está no <strong>{dailyLimitTier}</strong> (limite oficial de até {numericLimit.toLocaleString('pt-BR')} disparos/24h). O limite é controlado automaticamente na hora dos envios.
         </span>
       </div>
     </div>

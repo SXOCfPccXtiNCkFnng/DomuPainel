@@ -28,7 +28,7 @@ type TeamInvite = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  ADMIN: 'Admin',
+  ADMIN: 'Administrador',
   BROKER: 'Corretor',
   ATTENDANT: 'Atendente',
 };
@@ -117,7 +117,7 @@ export default function TeamSettingsPanel() {
   };
 
   const removeUser = async (userId: string) => {
-    if (!confirm('Remover este usuário da conta?')) return;
+    if (!confirm('Tem certeza que deseja remover este membro da equipe?')) return;
     const res = await fetch(`/api/team?userId=${userId}`, { method: 'DELETE' });
     const json = await res.json();
     if (!json.success) {
@@ -144,21 +144,35 @@ export default function TeamSettingsPanel() {
   };
 
   return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-domu-blue mb-1">
+          Gerenciar acesso
+        </p>
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+          Equipe e permissões
+        </h1>
+        <p className="text-sm text-slate-500 mt-1.5 max-w-lg">
+          Adicione membros da sua equipe e defina o que cada pessoa pode fazer dentro da plataforma.
+        </p>
+      </div>
+
     <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+      <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
             <Users className="w-4 h-4 text-domu-blue" />
-            Equipe e permissões
+            Convidar novo membro
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Convide corretores (BROKER) e atendentes (ATTENDANT). Só ADMIN gerencia.
+            Envie um convite por e-mail para adicionar alguém à sua conta.
           </p>
         </div>
         <button
           type="button"
           onClick={load}
-          className="text-xs font-bold text-domu-blue inline-flex items-center gap-1"
+          className="text-xs font-bold text-domu-blue inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:border-domu-blue/40 transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Atualizar
@@ -215,7 +229,7 @@ export default function TeamSettingsPanel() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase text-slate-600">Papel</label>
+            <label className="text-[11px] font-bold uppercase text-slate-600">Função</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
@@ -314,6 +328,7 @@ export default function TeamSettingsPanel() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
