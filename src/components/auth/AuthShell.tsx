@@ -109,7 +109,7 @@ export default function AuthShell({ title, subtitle, children, footer }: AuthShe
             <p className="text-base text-slate-500 mt-2 leading-relaxed">{subtitle}</p>
           </div>
 
-          <div className="bg-white border border-slate-200 p-7 shadow-sm">
+          <div className="bg-white border border-slate-200 p-5 sm:p-7 shadow-sm">
             {children}
           </div>
 

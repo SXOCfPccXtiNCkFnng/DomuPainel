@@ -12,6 +12,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const router = useRouter();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAuthPage =
     pathname === '/login' ||
@@ -20,6 +21,18 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
     pathname === '/recuperar-senha' ||
     pathname === '/redefinir-senha' ||
     pathname === '/convite';
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+      return;
+    }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,11 +161,11 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="min-h-screen flex w-full">
-      <Sidebar />
-      <div className="flex-1 pl-64 flex flex-col min-h-screen w-full">
-        <Header />
-        <main className="flex-1 pt-24 px-8 pb-12 overflow-y-auto w-full">
+    <div className="min-h-screen flex w-full overflow-x-hidden">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 md:pl-64 flex flex-col min-h-screen w-full min-w-0">
+        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <main className="flex-1 pt-16 sm:pt-20 px-4 sm:px-6 lg:px-8 pb-10 sm:pb-12 overflow-x-hidden overflow-y-auto w-full min-w-0">
           {children}
         </main>
       </div>

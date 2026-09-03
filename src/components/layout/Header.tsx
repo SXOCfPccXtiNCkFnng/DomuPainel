@@ -3,16 +3,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown } from 'lucide-react';
+import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown, Menu } from 'lucide-react';
 import { getPageTitle, getSegmentFromStorage } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
 import { clearAuthSession, getAuthItem } from '@/lib/authStorage';
 
 interface HeaderProps {
   onOpenNewDispatchModal?: () => void;
+  onMenuClick?: () => void;
 }
 
-export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
+export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const pageInfo = getPageTitle(pathname, getSegmentFromStorage());
@@ -110,33 +111,48 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
 
   return (
     <>
-      <header className="h-14 bg-white border-b border-slate-200 fixed top-0 right-0 left-64 z-30 px-6 flex items-center justify-between font-sans">
-        {/* Title */}
-        <div>
-          <h1 className="text-sm font-black text-slate-900 tracking-tight">
-            {pageInfo.title}
-          </h1>
-          <p className="text-[11px] text-slate-500 font-medium">{pageInfo.subtitle}</p>
+      <header className="h-14 bg-white border-b border-slate-200 fixed top-0 right-0 left-0 md:left-64 z-30 px-3 sm:px-6 flex items-center justify-between gap-2 font-sans">
+        {/* Menu + Title */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 shrink-0"
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-sm font-black text-slate-900 tracking-tight truncate">
+              {pageInfo.title}
+            </h1>
+            <p className="text-[11px] text-slate-500 font-medium truncate hidden sm:block">
+              {pageInfo.subtitle}
+            </p>
+          </div>
         </div>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Connection Status Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-full px-3 py-1 text-[11px] font-semibold text-slate-700">
+          <div className="hidden lg:flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-full px-3 py-1 text-[11px] font-semibold text-slate-700">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span>WhatsApp: <strong className="text-emerald-700 font-bold">Online</strong></span>
+            <span>
+              WhatsApp: <strong className="text-emerald-700 font-bold">Online</strong>
+            </span>
           </div>
 
           {/* Quick Action Button (Global Dispatch Opening) */}
           <button
             onClick={handleQuickDispatchClick}
-            className="btn-domu-primary text-xs shadow-sm py-1.5 px-3 flex items-center gap-1.5 cursor-pointer"
+            className="btn-domu-primary text-xs shadow-sm py-1.5 px-2.5 sm:px-3 flex items-center gap-1.5 cursor-pointer"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>Novo Disparo</span>
+            <span className="hidden sm:inline">Novo Disparo</span>
+            <span className="sm:hidden">Disparo</span>
           </button>
 
           {/* Notifications Bell & Dropdown */}
@@ -153,7 +169,7 @@ export default function Header({ onOpenNewDispatchModal }: HeaderProps) {
 
             {/* Notification Menu */}
             {isNotificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-1.5rem))] bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                 <div className="p-3 bg-slate-900 text-white flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Bell className="w-4 h-4 text-blue-400" />
