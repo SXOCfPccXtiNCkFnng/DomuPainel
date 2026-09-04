@@ -2,15 +2,7 @@ import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import { CONTACT_EMAIL, CONTACT_WHATSAPP_URL } from '@/lib/contact';
 
-/** Rodapé de contato para e-mails automáticos voltados ao cliente (não usar em alertas internos). */
-export function contactFooterHtml(): string {
-  const wa = CONTACT_WHATSAPP_URL('Olá! Preciso de ajuda com o Portal Domu Tech.');
-  return `<p style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
-    Precisa de ajuda? Fale com a gente pelo <a href="${wa}">WhatsApp</a> ou pelo e-mail
-    <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.
-  </p>`;
-}
-
+/** Rodapé de contato em texto puro (a versão HTML já vem embutida em brandedEmailHtml). */
 export function contactFooterText(): string {
   const wa = CONTACT_WHATSAPP_URL('Olá! Preciso de ajuda com o Portal Domu Tech.');
   return `\n\n---\nPrecisa de ajuda? Fale com a gente:\nWhatsApp: ${wa}\nE-mail: ${CONTACT_EMAIL}`;
