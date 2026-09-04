@@ -28,6 +28,19 @@ function ConviteForm() {
   const [loadingInvite, setLoadingInvite] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+  const isPasswordValid = hasMinLength && hasUppercase && hasNumber && hasSpecialChar;
+  const passwordsMatch = password.length > 0 && password === confirm;
+  const requirements = [
+    { ok: hasMinLength, label: 'Mínimo 8 caracteres' },
+    { ok: hasUppercase, label: 'Uma letra maiúscula' },
+    { ok: hasNumber, label: 'Um número' },
+    { ok: hasSpecialChar, label: 'Um caractere especial' },
+  ];
+
   useEffect(() => {
     const load = async () => {
       if (!token) {
@@ -55,7 +68,11 @@ function ConviteForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    if (password !== confirm) {
+    if (!isPasswordValid) {
+      setErrorMessage('Atenda a todos os requisitos de senha.');
+      return;
+    }
+    if (!passwordsMatch) {
       setErrorMessage('As senhas não coincidem.');
       return;
     }
@@ -161,9 +178,21 @@ function ConviteForm() {
               className={inputClass}
             />
           </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 py-2 border-t border-slate-100">
+            {requirements.map((req) => (
+              <div
+                key={req.label}
+                className={`flex items-center gap-1.5 text-xs ${req.ok ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${req.ok ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                {req.label}
+              </div>
+            ))}
+          </div>
+
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !isPasswordValid || !passwordsMatch}
             className="w-full btn-domu-primary text-base py-3 justify-center disabled:opacity-50"
           >
             {isLoading ? 'Criando acesso…' : 'Entrar no portal'}
