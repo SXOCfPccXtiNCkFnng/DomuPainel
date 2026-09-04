@@ -4,6 +4,8 @@ import { requireAdmin, isValidTeamRole, TEAM_ROLES } from '@/lib/requireAuth';
 import { getPlanUserLimit, normalizePlanTier } from '@/lib/planLimits';
 import {
   appBaseUrl,
+  contactFooterHtml,
+  contactFooterText,
   generateSecureToken,
   hashToken,
   sendEmail,
@@ -149,10 +151,11 @@ export async function POST(req: NextRequest) {
     const mailed = await sendEmail({
       to: email,
       subject: 'Convite para o Portal Domu Tech',
-      text: `Olá ${name},\n\nVocê foi convidado como ${role} no Portal Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}`,
+      text: `Olá ${name},\n\nVocê foi convidado como ${role} no Portal Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}${contactFooterText()}`,
       html: `<p>Olá <strong>${name}</strong>,</p>
         <p>Você foi convidado como <strong>${role}</strong> no Portal Domu Tech.</p>
-        <p><a href="${inviteUrl}">Aceitar convite</a> (válido por 7 dias)</p>`,
+        <p><a href="${inviteUrl}">Aceitar convite</a> (válido por 7 dias)</p>
+        ${contactFooterHtml()}`,
     });
 
     logger.info('team.invite_created', { tenantId, email, role });
