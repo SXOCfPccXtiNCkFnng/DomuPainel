@@ -1,5 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { loadOpsAlerts, type OpsAlert } from '@/lib/opsAlert';
+import { decryptData } from '@/lib/crypto';
+import { getPhoneNumberQuality } from '@/lib/metaClient';
 
 export type SubscriptionStatus =
   | 'ACTIVE'
@@ -45,6 +47,15 @@ export type ErrorSourceStat = {
   count7d: number;
 };
 
+export type WhatsappQualityRow = {
+  tenantId: string;
+  tenantName: string | null;
+  displayPhoneNumber: string | null;
+  qualityRating: 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN' | 'ERROR';
+  messagingLimitTier: string | null;
+  error?: string;
+};
+
 export type PlatformOverview = {
   generatedAt: string;
   totals: {
@@ -82,6 +93,7 @@ export type PlatformOverview = {
   };
   expiringSoon: ExpiringSubscription[];
   errorsBySource: ErrorSourceStat[];
+  whatsappQuality: WhatsappQualityRow[];
   tenants: TenantOpsRow[];
   alerts: OpsAlert[];
 };
@@ -256,6 +268,8 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
   }
   const errorsBySource = Array.from(errorStatsBySource.values()).sort((a, b) => b.count7d - a.count7d);
 
+  const whatsappQuality = await loadWhatsappQuality(tenantNameById);
+
   return {
     generatedAt: new Date().toISOString(),
     totals,
@@ -266,7 +280,58 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
     cronHealth: { overdueCount: overdueCampaigns.length, overdueCampaigns },
     expiringSoon,
     errorsBySource,
+    whatsappQuality,
     tenants: rows,
     alerts,
   };
+}
+
+/** Consulta a qualidade das contas WhatsApp (Meta) de cada tenant com credenciais próprias. */
+async function loadWhatsappQuality(
+  tenantNameById: Map<string, string>
+): Promise<WhatsappQualityRow[]> {
+  const { data: creds } = await supabaseAdmin
+    .from('tenant_credentials')
+    .select('tenant_id, phone_number_id, encrypted_access_token, token_encryption_iv')
+    .limit(50);
+
+  if (!creds || creds.length === 0) return [];
+
+  const rows = await Promise.all(
+    creds.map(async (cred): Promise<WhatsappQualityRow> => {
+      const tenantName = tenantNameById.get(cred.tenant_id) || null;
+      try {
+        const accessToken = decryptData(cred.encrypted_access_token, cred.token_encryption_iv);
+        const quality = await getPhoneNumberQuality({
+          accessToken,
+          phoneNumberId: cred.phone_number_id,
+        });
+        return {
+          tenantId: cred.tenant_id,
+          tenantName,
+          displayPhoneNumber: quality.displayPhoneNumber,
+          qualityRating: quality.qualityRating,
+          messagingLimitTier: quality.messagingLimitTier,
+        };
+      } catch (err) {
+        return {
+          tenantId: cred.tenant_id,
+          tenantName,
+          displayPhoneNumber: null,
+          qualityRating: 'ERROR',
+          messagingLimitTier: null,
+          error: err instanceof Error ? err.message : 'Falha ao consultar a Meta.',
+        };
+      }
+    })
+  );
+
+  const rank: Record<WhatsappQualityRow['qualityRating'], number> = {
+    RED: 0,
+    ERROR: 1,
+    YELLOW: 2,
+    UNKNOWN: 3,
+    GREEN: 4,
+  };
+  return rows.sort((a, b) => rank[a.qualityRating] - rank[b.qualityRating]);
 }

@@ -32,6 +32,21 @@ function statusLabel(status: SubscriptionStatus) {
   }
 }
 
+function qualityLabel(rating: string) {
+  switch (rating) {
+    case 'GREEN':
+      return { text: 'Boa', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    case 'YELLOW':
+      return { text: 'Atenção', className: 'bg-amber-50 text-amber-800 border-amber-200' };
+    case 'RED':
+      return { text: 'Crítica', className: 'bg-red-50 text-red-700 border-red-200' };
+    case 'ERROR':
+      return { text: 'Erro ao consultar', className: 'bg-slate-100 text-slate-600 border-slate-200' };
+    default:
+      return { text: 'Desconhecida', className: 'bg-slate-50 text-slate-500 border-slate-200' };
+  }
+}
+
 function formatDate(iso: string | null) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('pt-BR', {
@@ -201,6 +216,8 @@ export default function InternoPage() {
   const cron = overview?.cronHealth;
   const expiring = overview?.expiringSoon || [];
   const errSources = overview?.errorsBySource || [];
+  const waQuality = overview?.whatsappQuality || [];
+  const waQualityAtRisk = waQuality.filter((w) => w.qualityRating !== 'GREEN').length;
   const mrrLabel = overview
     ? overview.mrr.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
     : 'R$ 0';
@@ -359,6 +376,38 @@ export default function InternoPage() {
                 </span>
               </li>
             ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {waQuality.length > 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <h2 className="text-sm font-black text-slate-900">Qualidade das contas WhatsApp</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {waQualityAtRisk > 0
+                ? `${waQualityAtRisk} conta${waQualityAtRisk > 1 ? 's' : ''} fora do verde — a Meta reduz o limite de disparo (ou bloqueia) quando isso acontece.`
+                : 'Nota dada pela Meta a cada número. Fora do verde, o limite de disparo cai.'}
+            </p>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {waQuality.map((w) => {
+              const badge = qualityLabel(w.qualityRating);
+              return (
+                <li key={w.tenantId} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{w.tenantName || w.tenantId.slice(0, 8)}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {w.displayPhoneNumber || w.error || '—'}
+                      {w.messagingLimitTier ? ` · limite ${w.messagingLimitTier.replace('TIER_', '')}` : ''}
+                    </p>
+                  </div>
+                  <span className={`inline-flex text-[11px] font-bold border rounded-full px-2 py-0.5 ${badge.className}`}>
+                    {badge.text}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}
