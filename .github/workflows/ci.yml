@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # Valores fictícios só para satisfazer as validações de env em build-time.
+      # Nunca usar secrets reais aqui — o CI não precisa falar com o Supabase/Meta/Asaas de verdade.
+      DOMU_SESSION_SECRET: ci_fake_session_secret_32_chars_min_00000
+      ENCRYPTION_SECRET_KEY: ci_fake_encryption_secret_32_chars_000
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-fake.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-fake-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-fake-service-role-key-not-real
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
