@@ -15,6 +15,7 @@ import {
   Pencil,
   X,
   Tags,
+  AlertCircle,
 } from 'lucide-react';
 import ImportContactsModal from '@/components/disparos/ImportContactsModal';
 import { getAuthItem } from '@/lib/authStorage';
@@ -41,6 +42,39 @@ interface LeadContact {
 
 const selectClass =
   'px-2.5 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-domu-blue';
+
+/** Select reutilizado na barra de filtros e no modal de edição de tags. */
+function TagSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly string[] | readonly { max: number; label: string }[];
+  placeholder: string;
+  className: string;
+}) {
+  const isObjectOptions = options.length > 0 && typeof options[0] === 'object';
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={className}>
+      <option value="">{placeholder}</option>
+      {isObjectOptions
+        ? (options as readonly { max: number; label: string }[]).map((o) => (
+            <option key={o.max} value={o.max}>
+              {o.label}
+            </option>
+          ))
+        : (options as readonly string[]).map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+    </select>
+  );
+}
 
 function formatPhoneDisplay(phone: string): string {
   const d = (phone || '').replace(/\D/g, '');
@@ -74,9 +108,11 @@ export default function ContatosPage() {
     status: 'NOVO',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const fetchContacts = async () => {
     setIsLoading(true);
+    setError('');
     try {
       const tenantId = getAuthItem('domu_tenant_id') || '';
       const params = new URLSearchParams({ tenantId });
@@ -89,9 +125,12 @@ export default function ContatosPage() {
       if (json.success) {
         setContacts(json.leads || []);
         setSelectedIds(new Set());
+      } else {
+        setError(json.error || 'Não foi possível carregar os contatos.');
       }
     } catch (err) {
       console.error('Erro ao carregar contatos:', err);
+      setError('Falha de conexão ao carregar os contatos. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -99,6 +138,7 @@ export default function ContatosPage() {
 
   useEffect(() => {
     fetchContacts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterInterest, filterRegion, filterType, filterBudget]);
 
   const filtered = useMemo(() => {
@@ -237,6 +277,13 @@ export default function ContatosPage() {
         </div>
       </div>
 
+      {error ? (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </p>
+      ) : null}
+
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-4 space-y-3 border-b border-slate-100">
           <div className="flex flex-col lg:flex-row gap-2">
@@ -275,54 +322,34 @@ export default function ContatosPage() {
             <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
               <Tags className="w-3 h-3" /> Segmentar
             </span>
-            <select
+            <TagSelect
               value={filterInterest}
-              onChange={(e) => setFilterInterest(e.target.value)}
+              onChange={setFilterInterest}
+              options={INTEREST_OPTIONS}
+              placeholder="Interesse"
               className={selectClass}
-            >
-              <option value="">Interesse</option>
-              {INTEREST_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-            <select
+            />
+            <TagSelect
               value={filterRegion}
-              onChange={(e) => setFilterRegion(e.target.value)}
+              onChange={setFilterRegion}
+              options={REGION_OPTIONS}
+              placeholder="Região"
               className={selectClass}
-            >
-              <option value="">Região</option>
-              {REGION_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-            <select
+            />
+            <TagSelect
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={setFilterType}
+              options={PROPERTY_TYPE_OPTIONS}
+              placeholder="Tipo imóvel"
               className={selectClass}
-            >
-              <option value="">Tipo imóvel</option>
-              {PROPERTY_TYPE_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-            <select
+            />
+            <TagSelect
               value={filterBudget}
-              onChange={(e) => setFilterBudget(e.target.value)}
+              onChange={setFilterBudget}
+              options={BUDGET_OPTIONS}
+              placeholder="Faixa de preço"
               className={selectClass}
-            >
-              <option value="">Faixa de preço</option>
-              {BUDGET_OPTIONS.map((o) => (
-                <option key={o.max} value={o.max}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            />
             {(filterInterest || filterRegion || filterType || filterBudget) && (
               <button
                 type="button"
@@ -478,69 +505,49 @@ export default function ContatosPage() {
                   <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                     Interesse
                   </label>
-                  <select
+                  <TagSelect
                     value={editForm.interest}
-                    onChange={(e) => setEditForm((f) => ({ ...f, interest: e.target.value }))}
+                    onChange={(v) => setEditForm((f) => ({ ...f, interest: v }))}
+                    options={INTEREST_OPTIONS}
+                    placeholder="—"
                     className={`w-full ${selectClass}`}
-                  >
-                    <option value="">—</option>
-                    {INTEREST_OPTIONS.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                     Região
                   </label>
-                  <select
+                  <TagSelect
                     value={editForm.region}
-                    onChange={(e) => setEditForm((f) => ({ ...f, region: e.target.value }))}
+                    onChange={(v) => setEditForm((f) => ({ ...f, region: v }))}
+                    options={REGION_OPTIONS}
+                    placeholder="—"
                     className={`w-full ${selectClass}`}
-                  >
-                    <option value="">—</option>
-                    {REGION_OPTIONS.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                     Tipo
                   </label>
-                  <select
+                  <TagSelect
                     value={editForm.propertyType}
-                    onChange={(e) => setEditForm((f) => ({ ...f, propertyType: e.target.value }))}
+                    onChange={(v) => setEditForm((f) => ({ ...f, propertyType: v }))}
+                    options={PROPERTY_TYPE_OPTIONS}
+                    placeholder="—"
                     className={`w-full ${selectClass}`}
-                  >
-                    <option value="">—</option>
-                    {PROPERTY_TYPE_OPTIONS.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                     Orçamento máx.
                   </label>
-                  <select
+                  <TagSelect
                     value={editForm.budgetMax}
-                    onChange={(e) => setEditForm((f) => ({ ...f, budgetMax: e.target.value }))}
+                    onChange={(v) => setEditForm((f) => ({ ...f, budgetMax: v }))}
+                    options={BUDGET_OPTIONS}
+                    placeholder="—"
                     className={`w-full ${selectClass}`}
-                  >
-                    <option value="">—</option>
-                    {BUDGET_OPTIONS.map((o) => (
-                      <option key={o.max} value={o.max}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
               <div>

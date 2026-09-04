@@ -11,6 +11,7 @@ import {
   CheckCheck,
   Eye,
   Building2,
+  AlertCircle,
 } from 'lucide-react';
 import CampaignWizardModal, {
   CampaignStartPayload,
@@ -23,6 +24,7 @@ export default function DisparosPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchCampaigns();
@@ -34,15 +36,19 @@ export default function DisparosPage() {
 
   const fetchCampaigns = async () => {
     setIsLoading(true);
+    setError('');
     try {
       const storedTenantId = getAuthItem('domu_tenant_id') || '';
       const res = await fetch(`/api/campaigns?tenantId=${storedTenantId}`);
       const json = await res.json();
       if (json.success) {
         setCampaigns(json.campaigns || []);
+      } else {
+        setError(json.error || 'Não foi possível carregar as campanhas.');
       }
     } catch (err) {
       console.error('Erro ao buscar campanhas:', err);
+      setError('Falha de conexão ao carregar as campanhas. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -126,6 +132,13 @@ export default function DisparosPage() {
           onClose={() => setActiveCampaignId(null)}
         />
       )}
+
+      {error ? (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </p>
+      ) : null}
 
       <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">

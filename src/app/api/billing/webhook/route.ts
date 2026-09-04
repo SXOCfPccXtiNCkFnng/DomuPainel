@@ -12,6 +12,7 @@ import {
 } from '@/lib/asaasClient';
 import { getPlanMonthlyLimit, normalizePlanTier } from '@/lib/planLimits';
 import { isProduction } from '@/lib/envSecrets';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,7 +133,7 @@ export async function POST(req: NextRequest) {
             .eq('tenant_id', tenantId);
         }
 
-        console.log('[Asaas Webhook]', event, payment.id, verifiedStatus, externalRef);
+        logger.info('billing.webhook_payment', { event, paymentId: payment.id, verifiedStatus, externalRef });
       }
     }
 
