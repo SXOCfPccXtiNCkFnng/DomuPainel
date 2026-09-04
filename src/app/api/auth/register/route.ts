@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isPasswordStrong, hashPassword } from '@/lib/authHelpers';
 import { clearSessionCookie } from '@/lib/requireAuth';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { isValidBrazilianPhone } from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,13 @@ export async function POST(req: NextRequest) {
     if (!passwordCheck.valid) {
       return NextResponse.json(
         { success: false, error: passwordCheck.reason },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidBrazilianPhone(whatsapp || '')) {
+      return NextResponse.json(
+        { success: false, error: 'Informe um número de WhatsApp válido, com DDD (ex: 11 98765-4321).' },
         { status: 400 }
       );
     }

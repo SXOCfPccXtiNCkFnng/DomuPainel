@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { encryptData } from '@/lib/crypto';
 import { generateSecureToken } from '@/lib/email';
 import { requireAdmin } from '@/lib/requireAuth';
+import { clientIpFromRequest } from '@/lib/rateLimit';
+import { isValidBrazilianPhone } from '@/lib/validators';
+import { LEGAL_DOCS_VERSION } from '@/lib/legal';
 
 /**
  * Salva dados de onboarding (empresa / credenciais Meta).
@@ -13,6 +16,7 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
+    const userId = auth.session.userId;
 
     const body = await req.json();
     const {
@@ -36,6 +40,22 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (whatsappPhone && !isValidBrazilianPhone(whatsappPhone)) {
+      return NextResponse.json(
+        { success: false, error: 'Informe um número de WhatsApp válido, com DDD (ex: 11 98765-4321).' },
+        { status: 400 }
+      );
+    }
+
+    await supabaseAdmin
+      .from('users')
+      .update({
+        terms_accepted_at: new Date().toISOString(),
+        terms_version: LEGAL_DOCS_VERSION,
+        terms_accepted_ip: clientIpFromRequest(req),
+      })
+      .eq('id', userId);
 
     const { error: tenantError } = await supabaseAdmin
       .from('tenants')

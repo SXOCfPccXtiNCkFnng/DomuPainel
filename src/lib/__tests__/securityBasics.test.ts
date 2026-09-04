@@ -7,6 +7,7 @@ import {
   normalizePlanTier,
 } from '../planLimits';
 import { hashToken, generateSecureToken } from '../email';
+import { isValidBrazilianPhone, isValidCpfCnpjLength } from '../validators';
 
 describe('isPasswordStrong', () => {
   it('rejects short passwords', () => {
@@ -52,6 +53,36 @@ describe('100% coupon', () => {
       coupon: { code: 'TESTE100', percent_off: 100, amount_off_brl: null },
     });
     expect(price.finalPrice).toBe(0);
+  });
+});
+
+describe('isValidBrazilianPhone', () => {
+  it('accepts mobile and landline numbers with DDD', () => {
+    expect(isValidBrazilianPhone('11987654321')).toBe(true);
+    expect(isValidBrazilianPhone('1132345678')).toBe(true);
+    expect(isValidBrazilianPhone('(11) 98765-4321')).toBe(true);
+  });
+
+  it('accepts numbers with the 55 country code', () => {
+    expect(isValidBrazilianPhone('5511987654321')).toBe(true);
+  });
+
+  it('rejects garbage input', () => {
+    expect(isValidBrazilianPhone('')).toBe(false);
+    expect(isValidBrazilianPhone('abc')).toBe(false);
+    expect(isValidBrazilianPhone('123')).toBe(false);
+  });
+});
+
+describe('isValidCpfCnpjLength', () => {
+  it('accepts 11 (CPF) or 14 (CNPJ) digit values', () => {
+    expect(isValidCpfCnpjLength('123.456.789-00')).toBe(true);
+    expect(isValidCpfCnpjLength('12.345.678/0001-00')).toBe(true);
+  });
+
+  it('rejects other lengths', () => {
+    expect(isValidCpfCnpjLength('123')).toBe(false);
+    expect(isValidCpfCnpjLength('')).toBe(false);
   });
 });
 

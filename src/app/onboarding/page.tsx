@@ -28,6 +28,7 @@ import { SegmentIcon } from '@/components/icons/DomuIcons';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, setAuthItem, syncSessionToActiveStorage } from '@/lib/authStorage';
 import { SEGMENT_LABELS } from '@/lib/segmentConfig';
+import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 import {
   formatWhatsAppMask,
   validateCityState,
@@ -125,7 +126,7 @@ export default function OnboardingPage() {
   const [selectedPlan, setSelectedPlan] = useState<'STARTER' | 'PRO' | 'ENTERPRISE'>('STARTER');
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [legalModalDoc, setLegalModalDoc] = useState<LegalDoc | null>(null);
   const [termsError, setTermsError] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -1623,7 +1624,7 @@ export default function OnboardingPage() {
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
-                        setShowTermsModal(true);
+                        setLegalModalDoc('terms');
                       }}
                       className="font-semibold text-domu-blue hover:underline"
                     >
@@ -1634,7 +1635,7 @@ export default function OnboardingPage() {
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
-                        setShowTermsModal(true);
+                        setLegalModalDoc('privacy');
                       }}
                       className="font-semibold text-domu-blue hover:underline"
                     >
@@ -1689,92 +1690,15 @@ export default function OnboardingPage() {
 
       </main>
 
-      {showTermsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50">
-          <div className="bg-white w-full max-w-2xl max-h-[85vh] flex flex-col border border-slate-200 shadow-xl">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Termos de Uso e Privacidade</h3>
-                <p className="text-sm text-slate-500">Domu Tech</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="text-sm font-semibold text-slate-500 hover:text-slate-800"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <div className="px-6 py-5 overflow-y-auto space-y-4 text-sm text-slate-600 leading-relaxed">
-              <section className="space-y-2">
-                <h4 className="font-bold text-slate-900">1. Objeto</h4>
-                <p>
-                  O Portal Domu Tech oferece ferramentas de disparo, automação e gestão de atendimento via WhatsApp
-                  utilizando a Meta Cloud API oficial, sob responsabilidade do contratante quanto ao uso dos dados
-                  e ao cumprimento das regras da Meta e da LGPD.
-                </p>
-              </section>
-              <section className="space-y-2">
-                <h4 className="font-bold text-slate-900">2. Conta e responsabilidade</h4>
-                <p>
-                  O usuário declara ser responsável pelas informações cadastradas, pelos contatos importados e pelo
-                  conteúdo das mensagens enviadas. É obrigatório obter opt-in válido antes de disparos comerciais.
-                </p>
-              </section>
-              <section className="space-y-2">
-                <h4 className="font-bold text-slate-900">3. Dados e privacidade</h4>
-                <p>
-                  Tratamos dados de conta, empresa, WhatsApp e métricas de campanha para operação do serviço.
-                  Credenciais da Meta são armazenadas de forma criptografada. Não vendemos dados de clientes a terceiros.
-                </p>
-              </section>
-              <section className="space-y-2">
-                <h4 className="font-bold text-slate-900">4. Planos e cobrança</h4>
-                <p>
-                  A assinatura é mensal conforme o plano escolhido. Limites de disparo e recursos seguem a tabela
-                  vigente. Taxas da Meta (conversas/templates) são de responsabilidade do contratante junto à Meta.
-                </p>
-              </section>
-              <section className="space-y-2">
-                <h4 className="font-bold text-slate-900">5. Uso aceitável</h4>
-                <p>
-                  É proibido spam, conteúdo ilegal, phishing ou qualquer prática que viole as políticas do WhatsApp
-                  Business Platform. Contas que gerarem risco de bloqueio poderão ser suspensas.
-                </p>
-              </section>
-              <section className="space-y-2">
-                <h4 className="font-bold text-slate-900">6. Aceite</h4>
-                <p>
-                  Ao marcar a opção de aceite e ativar o plano, você confirma que leu e concorda com estes Termos
-                  de Uso e com a Política de Privacidade da Domu Tech.
-                </p>
-              </section>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
-              >
-                Voltar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAcceptedTerms(true);
-                  setTermsError('');
-                  setShowTermsModal(false);
-                }}
-                className="btn-domu-primary text-sm py-2.5 px-5"
-              >
-                Aceitar e continuar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LegalDocumentModal
+        doc={legalModalDoc}
+        onClose={() => setLegalModalDoc(null)}
+        onAccept={() => {
+          setAcceptedTerms(true);
+          setTermsError('');
+          setLegalModalDoc(null);
+        }}
+      />
     </div>
   );
 }
