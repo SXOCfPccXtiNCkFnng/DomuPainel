@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Template } from '@/types';
 import WhatsAppPreview, { renderTemplateVariables } from '@/components/shared/WhatsAppPreview';
+import { useModalA11y } from '@/hooks/useModalA11y';
 
 interface CriarTemplateModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
   const [variables, setVariables] = useState('nome');
   const [previewTestName, setPreviewTestName] = useState('Carlos Eduardo');
   const [companyName, setCompanyName] = useState('Sua Empresa');
+  const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
 
   useEffect(() => {
     const saved = localStorage.getItem('domu_company_name');
@@ -71,6 +73,8 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
       role="presentation"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="bg-white border border-slate-200 shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -84,6 +88,7 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
           </div>
           <button
             onClick={onClose}
+            aria-label="Fechar"
             className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />

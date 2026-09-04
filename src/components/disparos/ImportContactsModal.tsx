@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
+import { useModalA11y } from '@/hooks/useModalA11y';
 
 interface ImportContactsModalProps {
   isOpen: boolean;
@@ -82,6 +83,7 @@ export default function ImportContactsModal({
   const [isImporting, setIsImporting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
 
   useEffect(() => {
     setMounted(true);
@@ -181,6 +183,8 @@ export default function ImportContactsModal({
       role="presentation"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 sm:p-8 space-y-5 max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -201,6 +205,7 @@ export default function ImportContactsModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Fechar"
             className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
           >
             <X className="w-4 h-4" />
