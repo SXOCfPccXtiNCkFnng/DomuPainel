@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { resolveMetaCredentials, sendMetaTemplate } from '@/lib/metaClient';
 import { logOpsAlert } from '@/lib/opsAlert';
+import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 
 export type DispatchResult = {
   processed: number;
@@ -82,6 +83,24 @@ export async function dispatchCampaignPending(
         campaignStatus: 'SCHEDULED',
       };
     }
+  }
+
+  const { data: subscription } = await supabaseAdmin
+    .from('subscriptions')
+    .select('status')
+    .eq('tenant_id', campaign.tenant_id)
+    .maybeSingle();
+
+  if (!isSubscriptionAllowedToDispatch(subscription?.status)) {
+    return {
+      processed: 0,
+      sent: 0,
+      failed: 0,
+      skippedOptOut: 0,
+      skipped: true,
+      reason: 'Assinatura inativa ou vencida — disparo bloqueado até regularizar o pagamento.',
+      campaignStatus: status,
+    };
   }
 
   const templateName =
