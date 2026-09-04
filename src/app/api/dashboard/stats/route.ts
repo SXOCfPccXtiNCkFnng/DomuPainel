@@ -60,6 +60,16 @@ export async function GET(req: NextRequest) {
       .select('*')
       .eq('tenant_id', tenantId);
 
+    // Conexão real com a Meta = existe credencial própria salva (ou fallback global via env).
+    // tenants.coexistence_status é só uma flag de UI do onboarding — não prova que há canal ativo.
+    const { data: metaCred } = await supabaseAdmin
+      .from('tenant_credentials')
+      .select('tenant_id')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const metaConnected =
+      Boolean(metaCred) || Boolean(process.env.META_ACCESS_TOKEN && process.env.META_PHONE_NUMBER_ID);
+
     const now = new Date();
     const currentStart = new Date(now);
     currentStart.setHours(0, 0, 0, 0);
@@ -127,7 +137,7 @@ export async function GET(req: NextRequest) {
         leadsInPeriod: leadsCurrent,
         readCount,
         failedCount,
-        whatsappStatus: tenant?.coexistence_status || 'CONNECTED',
+        metaConnected,
         whatsappPhone: tenant?.whatsapp_number || 'Não cadastrado',
         tenantName: tenant?.name || 'Sua Empresa',
         segment: tenant?.segment || 'geral',
