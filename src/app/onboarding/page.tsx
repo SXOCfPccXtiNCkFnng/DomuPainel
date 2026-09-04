@@ -143,6 +143,7 @@ export default function OnboardingPage() {
   const [couponCode, setCouponCode] = useState('');
   const [couponMessage, setCouponMessage] = useState('');
   const [couponDiscountLabel, setCouponDiscountLabel] = useState('');
+  const [couponFinalPrice, setCouponFinalPrice] = useState<number | null>(null);
   const [awaitingPayment, setAwaitingPayment] = useState(false);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [pixImage, setPixImage] = useState<string | null>(null);
@@ -441,6 +442,7 @@ export default function OnboardingPage() {
   const handleApplyCoupon = async () => {
     setCouponMessage('');
     setCouponDiscountLabel('');
+    setCouponFinalPrice(null);
     if (!couponCode.trim()) {
       setCouponMessage('Digite um cupom.');
       return;
@@ -465,6 +467,7 @@ export default function OnboardingPage() {
           ? `${data.coupon.percentOff}% off`
           : `R$ ${data.coupon.amountOffBrl} off`
       );
+      setCouponFinalPrice(data.price.finalPrice);
       setCouponMessage(
         `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
       );
@@ -1340,7 +1343,14 @@ export default function OnboardingPage() {
                   <button
                     key={plan.id}
                     type="button"
-                    onClick={() => setSelectedPlan(plan.id)}
+                    onClick={() => {
+                      setSelectedPlan(plan.id);
+                      if (couponDiscountLabel) {
+                        setCouponMessage('Plano mudou — clique em "Aplicar" de novo pra recalcular o cupom.');
+                        setCouponDiscountLabel('');
+                        setCouponFinalPrice(null);
+                      }
+                    }}
                     className={`text-left p-6 border-2 transition-all flex flex-col relative ${
                       isPro
                         ? isSelected
@@ -1449,9 +1459,10 @@ export default function OnboardingPage() {
                 <div className="text-right">
                   <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
                     {paymentMethod === 'PIX' ? 'Com PIX' : 'No cartão'}
+                    {couponFinalPrice != null ? ' · com cupom' : ''}
                   </p>
                   <p className="text-xl font-bold text-slate-900">
-                    R$ {paymentMethod === 'PIX' ? pixPrice : activePlan.price}
+                    R$ {couponFinalPrice ?? (paymentMethod === 'PIX' ? pixPrice : activePlan.price)}
                     <span className="text-sm font-medium text-slate-400">/mês</span>
                   </p>
                 </div>
@@ -1477,7 +1488,14 @@ export default function OnboardingPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('PIX')}
+                  onClick={() => {
+                    setPaymentMethod('PIX');
+                    if (couponDiscountLabel) {
+                      setCouponMessage('Método de pagamento mudou — clique em "Aplicar" de novo pra recalcular o cupom.');
+                      setCouponDiscountLabel('');
+                      setCouponFinalPrice(null);
+                    }
+                  }}
                   className={`p-3 border flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
                     paymentMethod === 'PIX'
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
@@ -1490,7 +1508,14 @@ export default function OnboardingPage() {
 
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('CREDIT_CARD')}
+                  onClick={() => {
+                    setPaymentMethod('CREDIT_CARD');
+                    if (couponDiscountLabel) {
+                      setCouponMessage('Método de pagamento mudou — clique em "Aplicar" de novo pra recalcular o cupom.');
+                      setCouponDiscountLabel('');
+                      setCouponFinalPrice(null);
+                    }
+                  }}
                   className={`p-3 border flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
                     paymentMethod === 'CREDIT_CARD'
                       ? 'border-domu-blue bg-blue-50 text-blue-900'
@@ -1506,7 +1531,8 @@ export default function OnboardingPage() {
                 <div className="p-4 bg-emerald-50 border border-emerald-100 text-sm text-emerald-900 space-y-1">
                   <p className="font-semibold">Desconto de 5% no PIX</p>
                   <p className="text-emerald-800/80">
-                    De R$ {activePlan.price} por <strong>R$ {pixPrice}/mês</strong>
+                    De R$ {activePlan.price} por{' '}
+                    <strong>R$ {couponFinalPrice ?? pixPrice}/mês</strong>
                     {couponDiscountLabel ? ` · cupom ${couponDiscountLabel}` : ''}.
                     A ativação ocorre após a confirmação do pagamento no Asaas.
                   </p>
