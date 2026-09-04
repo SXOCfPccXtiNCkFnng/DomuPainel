@@ -50,7 +50,7 @@ function StatCard({
   tone = 'navy',
 }: {
   label: string;
-  value: number;
+  value: number | string;
   hint?: string;
   tone?: 'navy' | 'green' | 'amber' | 'red' | 'slate';
 }) {
@@ -196,6 +196,22 @@ export default function InternoPage() {
 
   const t = overview?.totals;
   const c = overview?.campaigns7d;
+  const delivery = overview?.delivery7d;
+  const growth = overview?.growth;
+  const cron = overview?.cronHealth;
+  const expiring = overview?.expiringSoon || [];
+  const errSources = overview?.errorsBySource || [];
+  const mrrLabel = overview
+    ? overview.mrr.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+    : 'R$ 0';
+  const arpuLabel =
+    overview && t && t.paying > 0
+      ? (overview.mrr / t.paying).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+          maximumFractionDigits: 0,
+        })
+      : '—';
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -225,26 +241,126 @@ export default function InternoPage() {
         <p className="text-sm text-slate-500">Carregando números…</p>
       ) : null}
 
+      {cron && cron.overdueCount > 0 ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white rounded-full px-2 py-0.5">
+            Cron atrasado
+          </span>
+          <p className="text-sm text-red-800">
+            {cron.overdueCount} campanha{cron.overdueCount > 1 ? 's' : ''} agendada
+            {cron.overdueCount > 1 ? 's' : ''} passou{cron.overdueCount > 1 ? 'ram' : ''} do horário e ainda não
+            foi disparada. Confira se o agendador externo (que chama <code className="font-mono">/api/campaigns/run-due</code>)
+            está ativo.
+          </p>
+        </div>
+      ) : null}
+
       {t ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Empresas" value={t.tenants} hint={`${t.users} usuários`} tone="navy" />
-            <StatCard label="Pagando" value={t.paying} hint="Assinatura ACTIVE" tone="green" />
-            <StatCard label="Em atraso" value={t.pastDue} hint="PAST_DUE" tone="red" />
-            <StatCard label="Aguardando PIX/cartão" value={t.pendingPayment} hint="PENDING_PAYMENT" tone="amber" />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-domu-blue mb-2">Negócio</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard label="Empresas" value={t.tenants} hint={`${t.users} usuários`} tone="navy" />
+              <StatCard label="Pagando" value={t.paying} hint="Assinatura ACTIVE" tone="green" />
+              <StatCard label="MRR" value={mrrLabel} hint="Receita recorrente mensal" tone="green" />
+              <StatCard label="Ticket médio" value={arpuLabel} hint="MRR ÷ empresas pagando" tone="slate" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              <StatCard
+                label="Novos cadastros"
+                value={growth?.signups7d || 0}
+                hint={`${growth?.signups30d || 0} nos últimos 30 dias`}
+                tone="slate"
+              />
+              <StatCard label="Trial" value={t.trial} tone="slate" />
+              <StatCard
+                label="Em atraso"
+                value={t.pastDue}
+                hint="PAST_DUE"
+                tone={t.pastDue > 0 ? 'red' : 'slate'}
+              />
+              <StatCard
+                label="Aguardando PIX/cartão"
+                value={t.pendingPayment}
+                hint="PENDING_PAYMENT"
+                tone={t.pendingPayment > 0 ? 'amber' : 'slate'}
+              />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              <StatCard label="Canceladas" value={t.canceled} tone="slate" />
+              <StatCard
+                label="Sem assinatura"
+                value={t.noSubscription}
+                hint="Cadastrou mas não ativou plano"
+                tone="slate"
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Trial" value={t.trial} tone="slate" />
-            <StatCard label="Canceladas" value={t.canceled} tone="slate" />
-            <StatCard label="Sem assinatura" value={t.noSubscription} tone="slate" />
-            <StatCard
-              label="Campanhas (7 dias)"
-              value={c?.total || 0}
-              hint={`${c?.failed || 0} falhas · ${c?.scheduled || 0} agendadas`}
-              tone="slate"
-            />
+
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-domu-blue mb-2">Operação</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard
+                label="Campanhas (7 dias)"
+                value={c?.total || 0}
+                hint={`${c?.failed || 0} falhas · ${c?.scheduled || 0} agendadas`}
+                tone="slate"
+              />
+              <StatCard
+                label="Taxa de entrega (7d)"
+                value={delivery?.deliveryRatePercent != null ? `${delivery.deliveryRatePercent}%` : '—'}
+                hint={
+                  delivery && delivery.sent > 0
+                    ? `${delivery.delivered} de ${delivery.sent} envios`
+                    : 'Sem envios nos últimos 7 dias'
+                }
+                tone={
+                  delivery?.deliveryRatePercent == null
+                    ? 'slate'
+                    : delivery.deliveryRatePercent < 80
+                      ? 'red'
+                      : 'green'
+                }
+              />
+              <StatCard
+                label="Falhas de envio (7d)"
+                value={delivery?.failed || 0}
+                hint="Mensagens não entregues"
+                tone={delivery && delivery.failed > 0 ? 'amber' : 'slate'}
+              />
+              <StatCard
+                label="Agendadas atrasadas"
+                value={cron?.overdueCount || 0}
+                hint="Aguardando o cron disparar"
+                tone={cron && cron.overdueCount > 0 ? 'red' : 'slate'}
+              />
+            </div>
           </div>
         </>
+      ) : null}
+
+      {expiring.length > 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <h2 className="text-sm font-black text-slate-900">Vencendo em até 3 dias</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Assinaturas ativas cujo período acaba em breve — vale um contato antes de virar PAST_DUE.
+            </p>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {expiring.map((s) => (
+              <li key={s.tenantId} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{s.tenantName || s.tenantId.slice(0, 8)}</p>
+                  <p className="text-[11px] text-slate-500">{s.planTier || '—'}</p>
+                </div>
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                  {s.daysLeft === 0 ? 'vence hoje' : `${s.daysLeft} dia${s.daysLeft > 1 ? 's' : ''}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -254,6 +370,26 @@ export default function InternoPage() {
             Campanhas, envios, checkout e cron. Sem Sentry ainda — isto vem do próprio banco.
           </p>
         </div>
+        {errSources.length > 0 ? (
+          <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap gap-2">
+            {errSources.map((s) => (
+              <span
+                key={s.source}
+                title={`${s.count7d} nos últimos 7 dias`}
+                className={`inline-flex items-center gap-1.5 text-[11px] font-bold rounded-full px-2.5 py-1 border ${
+                  s.count24h > 0
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                }`}
+              >
+                {s.source}
+                <span className="opacity-70">
+                  {s.count24h}/24h · {s.count7d}/7d
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : null}
         {(overview?.alerts || []).length === 0 ? (
           <p className="px-4 py-6 text-sm text-slate-500">Nenhum erro recente. Quando algo falhar, aparece aqui.</p>
         ) : (
