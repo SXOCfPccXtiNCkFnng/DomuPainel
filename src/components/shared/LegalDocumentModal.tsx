@@ -2,10 +2,9 @@
 
 import React from 'react';
 import { LEGAL_DOCS_VERSION } from '@/lib/legal';
+import { CONTACT_EMAIL } from '@/lib/contact';
 
 export type LegalDoc = 'terms' | 'privacy';
-
-const CONTACT_EMAIL = 'contato@domutech.digital';
 
 function TermsBody() {
   return (

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
-import { appBaseUrl, generateSecureToken, hashToken, sendEmail } from '@/lib/email';
+import {
+  appBaseUrl,
+  contactFooterHtml,
+  contactFooterText,
+  generateSecureToken,
+  hashToken,
+  sendEmail,
+} from '@/lib/email';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -78,11 +85,12 @@ export async function POST(req: NextRequest) {
     await sendEmail({
       to: user.email,
       subject: 'Redefinir senha — Domu Tech',
-      text: `Olá ${user.name},\n\nUse o link abaixo para redefinir sua senha (válido por 1 hora):\n${resetUrl}\n\nSe você não pediu isso, ignore este e-mail.`,
+      text: `Olá ${user.name},\n\nUse o link abaixo para redefinir sua senha (válido por 1 hora):\n${resetUrl}\n\nSe você não pediu isso, ignore este e-mail.${contactFooterText()}`,
       html: `<p>Olá <strong>${user.name}</strong>,</p>
         <p>Use o link abaixo para redefinir sua senha (válido por <strong>1 hora</strong>):</p>
         <p><a href="${resetUrl}">${resetUrl}</a></p>
-        <p>Se você não pediu isso, ignore este e-mail.</p>`,
+        <p>Se você não pediu isso, ignore este e-mail.</p>
+        ${contactFooterHtml()}`,
     });
 
     logger.info('auth.forgot_sent', { userId: user.id });
