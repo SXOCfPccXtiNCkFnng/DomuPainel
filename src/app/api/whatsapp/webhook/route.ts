@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getMetaAppSecret, getMetaVerifyToken, isProduction } from '@/lib/envSecrets';
 import { isOptOutMessage } from '@/lib/metaClient';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +59,7 @@ async function handleStatusUpdate(status: any) {
     .maybeSingle();
 
   if (!log) {
-    console.log('[Webhook] campaign_log não encontrado para wamid', wamid);
+    logger.info('webhook.campaign_log_not_found', { wamid });
     return;
   }
 
@@ -153,7 +154,7 @@ async function handleInboundMessage(message: any, tenantId: string | null, metad
 
   const lead = leads?.[0];
   if (!lead) {
-    console.log('[Webhook] Lead não encontrado para', from, 'tenant', tenantId);
+    logger.info('webhook.lead_not_found', { from, tenantId });
     return;
   }
 

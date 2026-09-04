@@ -14,6 +14,7 @@ import {
   Send,
   CheckCheck,
   Users,
+  AlertCircle,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
 import { getSegmentFromStorage, isDispatchOnlySegment } from '@/lib/segmentConfig';
@@ -48,8 +49,11 @@ export default function MetricasRoiPage() {
     baseContatos: 0,
   });
 
+  const [error, setError] = useState('');
+
   const fetchMetrics = async () => {
     setIsLoading(true);
+    setError('');
     try {
       const tenantId = getAuthItem('domu_tenant_id') || '';
       const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
@@ -59,6 +63,10 @@ export default function MetricasRoiPage() {
         `/api/dashboard/stats?tenantId=${tenantId}&period=${period}`
       );
       const json = await res.json();
+      if (!json.success) {
+        setError(json.error || 'Não foi possível carregar as métricas.');
+        return;
+      }
       const m = json.metrics || {};
 
       // Respostas reais = mensagens INBOUND no período
@@ -85,6 +93,7 @@ export default function MetricasRoiPage() {
       });
     } catch (err) {
       console.error('Erro ao carregar métricas de ROI:', err);
+      setError('Falha de conexão ao carregar as métricas. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -212,6 +221,13 @@ export default function MetricasRoiPage() {
           </Link>
         </div>
       </div>
+
+      {error ? (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {cards.map((card) => {
