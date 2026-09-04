@@ -141,6 +141,19 @@ export async function POST(req: NextRequest) {
       body.accessToken
     ) {
       const { encryptedText, iv } = encryptData(body.accessToken);
+
+      // Reaproveita o verify_token já salvo (ex.: no passo 4 do onboarding) em vez de
+      // gerar outro por cima — senão o token que o cliente configurou na Meta perde a validade.
+      let checkoutVerifyToken = body.verifyToken || undefined;
+      if (!checkoutVerifyToken) {
+        const { data: existingCred } = await supabaseAdmin
+          .from('tenant_credentials')
+          .select('verify_token')
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        checkoutVerifyToken = existingCred?.verify_token || generateSecureToken(16);
+      }
+
       await supabaseAdmin.from('tenant_credentials').upsert(
         {
           tenant_id: tenantId,
@@ -148,7 +161,7 @@ export async function POST(req: NextRequest) {
           phone_number_id: body.phoneNumberId,
           encrypted_access_token: encryptedText,
           token_encryption_iv: iv,
-          verify_token: body.verifyToken || generateSecureToken(16),
+          verify_token: checkoutVerifyToken,
           app_id: body.appId || null,
           webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://painel.domutech.digital'}/api/whatsapp/webhook`,
           is_verified: true,
