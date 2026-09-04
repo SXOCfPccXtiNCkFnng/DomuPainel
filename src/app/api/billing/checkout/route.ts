@@ -22,6 +22,9 @@ import {
 } from '@/lib/asaasClient';
 import { encryptData } from '@/lib/crypto';
 import { generateSecureToken } from '@/lib/email';
+import { clientIpFromRequest } from '@/lib/rateLimit';
+import { isValidBrazilianPhone, isValidCpfCnpjLength } from '@/lib/validators';
+import { LEGAL_DOCS_VERSION } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +54,30 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (body.whatsappPhone && !isValidBrazilianPhone(body.whatsappPhone)) {
+      return NextResponse.json(
+        { success: false, error: 'Informe um número de WhatsApp válido, com DDD (ex: 11 98765-4321).' },
+        { status: 400 }
+      );
+    }
+
+    if (body.cpfCnpj && !isValidCpfCnpjLength(body.cpfCnpj)) {
+      return NextResponse.json(
+        { success: false, error: 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.' },
+        { status: 400 }
+      );
+    }
+
+    // Registro de consentimento (LGPD) — data, versão do documento e IP de quem aceitou.
+    await supabaseAdmin
+      .from('users')
+      .update({
+        terms_accepted_at: new Date().toISOString(),
+        terms_version: LEGAL_DOCS_VERSION,
+        terms_accepted_ip: clientIpFromRequest(req),
+      })
+      .eq('id', userId);
 
     let coupon = null;
     if (couponCode.trim()) {

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
 import { PLAN_DISPATCH_LIMITS, PLAN_PRICES_BRL, PlanTier } from '@/lib/planLimits';
+import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 
 const PLANS: {
   tier: PlanTier;
@@ -110,6 +111,8 @@ export default function AssinaturaPage() {
   const [modalCouponDiscount, setModalCouponDiscount] = useState('');
   const [modalError, setModalError] = useState('');
   const [modalProcessing, setModalProcessing] = useState(false);
+  const [modalAcceptedTerms, setModalAcceptedTerms] = useState(false);
+  const [legalModalDoc, setLegalModalDoc] = useState<LegalDoc | null>(null);
 
   // Payment result inside modal
   const [modalAwaitingPayment, setModalAwaitingPayment] = useState(false);
@@ -166,6 +169,7 @@ export default function AssinaturaPage() {
     setModalCouponDiscount('');
     setModalError('');
     setModalProcessing(false);
+    setModalAcceptedTerms(false);
     setModalAwaitingPayment(false);
     setModalPixPayload(null);
     setModalPixImage(null);
@@ -230,6 +234,11 @@ export default function AssinaturaPage() {
       return;
     }
 
+    if (!modalAcceptedTerms) {
+      setModalError('Aceite os Termos de Uso e a Política de Privacidade para continuar.');
+      return;
+    }
+
     setModalProcessing(true);
     setAuthItem('domu_billing_cpf_cnpj', modalCpfCnpj.trim());
 
@@ -240,7 +249,7 @@ export default function AssinaturaPage() {
         body: JSON.stringify({
           planTier: modalPlan,
           paymentMethod: modalPaymentMethod,
-          acceptedTerms: true,
+          acceptedTerms: modalAcceptedTerms,
           cpfCnpj: modalCpfCnpj.trim(),
           couponCode: modalCoupon.trim() || undefined,
         }),
@@ -658,6 +667,41 @@ export default function AssinaturaPage() {
                     )}
                   </div>
 
+                  {/* Termos */}
+                  <label className="flex items-start gap-3 text-xs text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={modalAcceptedTerms}
+                      onChange={(e) => setModalAcceptedTerms(e.target.checked)}
+                      className="mt-0.5 border-slate-300 text-domu-blue focus:ring-domu-blue"
+                    />
+                    <span>
+                      Li e aceito os{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setLegalModalDoc('terms');
+                        }}
+                        className="font-semibold text-domu-blue hover:underline"
+                      >
+                        Termos de Uso
+                      </button>{' '}
+                      e a{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setLegalModalDoc('privacy');
+                        }}
+                        className="font-semibold text-domu-blue hover:underline"
+                      >
+                        Política de Privacidade
+                      </button>{' '}
+                      da Domu Tech.
+                    </span>
+                  </label>
+
                   {/* Error */}
                   {modalError && (
                     <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
@@ -772,6 +816,8 @@ export default function AssinaturaPage() {
           </div>
         </div>
       )}
+
+      <LegalDocumentModal doc={legalModalDoc} onClose={() => setLegalModalDoc(null)} />
     </div>
   );
 }
