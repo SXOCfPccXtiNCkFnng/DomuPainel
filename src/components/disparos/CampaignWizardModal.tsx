@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
 import { BILLING_PAY_PATH, redirectIfDispatchBlocked } from '@/lib/billingGuard';
+import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   INTEREST_OPTIONS,
   REGION_OPTIONS,
@@ -247,6 +248,7 @@ export default function CampaignWizardModal({
 
   const selectAll = () => setSelectedIds(new Set(contacts.map((c) => c.id)));
   const clearSelection = () => setSelectedIds(new Set());
+  const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen || !mounted) return null;
 
@@ -330,6 +332,8 @@ export default function CampaignWizardModal({
       role="presentation"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="bg-white border border-slate-200 shadow-2xl w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -345,6 +349,7 @@ export default function CampaignWizardModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Fechar"
             className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
           >
             <X className="w-4 h-4" />

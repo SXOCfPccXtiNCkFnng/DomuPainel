@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, Building2, Plus, Image as ImageIcon, MapPin, DollarSign, CheckCircle2 } from 'lucide-react';
 import { Property } from '@/types';
+import { useModalA11y } from '@/hooks/useModalA11y';
 
 interface NovoImovelModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export default function NovoImovelModal({ isOpen, onClose, onAddProperty }: Novo
   const [city, setCity] = useState('Ribeirão Preto');
   const [imageUrl, setImageUrl] = useState('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80');
   const [filteredLeadsCount, setFilteredLeadsCount] = useState('115');
+  const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -53,6 +55,8 @@ export default function NovoImovelModal({ isOpen, onClose, onAddProperty }: Novo
       role="presentation"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in duration-200"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -71,8 +75,9 @@ export default function NovoImovelModal({ isOpen, onClose, onAddProperty }: Novo
             </div>
           </div>
 
-          <button 
+          <button
             onClick={onClose}
+            aria-label="Fechar"
             className="w-7 h-7 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
           >
             <X className="w-4 h-4" />
