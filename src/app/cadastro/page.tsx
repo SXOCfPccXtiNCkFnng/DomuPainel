@@ -13,6 +13,7 @@ import {
   validateFullName,
   validateCompanyName,
 } from '@/lib/validators';
+import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 
 const baseInputClass =
   'block w-full px-3 py-3 border bg-white text-slate-900 text-base placeholder-slate-400 focus:outline-none transition-colors';
@@ -39,6 +40,8 @@ export default function CadastroPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [legalModalDoc, setLegalModalDoc] = useState<LegalDoc | null>(null);
 
   // Field level validations
   const nameVal = validateFullName(name);
@@ -60,7 +63,8 @@ export default function CadastroPage() {
     emailVal.ok &&
     phoneVal.ok &&
     isPasswordValid &&
-    passwordsMatch;
+    passwordsMatch &&
+    acceptedTerms;
 
   const handleBlur = (field: keyof typeof touched) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -91,6 +95,7 @@ export default function CadastroPage() {
       else if (!phoneVal.ok) setErrorMessage(phoneVal.error || 'WhatsApp inválido.');
       else if (!isPasswordValid) setErrorMessage('Atenda a todos os requisitos de senha.');
       else if (!passwordsMatch) setErrorMessage('As senhas não coincidem.');
+      else if (!acceptedTerms) setErrorMessage('Aceite os Termos de Uso e a Política de Privacidade para continuar.');
       return;
     }
 
@@ -106,6 +111,7 @@ export default function CadastroPage() {
           password,
           companyName: companyName.trim(),
           whatsapp: phoneVal.digits,
+          acceptedTerms,
         }),
       });
 
@@ -342,6 +348,40 @@ export default function CadastroPage() {
           ))}
         </div>
 
+        <label className="flex items-start gap-2.5 text-xs text-slate-600 cursor-pointer pt-1">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-0.5 border-slate-300 text-domu-blue focus:ring-domu-blue rounded"
+          />
+          <span>
+            Li e aceito os{' '}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setLegalModalDoc('terms');
+              }}
+              className="font-semibold text-domu-blue hover:underline"
+            >
+              Termos de Uso
+            </button>{' '}
+            e a{' '}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setLegalModalDoc('privacy');
+              }}
+              className="font-semibold text-domu-blue hover:underline"
+            >
+              Política de Privacidade
+            </button>{' '}
+            da Domu Tech.
+          </span>
+        </label>
+
         <button
           type="submit"
           disabled={isLoading || !isFormValid}
@@ -355,6 +395,8 @@ export default function CadastroPage() {
           )}
         </button>
       </form>
+
+      <LegalDocumentModal doc={legalModalDoc} onClose={() => setLegalModalDoc(null)} />
     </AuthShell>
   );
 }

@@ -9,6 +9,10 @@ import {
   validateCompanyName,
   validatePhoneBR,
 } from '@/lib/validators';
+import { LEGAL_DOCS_VERSION } from '@/lib/legal';
+import { appBaseUrl, sendEmail } from '@/lib/email';
+import { brandedEmailHtml } from '@/lib/emailTemplates';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +31,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, email, password, companyName, whatsapp } = body;
+    const { name, email, password, companyName, whatsapp, acceptedTerms } = body;
+
+    if (!acceptedTerms) {
+      return NextResponse.json(
+        { success: false, error: 'Aceite os Termos de Uso e a Política de Privacidade para continuar.' },
+        { status: 400 }
+      );
+    }
 
     const nameCheck = validateFullName(name);
     if (!nameCheck.ok) {
@@ -106,6 +117,9 @@ export async function POST(req: NextRequest) {
         password_hash: passwordHash,
         role: 'ADMIN',
         phone: whatsapp || '',
+        terms_accepted_at: new Date().toISOString(),
+        terms_version: LEGAL_DOCS_VERSION,
+        terms_accepted_ip: clientIpFromRequest(req),
       })
       .select()
       .single();
@@ -113,6 +127,24 @@ export async function POST(req: NextRequest) {
     if (userError) {
       console.error('[Register User Error]', userError);
       throw new Error('Falha ao registrar usuário no banco de dados.');
+    }
+
+    // Boas-vindas: aguarda o envio (serverless pode matar a função antes de um "fire-and-forget"
+    // terminar), mas uma falha aqui não derruba o cadastro — só loga.
+    const welcomeResult = await sendEmail({
+      to: newUser.email,
+      subject: 'Bem-vindo à Domu Tech!',
+      text: `Olá ${newUser.name},\n\nSua conta na Domu Tech foi criada com sucesso. Faça login para continuar a configuração do seu portal de automação no WhatsApp:\n${appBaseUrl(req.nextUrl.origin)}/login\n\nEquipe Domu Tech`,
+      html: brandedEmailHtml({
+        heading: 'Bem-vindo à Domu Tech!',
+        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${newUser.name}</strong>!</p>
+          <p style="margin:0 0 12px;">Sua conta da <strong>${newTenant.name}</strong> foi criada com sucesso. Falta pouco: faça login pra continuar a configuração do seu portal de automação no WhatsApp.</p>`,
+        ctaLabel: 'Entrar no portal',
+        ctaUrl: `${appBaseUrl(req.nextUrl.origin)}/login`,
+      }),
+    });
+    if (!welcomeResult.ok) {
+      logger.error('auth.welcome_email_failed', { userId: newUser.id, error: welcomeResult.error });
     }
 
     // Sem login automático: limpa cookie antigo e manda o usuário autenticar no /login.
