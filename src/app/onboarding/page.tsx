@@ -35,6 +35,7 @@ import {
   validateCityState,
   validateWhatsAppPhone,
 } from '@/lib/onboardingValidation';
+import { PLAN_PRICES_BRL } from '@/lib/planLimits';
 
 const STEPS = [
   { id: 1, label: 'Segmento' },
@@ -50,7 +51,7 @@ const PLAN_OPTIONS = [
     name: 'Starter',
     tagline: 'MVP completo',
     audience: 'Tudo que o corretor precisa para disparar, qualificar e medir ROI no WhatsApp.',
-    price: 197,
+    price: PLAN_PRICES_BRL.STARTER,
     highlight: false,
     features: [
       'Cadastro de imóveis (foto, preço, região, status)',
@@ -66,7 +67,7 @@ const PLAN_OPTIONS = [
     name: 'Pro',
     tagline: 'Mais popular',
     audience: 'Para imobiliárias e equipes que precisam de mais volume e operação diária.',
-    price: 497,
+    price: PLAN_PRICES_BRL.PRO,
     highlight: true,
     features: [
       'Tudo do Starter',
@@ -83,7 +84,7 @@ const PLAN_OPTIONS = [
     name: 'Enterprise',
     tagline: 'Alta escala',
     audience: 'Para redes, franquias e operações com volume alto e acompanhamento dedicado.',
-    price: 997,
+    price: PLAN_PRICES_BRL.ENTERPRISE,
     highlight: false,
     features: [
       'Tudo do Pro',
@@ -387,6 +388,10 @@ export default function OnboardingPage() {
         setIsConnecting(false);
         return;
       }
+
+      // Reaproveita o mesmo verify_token gerado pelo servidor — senão o checkout
+      // (passo 5) gera outro por cima e quebra a verificação do webhook na Meta.
+      if (data.verifyToken) setVerifyToken(data.verifyToken);
 
       setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
       setIsConnectedSimulated(true);
@@ -1076,9 +1081,9 @@ export default function OnboardingPage() {
                       <ol className="space-y-3">
                         {[
                           'Tenha o WhatsApp Business instalado no celular com o número informado.',
-                          'Clique em “Conectar com Meta” e autorize no Facebook Business / Meta.',
-                          'Confirme a coexistência no app do celular quando a Meta solicitar.',
-                          'Volte aqui: o canal fica pronto para disparos e atendimento.',
+                          'Clique em "Registrar meu WhatsApp" para vincular o número ao seu perfil Domu.',
+                          'Nossa equipe finaliza a conexão real assim que a verificação do seu Business for aprovada pela Meta.',
+                          'Você recebe um aviso assim que o canal estiver pronto para disparos.',
                         ].map((step, idx) => (
                           <li key={step} className="flex gap-3 text-sm text-slate-600">
                             <span className="w-6 h-6 shrink-0 bg-[#0B132B] text-white text-xs font-bold flex items-center justify-center">
@@ -1094,7 +1099,8 @@ export default function OnboardingPage() {
                         <p>
                           Número a vincular:{' '}
                           <strong className="text-slate-900">{whatsappPhone || '—'}</strong>
-                          . Em produção, esta etapa abre o Embedded Signup oficial da Meta.
+                          . A ativação do canal depende da aprovação da verificação do seu Business
+                          na Meta — isso é feito uma vez e pode levar alguns dias.
                         </p>
                       </div>
 
@@ -1107,12 +1113,12 @@ export default function OnboardingPage() {
                         {isConnecting ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            Autorizando com a Meta...
+                            Registrando...
                           </>
                         ) : (
                           <>
                             <ExternalLink className="w-4 h-4" />
-                            Conectar com Meta
+                            Registrar meu WhatsApp
                           </>
                         )}
                       </button>
@@ -1263,18 +1269,18 @@ export default function OnboardingPage() {
                 <div className="space-y-1">
                   <h3 className="text-xl font-bold text-slate-900">
                     {connectionType === 'COEXISTENCE'
-                      ? 'WhatsApp conectado com sucesso'
+                      ? 'Número registrado'
                       : 'Credenciais Meta salvas com sucesso'}
                   </h3>
                   <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
                     {connectionType === 'COEXISTENCE'
-                      ? `O número ${whatsappPhone} foi vinculado via coexistência oficial e registrado no Supabase.`
+                      ? `O número ${whatsappPhone} foi registrado no seu perfil. A conexão real com a Meta depende da aprovação da verificação do seu Business — nossa equipe ativa o canal assim que ela sair, e você recebe um aviso.`
                       : `WABA ${wabaId} e Phone Number ID ${phoneNumberId} foram salvos com token criptografado no Supabase.`}
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Canal pronto para o próximo passo
+                  {connectionType === 'COEXISTENCE' ? 'Você já pode seguir para o próximo passo' : 'Canal pronto para o próximo passo'}
                 </span>
               </div>
             )}

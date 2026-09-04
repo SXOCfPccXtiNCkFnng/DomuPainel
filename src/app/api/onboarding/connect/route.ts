@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { encryptData } from '@/lib/crypto';
 import { requireAdmin } from '@/lib/requireAuth';
 import { generateSecureToken } from '@/lib/email';
+import { isValidBrazilianPhone } from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (whatsappPhone && !isValidBrazilianPhone(whatsappPhone)) {
+      return NextResponse.json(
+        { success: false, error: 'Informe um número de WhatsApp válido, com DDD (ex: 11 98765-4321).' },
+        { status: 400 }
+      );
+    }
+
     const { error: tenantError } = await supabaseAdmin
       .from('tenants')
       .update({
@@ -78,11 +86,20 @@ export async function POST(req: NextRequest) {
     }
 
     let credentialsSaved = false;
+    let finalVerifyToken: string | undefined;
 
     if (connectionType === 'DIRECT_API') {
       const { encryptedText, iv } = encryptData(accessToken.trim());
-      const finalVerifyToken =
-        verifyToken?.trim() || generateSecureToken(16);
+
+      finalVerifyToken = verifyToken?.trim() || undefined;
+      if (!finalVerifyToken) {
+        const { data: existingCred } = await supabaseAdmin
+          .from('tenant_credentials')
+          .select('verify_token')
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        finalVerifyToken = existingCred?.verify_token || generateSecureToken(16);
+      }
 
       const { error: credError } = await supabaseAdmin
         .from('tenant_credentials')
@@ -121,6 +138,7 @@ export async function POST(req: NextRequest) {
           : 'Credenciais Meta salvas no Supabase.',
       connectionType,
       credentialsSaved,
+      verifyToken: finalVerifyToken || null,
       cityState: cityState || null,
     });
   } catch (error: unknown) {
