@@ -14,6 +14,7 @@ import {
   Shield,
   X,
 } from 'lucide-react';
+import { formatPhoneBR, validatePhoneBR } from '@/lib/validators';
 
 type ProfileData = {
   id: string;
@@ -124,7 +125,15 @@ export default function ProfileSettingsPanel() {
     const payload: Record<string, string> = {};
 
     if (name.trim() !== profile?.name) payload.name = name.trim();
-    if (phone.trim() !== (profile?.phone || '')) payload.phone = phone.trim();
+    if (phone.trim() && phone.trim() !== (profile?.phone || '')) {
+      const phoneCheck = validatePhoneBR(phone);
+      if (!phoneCheck.ok) {
+        setError(phoneCheck.error || 'Telefone pessoal inválido.');
+        setSaving(false);
+        return;
+      }
+      payload.phone = phoneCheck.formatted;
+    }
 
     if (showPasswordForm) {
       if (!currentPassword) {
@@ -267,7 +276,8 @@ export default function ProfileSettingsPanel() {
             <input
               type="text"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(formatPhoneBR(e.target.value))}
+              maxLength={15}
               placeholder="(11) 99999-8888"
               className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue/30 focus:border-domu-blue"
             />

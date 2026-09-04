@@ -1,4 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { getPlatformAdminEmails } from '@/lib/platformAdmin';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { sendEmail, appBaseUrl } from '@/lib/email';
+import { logger } from '@/lib/logger';
 
 export type OpsAlert = {
   id: string;
@@ -9,6 +13,32 @@ export type OpsAlert = {
   tenantName?: string | null;
   createdAt: string;
 };
+
+/** No máx. 1 e-mail por origem a cada 30 min — evita spam quando um erro se repete. */
+const ALERT_EMAIL_WINDOW_MS = 30 * 60 * 1000;
+
+async function notifyPlatformAdmins(input: { source: string; message: string; tenantId?: string | null }) {
+  const admins = getPlatformAdminEmails();
+  if (admins.length === 0) return;
+
+  const limit = checkRateLimit(`opsalert:email:${input.source}`, 1, ALERT_EMAIL_WINDOW_MS);
+  if (!limit.ok) return;
+
+  const dashboardUrl = `${appBaseUrl()}/interno`;
+  const subject = `[Domu Tech] Erro em ${input.source}`;
+  const text = `Origem: ${input.source}\n${
+    input.tenantId ? `Tenant: ${input.tenantId}\n` : ''
+  }\nMensagem: ${input.message}\n\nVeja detalhes: ${dashboardUrl}`;
+  const html = `<p><strong>Origem:</strong> ${input.source}</p>${
+    input.tenantId ? `<p><strong>Tenant:</strong> ${input.tenantId}</p>` : ''
+  }<p><strong>Mensagem:</strong> ${input.message}</p><p><a href="${dashboardUrl}">Ver painel /interno</a></p>`;
+
+  try {
+    await Promise.all(admins.map((to) => sendEmail({ to, subject, text, html })));
+  } catch (err) {
+    logger.error('opsalert.email_failed', { message: err instanceof Error ? err.message : String(err) });
+  }
+}
 
 export async function logOpsAlert(input: {
   source: string;
@@ -27,6 +57,14 @@ export async function logOpsAlert(input: {
     });
   } catch {
     // Tabela ainda não migrada — não quebrar o fluxo principal.
+  }
+
+  if ((input.level || 'error') === 'error') {
+    await notifyPlatformAdmins({
+      source: input.source,
+      message: input.message,
+      tenantId: input.tenantId,
+    });
   }
 }
 

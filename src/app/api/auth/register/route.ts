@@ -3,7 +3,12 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isPasswordStrong, hashPassword } from '@/lib/authHelpers';
 import { clearSessionCookie } from '@/lib/requireAuth';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
-import { isValidBrazilianPhone } from '@/lib/validators';
+import {
+  validateEmail,
+  validateFullName,
+  validateCompanyName,
+  validatePhoneBR,
+} from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,32 +29,30 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, email, password, companyName, whatsapp } = body;
 
-    if (!name || !email || !password || !companyName) {
-      return NextResponse.json(
-        { success: false, error: 'Por favor, preencha todos os campos obrigatórios.' },
-        { status: 400 }
-      );
+    const nameCheck = validateFullName(name);
+    if (!nameCheck.ok) {
+      return NextResponse.json({ success: false, error: nameCheck.error }, { status: 400 });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { success: false, error: 'Por favor, insira um e-mail válido (ex: seu.email@empresa.com).' },
-        { status: 400 }
-      );
+    const companyCheck = validateCompanyName(companyName);
+    if (!companyCheck.ok) {
+      return NextResponse.json({ success: false, error: companyCheck.error }, { status: 400 });
+    }
+
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.ok) {
+      return NextResponse.json({ success: false, error: emailCheck.error }, { status: 400 });
+    }
+
+    const phoneCheck = validatePhoneBR(whatsapp || '');
+    if (!phoneCheck.ok) {
+      return NextResponse.json({ success: false, error: phoneCheck.error }, { status: 400 });
     }
 
     const passwordCheck = isPasswordStrong(password);
     if (!passwordCheck.valid) {
       return NextResponse.json(
         { success: false, error: passwordCheck.reason },
-        { status: 400 }
-      );
-    }
-
-    if (!isValidBrazilianPhone(whatsapp || '')) {
-      return NextResponse.json(
-        { success: false, error: 'Informe um número de WhatsApp válido, com DDD (ex: 11 98765-4321).' },
         { status: 400 }
       );
     }

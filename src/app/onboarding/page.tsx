@@ -29,6 +29,7 @@ import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, setAuthItem, syncSessionToActiveStorage } from '@/lib/authStorage';
 import { SEGMENT_LABELS } from '@/lib/segmentConfig';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
+import { CityStateSelect } from '@/components/shared/CityStateSelect';
 import {
   formatWhatsAppMask,
   validateCityState,
@@ -791,24 +792,16 @@ export default function OnboardingPage() {
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                     Cidade / Estado <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    required
+                  <CityStateSelect
                     value={cityState}
-                    onChange={(e) => {
-                      setCityState(e.target.value);
+                    onChange={(val) => {
+                      setCityState(val);
                       if (step2Error) setStep2Error('');
                     }}
-                    onBlur={() => {
-                      const check = validateCityState(cityState);
-                      if (check.ok) setCityState(check.formatted);
-                    }}
-                    className="w-full px-3 py-3 border border-slate-200 text-base focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
-                    placeholder="Ex: São Paulo, SP"
-                    autoComplete="address-level2"
+                    error={step2Error && !validateCityState(cityState).ok ? step2Error : undefined}
                   />
                   <p className="mt-1.5 text-[11px] text-slate-400">
-                    Use cidade + UF. Ex: Curitiba, PR
+                    Selecione na busca rápida ou digite sua cidade e UF (ex: Curitiba, PR).
                   </p>
                 </div>
               </div>
