@@ -200,6 +200,40 @@ export async function sendMetaText({
   };
 }
 
+export type PhoneNumberQuality = {
+  qualityRating: 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
+  messagingLimitTier: string | null;
+  nameStatus: string | null;
+  displayPhoneNumber: string | null;
+};
+
+/**
+ * Consulta o status da conta WhatsApp na Meta (qualidade, limite de disparo, nome verificado).
+ * Uma conta YELLOW/RED tem o limite de envio reduzido pela Meta e pode ser suspensa.
+ */
+export async function getPhoneNumberQuality(
+  credentials: Pick<MetaCredentials, 'accessToken' | 'phoneNumberId'>
+): Promise<PhoneNumberQuality> {
+  const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${credentials.phoneNumberId}?fields=quality_rating,messaging_limit_tier,name_status,display_phone_number`;
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${credentials.accessToken}` },
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || 'Falha ao consultar qualidade do número na Meta.');
+  }
+
+  const rating = String(data.quality_rating || 'UNKNOWN').toUpperCase();
+  return {
+    qualityRating: rating === 'GREEN' || rating === 'YELLOW' || rating === 'RED' ? rating : 'UNKNOWN',
+    messagingLimitTier: data.messaging_limit_tier || null,
+    nameStatus: data.name_status || null,
+    displayPhoneNumber: data.display_phone_number || null,
+  };
+}
+
 /** Detecta pedido de opt-out em texto inbound. */
 export function isOptOutMessage(text: string): boolean {
   const t = (text || '')
