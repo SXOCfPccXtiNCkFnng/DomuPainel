@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isCronRequest } from '@/lib/cronAuth';
-import { sendEmail, appBaseUrl, contactFooterHtml, contactFooterText } from '@/lib/email';
+import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
+import { brandedEmailHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -69,9 +70,16 @@ export async function GET(req: NextRequest) {
       const text = `Olá!\n\nA assinatura do plano ${sub.plan_tier} (${priceLabel}/mês) da empresa ${
         tenant?.name || ''
       } vence em ${expiresAt}.\n\nPara continuar disparando campanhas sem interrupção, renove em: ${renewUrl}\n\nEquipe Domu Tech${contactFooterText()}`;
-      const html = `<p>Olá!</p><p>A assinatura do plano <strong>${sub.plan_tier}</strong> (${priceLabel}/mês) da empresa <strong>${
-        tenant?.name || ''
-      }</strong> vence em <strong>${expiresAt}</strong>.</p><p>Para continuar disparando campanhas sem interrupção, <a href="${renewUrl}">renove sua assinatura aqui</a>.</p><p>Equipe Domu Tech</p>${contactFooterHtml()}`;
+      const html = brandedEmailHtml({
+        heading: 'Sua assinatura vence em breve',
+        bodyHtml: `<p style="margin:0 0 12px;">Olá!</p>
+          <p style="margin:0 0 12px;">A assinatura do plano <strong>${sub.plan_tier}</strong> (${priceLabel}/mês) da empresa <strong>${
+            tenant?.name || ''
+          }</strong> vence em <strong>${expiresAt}</strong>.</p>
+          <p style="margin:0;">Para continuar disparando campanhas sem interrupção, renove antes dessa data.</p>`,
+        ctaLabel: 'Renovar assinatura',
+        ctaUrl: renewUrl,
+      });
 
       const results = await Promise.all(
         recipients.map((to) => sendEmail({ to, subject, text, html }))

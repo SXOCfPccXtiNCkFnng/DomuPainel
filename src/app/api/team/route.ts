@@ -4,12 +4,12 @@ import { requireAdmin, isValidTeamRole, TEAM_ROLES } from '@/lib/requireAuth';
 import { getPlanUserLimit, normalizePlanTier } from '@/lib/planLimits';
 import {
   appBaseUrl,
-  contactFooterHtml,
   contactFooterText,
   generateSecureToken,
   hashToken,
   sendEmail,
 } from '@/lib/email';
+import { brandedEmailHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
 
@@ -147,15 +147,20 @@ export async function POST(req: NextRequest) {
 
     const base = appBaseUrl(req.nextUrl.origin);
     const inviteUrl = `${base}/convite?token=${rawToken}`;
+    const roleLabel =
+      { ADMIN: 'Administrador', BROKER: 'Corretor', ATTENDANT: 'Atendente' }[role] || role;
 
     const mailed = await sendEmail({
       to: email,
-      subject: 'Convite para o Portal Domu Tech',
-      text: `Olá ${name},\n\nVocê foi convidado como ${role} no Portal Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}${contactFooterText()}`,
-      html: `<p>Olá <strong>${name}</strong>,</p>
-        <p>Você foi convidado como <strong>${role}</strong> no Portal Domu Tech.</p>
-        <p><a href="${inviteUrl}">Aceitar convite</a> (válido por 7 dias)</p>
-        ${contactFooterHtml()}`,
+      subject: 'Você foi convidado para o Portal Domu Tech',
+      text: `Olá ${name},\n\nVocê foi convidado como ${roleLabel} no Portal Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}${contactFooterText()}`,
+      html: brandedEmailHtml({
+        heading: 'Você foi convidado!',
+        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${name}</strong>!</p>
+          <p style="margin:0 0 12px;">Você foi convidado para acessar o Portal Domu Tech como <strong>${roleLabel}</strong>. Clique no botão abaixo pra criar sua senha e começar — o convite vale por <strong>7 dias</strong>.</p>`,
+        ctaLabel: 'Aceitar convite',
+        ctaUrl: inviteUrl,
+      }),
     });
 
     logger.info('team.invite_created', { tenantId, email, role });
