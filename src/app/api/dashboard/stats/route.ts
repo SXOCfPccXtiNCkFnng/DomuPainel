@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth } from '@/lib/requireAuth';
+import { periodDays, type PeriodKey as Period } from '@/lib/period';
 
 export const dynamic = 'force-dynamic';
-
-type Period = 'today' | '7d' | '30d' | '90d';
-
-function periodDays(period: Period): number {
-  if (period === 'today') return 1;
-  if (period === '7d') return 7;
-  if (period === '90d') return 90;
-  return 30;
-}
 
 function pctChange(current: number, previous: number): number | null {
   if (current === 0 && previous === 0) return null;

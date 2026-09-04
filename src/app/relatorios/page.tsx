@@ -21,51 +21,66 @@ interface DataPoint {
   percentage: number;
 }
 
+/** Linha reta ligando os pontos reais (prioriza corretude sobre curva suavizada). */
+function buildLinePath(points: DataPoint[]): string {
+  if (points.length === 0) return 'M 0 170 L 1000 170';
+  if (points.length === 1) {
+    const y = 170 - (points[0].percentage / 100) * 160;
+    return `M 0 ${y} L 1000 ${y}`;
+  }
+  const stepX = 1000 / (points.length - 1);
+  const coords = points.map((p, i) => {
+    const x = i * stepX;
+    const y = 170 - (p.percentage / 100) * 160;
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  });
+  return coords.join(' ');
+}
+
 export default function RelatoriosPage() {
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
   const [hoveredData, setHoveredData] = useState<DataPoint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [reportsData, setReportsData] = useState<any>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   const fetchReports = async () => {
     setIsLoading(true);
+    setError('');
     try {
       const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
-      const res = await fetch(`/api/reports?tenantId=${storedTenantId}`);
+      const res = await fetch(`/api/reports?tenantId=${storedTenantId}&period=${period}`);
       const json = await res.json();
       if (json.success) {
         setReportsData(json.reports);
+      } else {
+        setError(json.error || 'Não foi possível carregar os relatórios.');
       }
     } catch (err) {
       console.error('Erro ao carregar relatórios do Supabase:', err);
+      setError('Falha de conexão ao carregar os relatórios. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const hasData = reportsData && reportsData.totalSent > 0;
+  const chartData: DataPoint[] = reportsData?.series?.length
+    ? reportsData.series
+    : [{ date: 'Hoje', disparos: 0, percentage: 0 }];
 
-  const chartData: DataPoint[] = hasData ? [
-    { date: '25/08/2026', disparos: 120, percentage: 35 },
-    { date: '26/08/2026', disparos: 185, percentage: 75 },
-    { date: '27/08/2026', disparos: 150, percentage: 45 },
-    { date: '28/08/2026', disparos: 210, percentage: 92 },
-    { date: '29/08/2026', disparos: 110, percentage: 50 },
-    { date: '30/08/2026', disparos: 180, percentage: 80 },
-    { date: '01/09/2026', disparos: 240, percentage: 98 }
-  ] : [
-    { date: 'Hoje', disparos: 0, percentage: 0 }
-  ];
-
-  // Dynamic Bezier curve calculations (Flat baseline M 0 170 L 1000 170 when 0 data)
-  const smoothCurvePath = hasData 
-    ? "M 0 115 C 70 35, 96 35, 166 35 C 230 35, 260 89, 333 89 C 400 89, 430 10, 500 10 C 570 10, 600 80, 666 80 C 730 80, 770 125, 833 125 C 900 125, 940 148, 1000 148"
-    : "M 0 170 L 1000 170";
+  const smoothCurvePath = buildLinePath(chartData);
   const smoothAreaPath = `${smoothCurvePath} L 1000 180 L 0 180 Z`;
+
+  // Evita poluir o eixo X com dezenas de datas em períodos de 30/90 dias.
+  const labelStride = Math.max(1, Math.ceil(chartData.length / 7));
+  const labeledPoints = chartData.filter(
+    (_, i) => i % labelStride === 0 || i === chartData.length - 1
+  );
 
   return (
     <div className="space-y-6 w-full font-sans">
@@ -121,6 +136,13 @@ export default function RelatoriosPage() {
           </button>
         </div>
       </div>
+
+      {error ? (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </p>
+      ) : null}
 
       {/* Executive KPI Cards from Supabase Database (100% Dynamic) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
@@ -246,9 +268,9 @@ export default function RelatoriosPage() {
 
               {/* X-Axis Dates Row */}
               <div className="flex justify-between text-[11px] font-medium text-slate-500 pt-1 border-t border-slate-200">
-                {chartData.map((item) => (
-                  <div 
-                    key={item.date} 
+                {labeledPoints.map((item, i) => (
+                  <div
+                    key={`${item.date}-${i}`}
                     onMouseEnter={() => setHoveredData(item)}
                     onMouseLeave={() => setHoveredData(null)}
                     className="cursor-pointer hover:text-domu-blue transition-colors px-1 py-0.5"
