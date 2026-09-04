@@ -4,30 +4,13 @@ import {
   dispatchCampaignPending,
   processDueScheduledCampaigns,
 } from '@/lib/campaignDispatch';
+import { isCronRequest } from '@/lib/cronAuth';
 
 export const dynamic = 'force-dynamic';
 /** Disparo sequencial pode passar de 10s — Pro/Enterprise na Vercel. */
 export const maxDuration = 60;
 
-function allowCron(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET || process.env.DOMU_CRON_SECRET;
-  if (!secret || secret.length < 16) return false;
-
-  // Vercel Cron envia Authorization: Bearer <CRON_SECRET> e/ou x-vercel-cron
-  const authHeader = req.headers.get('authorization') || '';
-  const customHeader =
-    req.headers.get('x-domu-cron-secret') || req.headers.get('x-cron-secret') || '';
-  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const rawAuth = authHeader.trim();
-
-  if (bearer && bearer === secret) return true;
-  if (rawAuth && rawAuth === secret) return true;
-  if (customHeader && customHeader === secret) return true;
-
-  // Em produção, aceitar invocação nativa do Vercel Cron só se o bearer bater
-  // (já coberto acima). x-vercel-cron sozinho NÃO autentica.
-  return false;
-}
+const allowCron = isCronRequest;
 
 async function handleRunDue(req: NextRequest, body: { campaignId?: string }) {
   const isCron = allowCron(req);

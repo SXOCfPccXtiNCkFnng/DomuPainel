@@ -167,6 +167,7 @@ export async function activateTenantSubscription(input: {
       pending_payment_id: null,
       last_payment_status: status === 'ACTIVE' ? 'RECEIVED' : null,
       coupon_code: input.couponCode || null,
+      expiry_reminder_sent_at: null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'tenant_id' }

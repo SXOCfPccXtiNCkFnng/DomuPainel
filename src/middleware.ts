@@ -17,6 +17,7 @@ const PUBLIC_API_PREFIXES = [
   '/api/whatsapp/webhook',
   '/api/campaigns/run-due',
   '/api/billing/webhook',
+  '/api/billing/expiry-check',
 ];
 
 function b64urlDecode(input: string): Uint8Array {
