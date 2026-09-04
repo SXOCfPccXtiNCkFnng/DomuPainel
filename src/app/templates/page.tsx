@@ -229,7 +229,7 @@ export default function TemplatesPage() {
                 )}
 
                 <div className="p-3.5 bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed font-sans min-h-[75px]">
-                  "{tpl.body_text}"
+                  &ldquo;{tpl.body_text}&rdquo;
                 </div>
               </div>
 
