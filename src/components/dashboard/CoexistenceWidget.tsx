@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Smartphone, CheckCircle2, Info, AlertTriangle, Zap } from 'lucide-react';
+import { ShieldCheck, Smartphone, CheckCircle2, Info, Zap, Clock } from 'lucide-react';
 
 export default function CoexistenceWidget() {
   const [phone, setPhone] = useState<string>('');
-  const [qualityScore, setQualityScore] = useState<string>('VERDE (Excelente)');
-  const [dailyLimitTier, setDailyLimitTier] = useState<string>('Tier 1 (1.000 msgs/24h)');
-  const [numericLimit, setNumericLimit] = useState<number>(1000);
+  const [qualityScore, setQualityScore] = useState<string | null>(null);
+  const [dailyLimitTier, setDailyLimitTier] = useState<string | null>(null);
+  const [numericLimit, setNumericLimit] = useState<number | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isLoadingMeta, setIsLoadingMeta] = useState<boolean>(true);
 
   useEffect(() => {
@@ -29,9 +30,10 @@ export default function CoexistenceWidget() {
       const json = await res.json();
 
       if (json.success && json.stats) {
-        setDailyLimitTier(json.stats.formattedTierLabel || 'Tier 1 (1.000 msgs/24h)');
-        setQualityScore(json.stats.formattedQuality || 'VERDE (Excelente)');
-        setNumericLimit(json.stats.numericLimit || 1000);
+        setIsConnected(Boolean(json.stats.isConnected));
+        setDailyLimitTier(json.stats.formattedTierLabel);
+        setQualityScore(json.stats.formattedQuality);
+        setNumericLimit(json.stats.numericLimit);
         if (json.stats.displayPhoneNumber) {
           setPhone(json.stats.displayPhoneNumber);
         }
@@ -42,6 +44,38 @@ export default function CoexistenceWidget() {
       setIsLoadingMeta(false);
     }
   };
+
+  if (isLoadingMeta) {
+    return (
+      <div className="card-domu p-5 bg-white border border-slate-200 space-y-3 animate-pulse">
+        <div className="h-4 w-48 bg-slate-100 rounded" />
+        <div className="h-4 w-72 bg-slate-100 rounded" />
+        <div className="h-3 w-full max-w-md bg-slate-100 rounded" />
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="card-domu p-5 bg-gradient-to-br from-white via-slate-50 to-amber-50/30 border border-amber-200 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-2.5 py-0.5 rounded-sm text-[10px] font-extrabold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300">
+            Status da Conexão WhatsApp
+          </span>
+          <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-sm border border-amber-300">
+            <Clock className="w-3 h-3" />
+            Aguardando aprovação da Meta
+          </span>
+        </div>
+        <h4 className="text-sm font-bold text-slate-900">Nenhum número conectado ainda</h4>
+        <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
+          A ativação do canal depende da verificação do seu Business ser aprovada pela Meta — isso
+          é feito uma vez e pode levar alguns dias. Assim que sair, conectamos seu número e as
+          métricas reais (qualidade, limite diário) aparecem aqui automaticamente.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="card-domu p-5 bg-gradient-to-br from-white via-slate-50 to-blue-50/30 border border-blue-100 space-y-4">
@@ -109,7 +143,7 @@ export default function CoexistenceWidget() {
       <div className="p-3 bg-blue-50/80 border border-blue-200/90 rounded-sm text-xs text-slate-800 flex items-center gap-2">
         <Info className="w-4 h-4 text-domu-blue shrink-0" />
         <span>
-          <strong>Consulta oficial da Meta:</strong> Sua conta está no <strong>{dailyLimitTier}</strong> (limite oficial de até {numericLimit.toLocaleString('pt-BR')} disparos/24h). O limite é controlado automaticamente na hora dos envios.
+          <strong>Consulta oficial da Meta:</strong> Sua conta está no <strong>{dailyLimitTier}</strong> (limite oficial de até {(numericLimit ?? 0).toLocaleString('pt-BR')} disparos/24h). O limite é controlado automaticamente na hora dos envios.
         </span>
       </div>
     </div>

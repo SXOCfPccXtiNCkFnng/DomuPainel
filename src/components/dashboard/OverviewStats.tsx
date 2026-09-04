@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Send,
   CheckCheck,
@@ -20,7 +21,7 @@ interface DashboardMetrics {
   deliveryRate: string;
   totalLeads: number;
   readCount: number;
-  whatsappStatus?: string;
+  metaConnected?: boolean;
   trends?: {
     dispatches: number | null;
     deliveryRate: number | null;
@@ -115,10 +116,7 @@ export default function OverviewStats() {
     { id: '90d', label: 'Últimos 90 Dias' },
   ];
 
-  const metaOk =
-    !metrics.whatsappStatus ||
-    metrics.whatsappStatus === 'CONNECTED' ||
-    metrics.whatsappStatus === 'ACTIVE';
+  const metaConnected = Boolean(metrics.metaConnected);
 
   return (
     <div className="space-y-3 font-sans">
@@ -208,27 +206,30 @@ export default function OverviewStats() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-600">Conta Meta</span>
             <ShieldCheck
-              className={`w-3.5 h-3.5 ${metaOk ? 'text-emerald-500' : 'text-amber-500'}`}
+              className={`w-3.5 h-3.5 ${metaConnected ? 'text-emerald-500' : 'text-amber-500'}`}
             />
           </div>
           <div>
             <h3
               className={`text-xl font-black tracking-tight leading-none mt-0.5 ${
-                metaOk ? 'text-emerald-600' : 'text-amber-600'
+                metaConnected ? 'text-emerald-600' : 'text-amber-600'
               }`}
             >
-              {metaOk ? 'VERDE' : 'ATENÇÃO'}
+              {metaConnected ? 'CONECTADA' : 'PENDENTE'}
             </h3>
             <div className="flex items-center gap-1 mt-1 text-[10.5px]">
-              <span
-                className={`font-bold px-1.5 py-0.2 rounded border ${
-                  metaOk
-                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                    : 'text-amber-700 bg-amber-50 border-amber-200'
-                }`}
-              >
-                {metaOk ? 'Coexistência OK' : 'Revisar conexão'}
-              </span>
+              {metaConnected ? (
+                <span className="font-bold px-1.5 py-0.2 rounded border text-emerald-700 bg-emerald-50 border-emerald-200">
+                  Canal ativo
+                </span>
+              ) : (
+                <Link
+                  href="/configuracoes"
+                  className="font-bold px-1.5 py-0.2 rounded border text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
+                >
+                  Aguardando aprovação Meta
+                </Link>
+              )}
             </div>
           </div>
         </div>

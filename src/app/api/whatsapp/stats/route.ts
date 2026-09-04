@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
     const tenantId = auth.session.tenantId;
 
     const { searchParams } = new URL(req.url);
-    let messagingLimitTier = 'TIER_1K';
-    let qualityRating = 'GREEN';
+    let messagingLimitTier: string | null = null;
+    let qualityRating: string | null = null;
     let displayPhoneNumber = '';
     let isConnected = false;
 
@@ -32,46 +32,52 @@ export async function GET(req: NextRequest) {
       if (metaRes.ok) {
         const metaData = await metaRes.json();
         messagingLimitTier = metaData.messaging_limit_tier || 'TIER_1K';
-        qualityRating = metaData.quality_rating || 'GREEN';
+        qualityRating = metaData.quality_rating || 'UNKNOWN';
         displayPhoneNumber = metaData.display_phone_number || '';
         isConnected = true;
       }
     } catch (metaErr) {
-      console.warn('[Meta API Stats] fallback defaults:', metaErr);
+      console.warn('[Meta API Stats] sem credenciais reais ainda:', metaErr);
     }
 
-    let numericLimit = 1000;
-    let formattedTierLabel = 'Tier 1 (1.000 msgs/24h)';
+    let numericLimit: number | null = null;
+    let formattedTierLabel: string | null = null;
 
-    switch (messagingLimitTier) {
-      case 'TIER_250':
-        numericLimit = 250;
-        formattedTierLabel = 'Tier Inicial (250 msgs/24h)';
-        break;
-      case 'TIER_1K':
-        numericLimit = 1000;
-        formattedTierLabel = 'Tier 1 (1.000 msgs/24h)';
-        break;
-      case 'TIER_10K':
-        numericLimit = 10000;
-        formattedTierLabel = 'Tier 2 (10.000 msgs/24h)';
-        break;
-      case 'TIER_100K':
-        numericLimit = 100000;
-        formattedTierLabel = 'Tier 3 (100.000 msgs/24h)';
-        break;
-      case 'UNLIMITED':
-        numericLimit = 9999999;
-        formattedTierLabel = 'Tier Ilimitado (Meta API)';
-        break;
-      default:
-        numericLimit = 1000;
-        formattedTierLabel = 'Tier 1 (1.000 msgs/24h)';
+    if (isConnected) {
+      switch (messagingLimitTier) {
+        case 'TIER_250':
+          numericLimit = 250;
+          formattedTierLabel = 'Tier Inicial (250 msgs/24h)';
+          break;
+        case 'TIER_1K':
+          numericLimit = 1000;
+          formattedTierLabel = 'Tier 1 (1.000 msgs/24h)';
+          break;
+        case 'TIER_10K':
+          numericLimit = 10000;
+          formattedTierLabel = 'Tier 2 (10.000 msgs/24h)';
+          break;
+        case 'TIER_100K':
+          numericLimit = 100000;
+          formattedTierLabel = 'Tier 3 (100.000 msgs/24h)';
+          break;
+        case 'UNLIMITED':
+          numericLimit = 9999999;
+          formattedTierLabel = 'Tier Ilimitado (Meta API)';
+          break;
+        default:
+          numericLimit = 1000;
+          formattedTierLabel = 'Tier 1 (1.000 msgs/24h)';
+      }
     }
 
-    let formattedQuality = 'VERDE (Excelente)';
-    if (qualityRating === 'YELLOW') formattedQuality = 'AMARELO (Atenção)';
-    if (qualityRating === 'RED') formattedQuality = 'VERMELHO (Risco de Bloqueio)';
+    let formattedQuality: string | null = null;
+    if (isConnected) {
+      formattedQuality = 'VERDE (Excelente)';
+      if (qualityRating === 'YELLOW') formattedQuality = 'AMARELO (Atenção)';
+      if (qualityRating === 'RED') formattedQuality = 'VERMELHO (Risco de Bloqueio)';
+      if (qualityRating === 'UNKNOWN') formattedQuality = 'Não disponível';
+    }
 
     return NextResponse.json({
       success: true,
