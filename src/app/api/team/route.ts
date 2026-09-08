@@ -152,12 +152,12 @@ export async function POST(req: NextRequest) {
 
     const mailed = await sendEmail({
       to: email,
-      subject: 'Você foi convidado para o Portal Domu Tech',
-      text: `Olá ${name},\n\nVocê foi convidado como ${roleLabel} no Portal Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}${contactFooterText()}`,
+      subject: 'Você foi convidado para a Plataforma Domu Tech',
+      text: `Olá ${name},\n\nVocê foi convidado como ${roleLabel} na Plataforma Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}${contactFooterText()}`,
       html: brandedEmailHtml({
         heading: 'Você foi convidado!',
         bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${name}</strong>!</p>
-          <p style="margin:0 0 12px;">Você foi convidado para acessar o Portal Domu Tech como <strong>${roleLabel}</strong>. Clique no botão abaixo pra criar sua senha e começar — o convite vale por <strong>7 dias</strong>.</p>`,
+          <p style="margin:0 0 12px;">Você foi convidado para acessar a Plataforma Domu Tech como <strong>${roleLabel}</strong>. Clique no botão abaixo pra criar sua senha e começar — o convite vale por <strong>7 dias</strong>.</p>`,
         ctaLabel: 'Aceitar convite',
         ctaUrl: inviteUrl,
       }),

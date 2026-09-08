@@ -26,7 +26,7 @@ export const PLAN_DISPATCH_LIMITS: Record<
   ENTERPRISE: {
     monthly: 999999,
     daily: null,
-    labelMonthly: 'Disparos ilimitados no portal (sujeito à Meta)',
+    labelMonthly: 'Disparos ilimitados na plataforma (sujeito à Meta)',
     labelDaily: null,
   },
 };

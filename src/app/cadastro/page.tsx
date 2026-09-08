@@ -149,7 +149,7 @@ export default function CadastroPage() {
   return (
     <AuthShell
       title="Comece agora"
-      subtitle="Crie sua conta e ative seu portal de automação no WhatsApp em poucos minutos."
+      subtitle="Crie sua conta e ative sua plataforma de automação no WhatsApp em poucos minutos."
       footer={
         <>
           Já tem conta?{' '}

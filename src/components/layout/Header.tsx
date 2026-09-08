@@ -36,7 +36,7 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
   const [notifications, setNotifications] = useState([
     {
       id: '1',
-      title: 'Bem-vindo ao Portal Domu Tech',
+      title: 'Bem-vindo à Plataforma Domu Tech',
       message: 'Sua empresa e conta foram ativadas com sucesso.',
       time: 'Agora',
       type: 'SUCCESS',

@@ -121,7 +121,7 @@ function ConviteForm() {
       subtitle={
         invite
           ? `${invite.companyName} convidou você como ${invite.role}.`
-          : 'Defina sua senha para entrar no portal.'
+          : 'Defina sua senha para entrar na plataforma.'
       }
       footer={
         <Link href="/login" className="font-semibold text-domu-blue hover:underline">
@@ -195,7 +195,7 @@ function ConviteForm() {
             disabled={isLoading || !isPasswordValid || !passwordsMatch}
             className="w-full btn-domu-primary text-base py-3 justify-center disabled:opacity-50"
           >
-            {isLoading ? 'Criando acesso…' : 'Entrar no portal'}
+            {isLoading ? 'Criando acesso…' : 'Entrar na plataforma'}
           </button>
         </form>
       )}

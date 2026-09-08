@@ -216,7 +216,7 @@ function LoginForm() {
         >
           {isLoading ? 'Entrando...' : (
             <>
-              Acessar portal
+              Acessar plataforma
               <ArrowRight className="w-4 h-4" />
             </>
           )}

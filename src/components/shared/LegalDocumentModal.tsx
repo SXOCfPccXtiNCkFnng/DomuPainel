@@ -12,16 +12,16 @@ function TermsBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">1. Aceitação</h4>
         <p>
-          Estes Termos de Uso regem o acesso e uso do Portal Domu Tech (&quot;Portal&quot;), plataforma de
-          automação e gestão de atendimento via WhatsApp. Ao criar uma conta, contratar um plano ou usar o
-          Portal, você declara ter lido, compreendido e aceito integralmente estes termos.
+          Estes Termos de Uso regem o acesso e uso da Plataforma Domu Tech (&quot;Plataforma&quot;), sistema de
+          automação e gestão de atendimento via WhatsApp. Ao criar uma conta, contratar um plano ou usar a
+          Plataforma, você declara ter lido, compreendido e aceito integralmente estes termos.
         </p>
       </section>
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">2. Descrição do serviço</h4>
         <p>
-          O Portal oferece ferramentas de disparo de mensagens, automação de atendimento, gestão de contatos
-          (leads) e relatórios, integradas à WhatsApp Business Platform (Meta Cloud API). O Portal depende de
+          A Plataforma oferece ferramentas de disparo de mensagens, automação de atendimento, gestão de contatos
+          (leads) e relatórios, integradas à WhatsApp Business Platform (Meta Cloud API). A Plataforma depende de
           serviços de terceiros — Meta (WhatsApp), Asaas (pagamentos) e provedores de e-mail — cuja
           disponibilidade não está sob nosso controle.
         </p>
@@ -39,17 +39,17 @@ function TermsBody() {
         <h4 className="font-bold text-slate-900">4. Uso aceitável e anti-spam</h4>
         <p>
           É obrigatório obter <strong>opt-in válido</strong> (consentimento prévio) antes de enviar mensagens
-          comerciais a qualquer contato. É proibido usar o Portal para spam, phishing, conteúdo ilegal,
+          comerciais a qualquer contato. É proibido usar a Plataforma para spam, phishing, conteúdo ilegal,
           discurso de ódio ou qualquer prática que viole as políticas da WhatsApp Business Platform. O
           descumprimento pode levar ao bloqueio do número pela Meta — evento fora do nosso controle — e à
-          suspensão da conta no Portal, sem reembolso de valores já pagos no período.
+          suspensão da conta na Plataforma, sem reembolso de valores já pagos no período.
         </p>
       </section>
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">5. Planos, cobrança e cancelamento</h4>
         <p>
           A assinatura é mensal, recorrente e cobrada via Asaas (PIX ou cartão de crédito), conforme o plano
-          escolhido. Limites de disparo e recursos seguem a tabela vigente no Portal. O cancelamento pode ser
+          escolhido. Limites de disparo e recursos seguem a tabela vigente na Plataforma. O cancelamento pode ser
           solicitado a qualquer momento e produz efeito ao final do período já pago; não há reembolso
           proporcional de período já iniciado, salvo obrigação legal em contrário. Taxas cobradas diretamente
           pela Meta (ex.: conversas iniciadas por template fora da janela gratuita) são de responsabilidade do
@@ -61,15 +61,15 @@ function TermsBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">6. Propriedade intelectual</h4>
         <p>
-          O software, marca, layout e demais elementos do Portal são de propriedade da Domu Tech. O uso do
-          Portal não transfere qualquer direito de propriedade intelectual ao contratante. Os dados inseridos
+          O software, marca, layout e demais elementos da Plataforma são de propriedade da Domu Tech. O uso da
+          Plataforma não transfere qualquer direito de propriedade intelectual ao contratante. Os dados inseridos
           pelo contratante (leads, templates, mensagens) permanecem de sua titularidade.
         </p>
       </section>
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">7. Limitação de responsabilidade</h4>
         <p>
-          O Portal é fornecido &quot;como está&quot;. Não garantimos disponibilidade ininterrupta, nem nos
+          A Plataforma é fornecida &quot;como está&quot;. Não garantimos disponibilidade ininterrupta, nem nos
           responsabilizamos por indisponibilidade, bloqueio ou alteração de política por parte da Meta, Asaas
           ou outros provedores terceiros. Nossa responsabilidade, quando aplicável, está limitada ao valor
           pago pelo contratante nos 3 (três) meses anteriores ao evento.
@@ -87,7 +87,7 @@ function TermsBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">9. Alterações destes termos</h4>
         <p>
-          Podemos atualizar estes Termos periodicamente. Mudanças relevantes serão comunicadas no Portal antes
+          Podemos atualizar estes Termos periodicamente. Mudanças relevantes serão comunicadas na Plataforma antes
           de exigirem novo aceite. O uso continuado após a atualização implica concordância com a nova versão.
         </p>
       </section>
@@ -108,7 +108,7 @@ function PrivacyBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">1. Controlador dos dados</h4>
         <p>
-          A Domu Tech é a controladora dos dados pessoais tratados através do Portal, nos termos da Lei
+          A Domu Tech é a controladora dos dados pessoais tratados através da Plataforma, nos termos da Lei
           13.709/2018 (LGPD). Dúvidas ou solicitações sobre privacidade podem ser enviadas para{' '}
           <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold text-domu-blue hover:underline">
             {CONTACT_EMAIL}
@@ -127,13 +127,13 @@ function PrivacyBody() {
             Dados de contatos (leads) importados ou cadastrados pelo contratante, sob responsabilidade dele
             quanto à origem e ao consentimento (opt-in) desses contatos.
           </li>
-          <li>Dados de uso do Portal (logs de acesso, campanhas enviadas, métricas de entrega).</li>
+          <li>Dados de uso da Plataforma (logs de acesso, campanhas enviadas, métricas de entrega).</li>
         </ul>
       </section>
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">3. Como usamos os dados</h4>
         <p>
-          Usamos os dados para: operar o Portal e suas funcionalidades; processar pagamentos; enviar
+          Usamos os dados para: operar a Plataforma e suas funcionalidades; processar pagamentos; enviar
           comunicações operacionais (confirmação de conta, redefinição de senha, avisos de cobrança); cumprir
           obrigações legais e fiscais; e melhorar a segurança e a qualidade do serviço. Não usamos os dados
           para publicidade de terceiros.
@@ -192,7 +192,7 @@ function PrivacyBody() {
         <h4 className="font-bold text-slate-900">9. Alterações desta política</h4>
         <p>
           Podemos atualizar esta Política periodicamente. A data da versão vigente é exibida no rodapé deste
-          documento. Alterações relevantes serão comunicadas no Portal.
+          documento. Alterações relevantes serão comunicadas na Plataforma.
         </p>
       </section>
       <section className="space-y-2">

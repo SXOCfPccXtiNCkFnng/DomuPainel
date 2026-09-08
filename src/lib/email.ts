@@ -4,7 +4,7 @@ import { CONTACT_EMAIL, CONTACT_WHATSAPP_URL } from '@/lib/contact';
 
 /** Rodapé de contato em texto puro (a versão HTML já vem embutida em brandedEmailHtml). */
 export function contactFooterText(): string {
-  const wa = CONTACT_WHATSAPP_URL('Olá! Preciso de ajuda com o Portal Domu Tech.');
+  const wa = CONTACT_WHATSAPP_URL('Olá! Preciso de ajuda com a Plataforma Domu Tech.');
   return `\n\n---\nPrecisa de ajuda? Fale com a gente:\nWhatsApp: ${wa}\nE-mail: ${CONTACT_EMAIL}`;
 }
 

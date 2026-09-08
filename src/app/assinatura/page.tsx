@@ -46,7 +46,7 @@ const PLANS: {
     popular: true,
     features: [
       PLAN_DISPATCH_LIMITS.PRO.labelMonthly,
-      'Sem teto diário no portal',
+      'Sem teto diário na plataforma',
       'Até 10 usuários na conta',
       'Coexistência Celular + Web',
       'Suporte prioritário DOMU',

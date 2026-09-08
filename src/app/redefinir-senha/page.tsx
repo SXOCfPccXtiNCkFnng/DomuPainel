@@ -70,7 +70,7 @@ function ResetForm() {
   return (
     <AuthShell
       title="Nova senha"
-      subtitle="Defina uma senha forte para voltar a acessar o portal."
+      subtitle="Defina uma senha forte para voltar a acessar a plataforma."
       footer={
         <Link href="/login" className="font-semibold text-domu-blue hover:underline">
           Voltar ao login

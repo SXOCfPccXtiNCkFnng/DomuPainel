@@ -52,7 +52,7 @@ const GLOBAL_SYSTEM_TEMPLATES = [
     is_global: true,
     meta_template_id: 'meta_hsm_003',
     header_type: 'NONE',
-    body_text: 'Olá {{nome}}! Seu pedido/solicitação foi atualizado com sucesso. Acesse nosso portal para conferir.',
+    body_text: 'Olá {{nome}}! Seu pedido/solicitação foi atualizado com sucesso. Acesse nossa plataforma para conferir.',
     variables: ['nome']
   }
 ];

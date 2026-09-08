@@ -72,7 +72,7 @@ const PLAN_OPTIONS = [
     features: [
       'Tudo do Starter',
       'Até 6.000 disparos/mês (limite DOMU)',
-      'Sem teto diário no portal',
+      'Sem teto diário na plataforma',
       'Mais usuários na mesma conta',
       'Relatórios avançados de campanha',
       'CRM e atendimento (em breve)',
@@ -88,7 +88,7 @@ const PLAN_OPTIONS = [
     highlight: false,
     features: [
       'Tudo do Pro',
-      'Disparos ilimitados no portal*',
+      'Disparos ilimitados na plataforma*',
       'Multi-operadores no mesmo canal',
       'API direta / número dedicado',
       'Onboarding assistido pela DOMU',
@@ -656,7 +656,7 @@ export default function OnboardingPage() {
                 Qual é o foco do seu negócio?
               </h1>
               <p className="text-base text-slate-500 leading-relaxed">
-                Escolha o perfil que melhor representa sua operação. O portal adapta templates, automações e ferramentas para o seu dia a dia.
+                Escolha o perfil que melhor representa sua operação. A plataforma adapta templates, automações e ferramentas para o seu dia a dia.
               </p>
             </div>
 
@@ -729,7 +729,7 @@ export default function OnboardingPage() {
               </div>
 
               <a
-                href="https://wa.me/5511934430659?text=Olá!%20Gostaria%20de%20solicitar%20um%20segmento%20personalizado%20no%20Portal%20DOMU%20Tech"
+                href="https://wa.me/5511934430659?text=Olá!%20Gostaria%20de%20solicitar%20um%20segmento%20personalizado%20na%20Plataforma%20DOMU%20Tech"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-all shrink-0 flex items-center justify-center gap-2"
@@ -762,7 +762,7 @@ export default function OnboardingPage() {
                 Dados da sua empresa
               </h1>
               <p className="text-base text-slate-500 leading-relaxed">
-                Usamos essas informações para personalizar mensagens, relatórios e o painel do portal.
+                Usamos essas informações para personalizar mensagens, relatórios e o painel da plataforma.
               </p>
             </div>
 
@@ -926,7 +926,7 @@ export default function OnboardingPage() {
                 </div>
 
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Use o WhatsApp Business no celular normalmente e dispare campanhas pelo portal no mesmo número.
+                  Use o WhatsApp Business no celular normalmente e dispare campanhas pela plataforma no mesmo número.
                 </p>
 
                 <ul className="space-y-2 pt-1 border-t border-slate-100">
@@ -1089,7 +1089,7 @@ export default function OnboardingPage() {
                         </div>
                         <div>
                           <h3 className="text-lg font-bold text-slate-900">Coexistência oficial</h3>
-                          <p className="text-sm text-slate-500">Mesmo número no celular e no portal</p>
+                          <p className="text-sm text-slate-500">Mesmo número no celular e na plataforma</p>
                         </div>
                       </div>
 
@@ -1343,7 +1343,7 @@ export default function OnboardingPage() {
                 Escolha o plano da sua operação
               </h1>
               <p className="text-base text-slate-500 leading-relaxed">
-                Valores alinhados ao uso real do portal hoje: disparos, templates, coexistência Meta e evolução para CRM.
+                Valores alinhados ao uso real da plataforma hoje: disparos, templates, coexistência Meta e evolução para CRM.
               </p>
             </div>
 

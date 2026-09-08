@@ -19,7 +19,7 @@ export function brandedEmailHtml({
   ctaUrl?: string;
 }): string {
   const logoUrl = `${appBaseUrl()}/logo-com-nome.png`;
-  const wa = CONTACT_WHATSAPP_URL('Olá! Preciso de ajuda com o Portal Domu Tech.');
+  const wa = CONTACT_WHATSAPP_URL('Olá! Preciso de ajuda com a Plataforma Domu Tech.');
 
   const cta =
     ctaUrl && ctaLabel

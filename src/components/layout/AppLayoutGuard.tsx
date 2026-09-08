@@ -165,7 +165,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4">
         <div className="w-10 h-10 border-3 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
         <span className="text-xs font-bold text-slate-400 tracking-wider uppercase">
-          Carregando Portal DOMU...
+          Carregando Plataforma DOMU...
         </span>
       </div>
     );
@@ -184,7 +184,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         <header className="bg-[#0B132B] text-white px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <p className="text-sm font-black tracking-tight">DOMU · interno</p>
           <Link href="/" className="text-xs font-bold text-slate-300 hover:text-white">
-            Voltar ao portal
+            Voltar à plataforma
           </Link>
         </header>
         <main className="px-4 sm:px-6 lg:px-8 py-8">{children}</main>

@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         phone_number_id: phoneNumberId.trim(),
         verify_token: verifyToken?.trim() || generateSecureToken(16),
         app_id: appId?.trim() || null,
-        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://portal.domutech.digital'}/api/whatsapp/webhook`,
+        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://painel.domutech.digital'}/api/whatsapp/webhook`,
         is_verified: true,
         updated_at: new Date().toISOString(),
       };

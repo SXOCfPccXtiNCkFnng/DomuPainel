@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Este e-mail já está cadastrado no Portal Domu Tech. Faça login ou recupere a senha.',
+          error: 'Este e-mail já está cadastrado na Plataforma Domu Tech. Faça login ou recupere a senha.',
         },
         { status: 400 }
       );
@@ -134,12 +134,12 @@ export async function POST(req: NextRequest) {
     const welcomeResult = await sendEmail({
       to: newUser.email,
       subject: 'Bem-vindo à Domu Tech!',
-      text: `Olá ${newUser.name},\n\nSua conta na Domu Tech foi criada com sucesso. Faça login para continuar a configuração do seu portal de automação no WhatsApp:\n${appBaseUrl(req.nextUrl.origin)}/login\n\nEquipe Domu Tech`,
+      text: `Olá ${newUser.name},\n\nSua conta na Domu Tech foi criada com sucesso. Faça login para continuar a configuração da sua plataforma de automação no WhatsApp:\n${appBaseUrl(req.nextUrl.origin)}/login\n\nEquipe Domu Tech`,
       html: brandedEmailHtml({
         heading: 'Bem-vindo à Domu Tech!',
         bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${newUser.name}</strong>!</p>
-          <p style="margin:0 0 12px;">Sua conta da <strong>${newTenant.name}</strong> foi criada com sucesso. Falta pouco: faça login pra continuar a configuração do seu portal de automação no WhatsApp.</p>`,
-        ctaLabel: 'Entrar no portal',
+          <p style="margin:0 0 12px;">Sua conta da <strong>${newTenant.name}</strong> foi criada com sucesso. Falta pouco: faça login pra continuar a configuração da sua plataforma de automação no WhatsApp.</p>`,
+        ctaLabel: 'Entrar na plataforma',
         ctaUrl: `${appBaseUrl(req.nextUrl.origin)}/login`,
       }),
     });
