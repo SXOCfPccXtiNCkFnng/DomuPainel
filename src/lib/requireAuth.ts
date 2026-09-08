@@ -217,12 +217,16 @@ export function applySessionCookie(
     maxAge
   );
 
+  // Sem "lembrar de mim": cookie de sessão real do navegador (sem maxAge),
+  // apagado ao fechar o navegador. O token ainda expira em 12h por dentro
+  // (exp no payload) como segunda camada de segurança. Com "lembrar de mim":
+  // cookie persistente de 30 dias.
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge,
+    ...(rememberMe ? { maxAge } : {}),
   });
 }
 
