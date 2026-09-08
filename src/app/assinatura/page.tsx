@@ -18,12 +18,14 @@ import { getAuthItem, setAuthItem } from '@/lib/authStorage';
 import { PLAN_DISPATCH_LIMITS, PLAN_PRICES_BRL, PlanTier } from '@/lib/planLimits';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 
+type PlanFeature = { label: string; comingSoon?: boolean };
+
 const PLANS: {
   tier: PlanTier;
   name: string;
   eyebrow: string;
   blurb: string;
-  features: string[];
+  features: PlanFeature[];
   popular?: boolean;
 }[] = [
   {
@@ -32,10 +34,10 @@ const PLANS: {
     eyebrow: 'Começar',
     blurb: 'Disparos oficiais via WhatsApp da Meta, com trava diária de segurança.',
     features: [
-      PLAN_DISPATCH_LIMITS.STARTER.labelMonthly,
-      PLAN_DISPATCH_LIMITS.STARTER.labelDaily!,
-      'WhatsApp oficial da Meta',
-      'Coexistência Celular + Web',
+      { label: PLAN_DISPATCH_LIMITS.STARTER.labelMonthly },
+      { label: PLAN_DISPATCH_LIMITS.STARTER.labelDaily! },
+      { label: 'WhatsApp oficial da Meta' },
+      { label: 'Coexistência Celular + Web' },
     ],
   },
   {
@@ -45,11 +47,12 @@ const PLANS: {
     blurb: 'Mais volume, equipe e suporte prioritário para operações em crescimento.',
     popular: true,
     features: [
-      PLAN_DISPATCH_LIMITS.PRO.labelMonthly,
-      'Sem teto diário na plataforma',
-      'Até 10 usuários na conta',
-      'Coexistência Celular + Web',
-      'Suporte prioritário DOMU',
+      { label: PLAN_DISPATCH_LIMITS.PRO.labelMonthly },
+      { label: 'Sem teto diário na plataforma' },
+      { label: 'Até 10 usuários na conta' },
+      { label: 'Coexistência Celular + Web' },
+      { label: 'CRM e atendimento', comingSoon: true },
+      { label: 'Suporte prioritário DOMU' },
     ],
   },
   {
@@ -58,10 +61,10 @@ const PLANS: {
     eyebrow: 'Escala',
     blurb: 'Volume alto, API dedicada e acompanhamento próximo da operação.',
     features: [
-      PLAN_DISPATCH_LIMITS.ENTERPRISE.labelMonthly,
-      'API direta / número dedicado',
-      'Multi-operadores no mesmo canal',
-      'Gerente de conta dedicado',
+      { label: PLAN_DISPATCH_LIMITS.ENTERPRISE.labelMonthly },
+      { label: 'API direta / número dedicado' },
+      { label: 'Multi-operadores no mesmo canal', comingSoon: true },
+      { label: 'Gerente de conta dedicado' },
     ],
   },
 ];
@@ -491,9 +494,16 @@ export default function AssinaturaPage() {
                 </p>
                 <ul className="space-y-2.5 flex-1 mb-6">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
+                    <li key={f.label} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
                       <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
-                      <span>{f}</span>
+                      <span className="flex items-center gap-1.5 flex-wrap">
+                        {f.label}
+                        {f.comingSoon && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wide">
+                            Em breve
+                          </span>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>

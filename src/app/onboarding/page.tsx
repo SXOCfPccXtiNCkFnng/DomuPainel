@@ -45,54 +45,64 @@ const STEPS = [
   { id: 5, label: 'Plano' },
 ] as const;
 
-const PLAN_OPTIONS = [
+type PlanFeature = { label: string; comingSoon?: boolean };
+
+const PLAN_OPTIONS: {
+  id: 'STARTER' | 'PRO' | 'ENTERPRISE';
+  name: string;
+  tagline: string;
+  audience: string;
+  price: number;
+  highlight: boolean;
+  features: PlanFeature[];
+}[] = [
   {
-    id: 'STARTER' as const,
+    id: 'STARTER',
     name: 'Starter',
     tagline: 'MVP completo',
     audience: 'Tudo que o corretor precisa para disparar, qualificar e medir ROI no WhatsApp.',
     price: PLAN_PRICES_BRL.STARTER,
     highlight: false,
     features: [
-      'Cadastro de imóveis (foto, preço, região, status)',
-      'Contatos + tags (interesse, região, faixa)',
-      'Campanha: imóvel → segmento → envio',
-      'Até 1.500 disparos/mês (limite DOMU)',
-      'Até 200 disparos/dia (trava de segurança)',
-      'Leads que responderam + métricas de ROI',
+      { label: 'Cadastro de imóveis (foto, preço, região, status)' },
+      { label: 'Contatos + tags (interesse, região, faixa)' },
+      { label: 'Campanha: imóvel → segmento → envio' },
+      { label: 'Até 1.500 disparos/mês (limite DOMU)' },
+      { label: 'Até 200 disparos/dia (trava de segurança)' },
+      { label: 'Leads que responderam + métricas de ROI' },
     ],
   },
   {
-    id: 'PRO' as const,
+    id: 'PRO',
     name: 'Pro',
     tagline: 'Mais popular',
     audience: 'Para imobiliárias e equipes que precisam de mais volume e operação diária.',
     price: PLAN_PRICES_BRL.PRO,
     highlight: true,
     features: [
-      'Tudo do Starter',
-      'Até 6.000 disparos/mês (limite DOMU)',
-      'Sem teto diário na plataforma',
-      'Mais usuários na mesma conta',
-      'Relatórios avançados de campanha',
-      'CRM e atendimento (em breve)',
-      'Suporte prioritário DOMU',
+      { label: 'Tudo do Starter' },
+      { label: 'Até 6.000 disparos/mês (limite DOMU)' },
+      { label: 'Sem teto diário na plataforma' },
+      { label: 'Mais usuários na mesma conta' },
+      { label: 'Relatórios avançados de campanha' },
+      { label: 'CRM e atendimento', comingSoon: true },
+      { label: 'Suporte prioritário DOMU' },
     ],
   },
   {
-    id: 'ENTERPRISE' as const,
+    id: 'ENTERPRISE',
     name: 'Enterprise',
     tagline: 'Alta escala',
     audience: 'Para redes, franquias e operações com volume alto e acompanhamento dedicado.',
     price: PLAN_PRICES_BRL.ENTERPRISE,
     highlight: false,
     features: [
-      'Tudo do Pro',
-      'Disparos ilimitados na plataforma*',
-      'Multi-operadores no mesmo canal',
-      'API direta / número dedicado',
-      'Onboarding assistido pela DOMU',
-      'Gerente de conta e SLA',
+      { label: 'Tudo do Pro' },
+      { label: 'Disparos ilimitados na plataforma*' },
+      { label: 'Multi-operadores no mesmo canal', comingSoon: true },
+      { label: 'API direta / número dedicado' },
+      { label: 'Onboarding assistido pela DOMU' },
+      { label: 'Gerente de conta e SLA' },
     ],
   },
 ];
@@ -1425,7 +1435,7 @@ export default function OnboardingPage() {
                       >
                         {plan.features.map((feature) => (
                           <li
-                            key={feature}
+                            key={feature.label}
                             className={`flex items-start gap-2 text-sm ${
                               isPro ? 'text-slate-200' : 'text-slate-600'
                             }`}
@@ -1435,7 +1445,14 @@ export default function OnboardingPage() {
                                 isPro ? 'text-blue-400' : 'text-emerald-600'
                               }`}
                             />
-                            <span>{feature}</span>
+                            <span className="flex items-center gap-1.5 flex-wrap">
+                              {feature.label}
+                              {feature.comingSoon && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wide">
+                                  Em breve
+                                </span>
+                              )}
+                            </span>
                           </li>
                         ))}
                       </ul>

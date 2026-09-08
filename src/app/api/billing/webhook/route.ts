@@ -7,14 +7,92 @@ import {
 } from '@/lib/billing';
 import {
   asaasGetPayment,
+  asaasGetPixQrCode,
   getAsaasWebhookToken,
   isBillingMockEnabled,
 } from '@/lib/asaasClient';
 import { getPlanMonthlyLimit, normalizePlanTier } from '@/lib/planLimits';
 import { isProduction } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
+import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
+import { brandedEmailHtml } from '@/lib/emailTemplates';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Quando o Asaas gera automaticamente a cobrança do próximo ciclo de uma
+ * assinatura PIX já ativa, ele não avisa o cliente (notificationDisabled=true
+ * no customer). Buscamos o QR/copia-e-cola dessa cobrança nova e mandamos
+ * por e-mail, em vez de deixar o cliente descobrir sozinho no painel.
+ * Best-effort: nunca deve derrubar o processamento do webhook.
+ */
+async function sendPixRenewalEmail(input: {
+  tenantId: string;
+  paymentId: string;
+  planTier: string;
+  monthlyPrice: number;
+}): Promise<void> {
+  try {
+    const pix = await asaasGetPixQrCode(input.paymentId);
+    if (!pix?.payload) return;
+
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants')
+      .select('name')
+      .eq('id', input.tenantId)
+      .maybeSingle();
+
+    const { data: admins } = await supabaseAdmin
+      .from('users')
+      .select('email')
+      .eq('tenant_id', input.tenantId)
+      .eq('role', 'ADMIN');
+
+    const recipients = (admins || []).map((a) => a.email).filter(Boolean);
+    if (recipients.length === 0) return;
+
+    const base = appBaseUrl();
+    const billingUrl = `${base}/assinatura`;
+    const priceLabel = Number(input.monthlyPrice || 0).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+    const qrImage = pix.encodedImage ? `data:image/png;base64,${pix.encodedImage}` : null;
+
+    const subject = `Pix da sua renovação Domu Tech (${priceLabel})`;
+    const text = `Olá!\n\nSua assinatura do plano ${input.planTier} (${priceLabel}/mês) da empresa ${
+      tenant?.name || ''
+    } renovou e já tem um Pix aguardando pagamento.\n\nPix copia e cola:\n${pix.payload}\n\nOu pague direto no painel: ${billingUrl}\n\nEquipe Domu Tech${contactFooterText()}`;
+    const html = brandedEmailHtml({
+      heading: 'Pix da sua renovação está pronto',
+      bodyHtml: `<p style="margin:0 0 12px;">Olá!</p>
+        <p style="margin:0 0 12px;">Sua assinatura do plano <strong>${input.planTier}</strong> (${priceLabel}/mês) da empresa <strong>${
+          tenant?.name || ''
+        }</strong> renovou e já tem um Pix aguardando pagamento.</p>
+        ${qrImage ? `<div style="text-align:center;margin:20px 0;"><img src="${qrImage}" alt="QR Code Pix" width="220" style="display:inline-block;border:1px solid #E2E8F0;border-radius:12px;padding:8px;" /></div>` : ''}
+        <p style="margin:0 0 8px;font-weight:700;color:#0B132B;">Pix copia e cola:</p>
+        <p style="margin:0;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;font-family:monospace;font-size:12px;word-break:break-all;color:#334155;">${pix.payload}</p>`,
+      ctaLabel: 'Pagar no painel',
+      ctaUrl: billingUrl,
+    });
+
+    const results = await Promise.all(
+      recipients.map((to) => sendEmail({ to, subject, text, html }))
+    );
+
+    if (results.some((r) => r.ok)) {
+      await supabaseAdmin
+        .from('subscriptions')
+        .update({ pix_renewal_email_sent_for_payment_id: input.paymentId })
+        .eq('tenant_id', input.tenantId);
+    }
+  } catch (err) {
+    logger.error('billing.pix_renewal_email_error', {
+      tenantId: input.tenantId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 /**
  * Webhook Asaas.
@@ -131,6 +209,29 @@ export async function POST(req: NextRequest) {
             .from('subscriptions')
             .update({ status: mapped, updated_at: new Date().toISOString() })
             .eq('tenant_id', tenantId);
+        } else if (
+          payment.billingType === 'PIX' &&
+          current?.status === 'ACTIVE' &&
+          current?.asaas_subscription_id &&
+          payment.subscription === current.asaas_subscription_id
+        ) {
+          // Assinatura já ativa + cobrança nova pendente no mesmo asaas_subscription_id
+          // = o Asaas gerou o próximo ciclo automaticamente. Avisa o cliente com o Pix.
+          // Coluna de dedupe consultada à parte (nunca deve derrubar a ativação de pagamento
+          // acima se a migration ainda não tiver rodado em produção).
+          const { data: dedupe } = await supabaseAdmin
+            .from('subscriptions')
+            .select('pix_renewal_email_sent_for_payment_id')
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+          if (dedupe?.pix_renewal_email_sent_for_payment_id !== payment.id) {
+            await sendPixRenewalEmail({
+              tenantId,
+              paymentId: payment.id,
+              planTier: current.plan_tier,
+              monthlyPrice: Number(current.monthly_price_brl) || 0,
+            });
+          }
         }
 
         logger.info('billing.webhook_payment', { event, paymentId: payment.id, verifiedStatus, externalRef });
