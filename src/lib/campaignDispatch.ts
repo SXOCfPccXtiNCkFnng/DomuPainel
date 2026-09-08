@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { resolveMetaCredentials, sendMetaTemplate } from '@/lib/metaClient';
 import { logOpsAlert } from '@/lib/opsAlert';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
+import { notifyTenantAdmins } from '@/lib/notify';
 
 export type DispatchResult = {
   processed: number;
@@ -290,6 +291,17 @@ export async function dispatchCampaignPending(
       source: 'campanha',
       message: `Campanha falhou (${campaign.name || campaignId}): ${failed} envios com erro.`,
       tenantId: campaign.tenant_id,
+    });
+  }
+
+  if (finalStatus === 'COMPLETED' || finalStatus === 'FAILED') {
+    await notifyTenantAdmins(campaign.tenant_id, {
+      title: finalStatus === 'COMPLETED' ? 'Campanha concluída' : 'Campanha falhou',
+      message:
+        finalStatus === 'COMPLETED'
+          ? `"${campaign.name || 'Campanha'}" terminou: ${sent} enviada(s), ${failed} falha(s).`
+          : `"${campaign.name || 'Campanha'}" falhou: ${failed} envio(s) com erro.`,
+      type: finalStatus === 'COMPLETED' ? 'SUCCESS' : 'ERROR',
     });
   }
 

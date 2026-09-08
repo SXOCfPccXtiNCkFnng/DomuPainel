@@ -5,6 +5,7 @@ import { applySessionCookie } from '@/lib/requireAuth';
 import { hashToken } from '@/lib/email';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { notifyTenantAdmins } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +104,12 @@ export async function POST(req: NextRequest) {
       .from('user_invites')
       .update({ accepted_at: new Date().toISOString() })
       .eq('id', invite.id);
+
+    await notifyTenantAdmins(invite.tenant_id, {
+      title: 'Novo membro na equipe',
+      message: `${user.name} aceitou o convite e já pode acessar a plataforma.`,
+      type: 'INFO',
+    });
 
     const { data: tenant } = await supabaseAdmin
       .from('tenants')

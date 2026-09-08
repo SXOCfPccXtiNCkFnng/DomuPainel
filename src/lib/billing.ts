@@ -5,6 +5,7 @@ import {
   PlanTier,
 } from '@/lib/planLimits';
 import { getLivePlanPrice } from '@/lib/planPricing';
+import { notifyTenantAdmins } from '@/lib/notify';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export type CouponRow = {
@@ -158,6 +159,13 @@ export async function activateTenantSubscription(input: {
   const periodEnd = new Date(periodStart.getTime() + 30 * 24 * 60 * 60 * 1000);
   const status = input.status || 'ACTIVE';
 
+  const { data: previousSub } = await supabaseAdmin
+    .from('subscriptions')
+    .select('status')
+    .eq('tenant_id', input.tenantId)
+    .maybeSingle();
+  const wasAlreadyActive = previousSub?.status === 'ACTIVE';
+
   await supabaseAdmin.from('subscriptions').upsert(
     {
       tenant_id: input.tenantId,
@@ -184,6 +192,14 @@ export async function activateTenantSubscription(input: {
       .from('tenants')
       .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
       .eq('id', input.tenantId);
+  }
+
+  if (status === 'ACTIVE' && !wasAlreadyActive) {
+    await notifyTenantAdmins(input.tenantId, {
+      title: 'Assinatura ativada',
+      message: `Seu plano ${planTier} está ativo. Bom disparo!`,
+      type: 'SUCCESS',
+    });
   }
 
   if (input.couponCode && status === 'ACTIVE') {

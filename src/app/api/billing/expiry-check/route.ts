@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isCronRequest } from '@/lib/cronAuth';
 import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
 import { brandedEmailHtml } from '@/lib/emailTemplates';
+import { notifyTenantAdmins } from '@/lib/notify';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,11 @@ export async function GET(req: NextRequest) {
           .from('subscriptions')
           .update({ expiry_reminder_sent_at: new Date().toISOString() })
           .eq('tenant_id', sub.tenant_id);
+        await notifyTenantAdmins(sub.tenant_id, {
+          title: 'Assinatura vence em breve',
+          message: `Seu plano ${sub.plan_tier} vence em ${expiresAt}. Renove pra não perder o acesso.`,
+          type: 'WARNING',
+        });
         notified += 1;
       }
     }
