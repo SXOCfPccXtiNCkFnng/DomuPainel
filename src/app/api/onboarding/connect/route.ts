@@ -28,23 +28,24 @@ export async function POST(req: NextRequest) {
       appId,
     } = body;
 
-    if (!connectionType || !['COEXISTENCE', 'DIRECT_API'].includes(connectionType)) {
+    // Coexistência tem endpoint próprio (/api/onboarding/embedded-signup), que
+    // troca o code real do Meta Embedded Signup por credenciais de verdade.
+    // Esta rota só serve pra conexão manual (API Direta).
+    if (connectionType !== 'DIRECT_API') {
       return NextResponse.json(
         { success: false, error: 'Tipo de conexão inválido.' },
         { status: 400 }
       );
     }
 
-    if (connectionType === 'DIRECT_API') {
-      if (!wabaId?.trim() || !phoneNumberId?.trim() || !accessToken?.trim()) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Para API Direta, informe WABA ID, Phone Number ID e Access Token.',
-          },
-          { status: 400 }
-        );
-      }
+    if (!wabaId?.trim() || !phoneNumberId?.trim() || !accessToken?.trim()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Para API Direta, informe WABA ID, Phone Number ID e Access Token.',
+        },
+        { status: 400 }
+      );
     }
 
     if (whatsappPhone && !isValidBrazilianPhone(whatsappPhone)) {
@@ -85,60 +86,48 @@ export async function POST(req: NextRequest) {
         .eq('role', 'ADMIN');
     }
 
-    let credentialsSaved = false;
-    let finalVerifyToken: string | undefined;
+    const { encryptedText, iv } = encryptData(accessToken.trim());
 
-    if (connectionType === 'DIRECT_API') {
-      const { encryptedText, iv } = encryptData(accessToken.trim());
-
-      finalVerifyToken = verifyToken?.trim() || undefined;
-      if (!finalVerifyToken) {
-        const { data: existingCred } = await supabaseAdmin
-          .from('tenant_credentials')
-          .select('verify_token')
-          .eq('tenant_id', tenantId)
-          .maybeSingle();
-        finalVerifyToken = existingCred?.verify_token || generateSecureToken(16);
-      }
-
-      const { error: credError } = await supabaseAdmin
+    let finalVerifyToken: string | undefined = verifyToken?.trim() || undefined;
+    if (!finalVerifyToken) {
+      const { data: existingCred } = await supabaseAdmin
         .from('tenant_credentials')
-        .upsert(
-          {
-            tenant_id: tenantId,
-            waba_id: wabaId.trim(),
-            phone_number_id: phoneNumberId.trim(),
-            encrypted_access_token: encryptedText,
-            token_encryption_iv: iv,
-            verify_token: finalVerifyToken,
-            app_id: appId?.trim() || null,
-            webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://painel.domutech.digital'}/api/whatsapp/webhook`,
-            is_verified: true,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'tenant_id' }
-        );
+        .select('verify_token')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      finalVerifyToken = existingCred?.verify_token || generateSecureToken(16);
+    }
 
-      if (credError) {
-        console.error('[Onboarding Connect Credentials Error]', credError);
-        return NextResponse.json(
-          { success: false, error: 'Falha ao salvar credenciais Meta no banco.' },
-          { status: 500 }
-        );
-      }
+    const { error: credError } = await supabaseAdmin.from('tenant_credentials').upsert(
+      {
+        tenant_id: tenantId,
+        waba_id: wabaId.trim(),
+        phone_number_id: phoneNumberId.trim(),
+        encrypted_access_token: encryptedText,
+        token_encryption_iv: iv,
+        verify_token: finalVerifyToken,
+        app_id: appId?.trim() || null,
+        webhook_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://painel.domutech.digital'}/api/whatsapp/webhook`,
+        is_verified: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tenant_id' }
+    );
 
-      credentialsSaved = true;
+    if (credError) {
+      console.error('[Onboarding Connect Credentials Error]', credError);
+      return NextResponse.json(
+        { success: false, error: 'Falha ao salvar credenciais Meta no banco.' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      message:
-        connectionType === 'COEXISTENCE'
-          ? 'Coexistência registrada no Supabase.'
-          : 'Credenciais Meta salvas no Supabase.',
+      message: 'Credenciais Meta salvas no Supabase.',
       connectionType,
-      credentialsSaved,
-      verifyToken: finalVerifyToken || null,
+      credentialsSaved: true,
+      verifyToken: finalVerifyToken,
       cityState: cityState || null,
     });
   } catch (error: unknown) {

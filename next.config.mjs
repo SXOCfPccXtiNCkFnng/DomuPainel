@@ -19,8 +19,9 @@ const nextConfig = {
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https:",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.asaas.com https://api-sandbox.asaas.com https://graph.facebook.com https://api.resend.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.asaas.com https://api-sandbox.asaas.com https://graph.facebook.com https://api.resend.com https://connect.facebook.net https://*.facebook.com",
+      "frame-src 'self' https://*.facebook.com",
     ].join('; ');
 
     return [

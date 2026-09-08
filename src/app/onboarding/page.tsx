@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { 
   Check, 
@@ -118,6 +119,36 @@ interface SegmentOption {
   available: boolean;
 }
 
+type FbLoginResponse = { authResponse?: { code?: string } };
+
+declare global {
+  interface Window {
+    FB?: {
+      init: (params: {
+        appId: string;
+        autoLogAppEvents?: boolean;
+        xfbml?: boolean;
+        version: string;
+      }) => void;
+      login: (
+        callback: (response: FbLoginResponse) => void,
+        params: {
+          config_id: string;
+          response_type: string;
+          override_default_response_type: boolean;
+          extras?: Record<string, unknown>;
+        }
+      ) => void;
+    };
+  }
+}
+
+type EmbeddedSignupData = {
+  wabaId?: string;
+  phoneNumberId?: string;
+  businessId?: string;
+};
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -145,6 +176,8 @@ export default function OnboardingPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [step2Error, setStep2Error] = useState('');
   const [step4Error, setStep4Error] = useState('');
+  const [fbSdkReady, setFbSdkReady] = useState(false);
+  const embeddedSignupDataRef = useRef<EmbeddedSignupData>({});
   const [wabaId, setWabaId] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [accessToken, setAccessToken] = useState('');
@@ -248,6 +281,112 @@ export default function OnboardingPage() {
       });
   }, []);
 
+  // Embedded Signup manda o waba_id/phone_number_id por postMessage antes do
+  // FB.login fechar o popup e devolver o code — guarda num ref pra combinar os dois.
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (!event.origin.endsWith('facebook.com')) return;
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type !== 'WA_EMBEDDED_SIGNUP') return;
+        if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') {
+          embeddedSignupDataRef.current = {
+            wabaId: data.data?.waba_id,
+            phoneNumberId: data.data?.phone_number_id,
+            businessId: data.data?.business_id,
+          };
+        }
+      } catch {
+        /* mensagens que não são JSON do embedded signup são ignoradas */
+      }
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const handleEmbeddedSignup = () => {
+    if (!window.FB) {
+      setStep4Error('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
+      return;
+    }
+    const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID;
+    if (!configId) {
+      setStep4Error('Conexão com a Meta não configurada (NEXT_PUBLIC_META_CONFIG_ID ausente).');
+      return;
+    }
+
+    setStep4Error('');
+    setIsConnecting(true);
+    embeddedSignupDataRef.current = {};
+
+    window.FB.login(
+      async (response) => {
+        const code = response.authResponse?.code;
+        if (!code) {
+          setStep4Error('Conexão cancelada ou não autorizada na Meta.');
+          setIsConnecting(false);
+          return;
+        }
+
+        const { wabaId: signupWabaId, phoneNumberId: signupPhoneNumberId } =
+          embeddedSignupDataRef.current;
+        if (!signupWabaId || !signupPhoneNumberId) {
+          setStep4Error(
+            'Não recebemos o WABA/número da Meta. Tente conectar novamente.'
+          );
+          setIsConnecting(false);
+          return;
+        }
+
+        try {
+          const storedTenantId = getAuthItem('domu_tenant_id') || '';
+          const res = await fetch('/api/onboarding/embedded-signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tenantId: storedTenantId,
+              code,
+              wabaId: signupWabaId,
+              phoneNumberId: signupPhoneNumberId,
+              whatsappPhone,
+              companyName,
+              segment: selectedSegment,
+              ownerName,
+              cityState,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            setStep4Error(data.error || 'Não foi possível concluir a conexão com a Meta.');
+            setIsConnecting(false);
+            return;
+          }
+
+          setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
+          setWabaId(signupWabaId);
+          setPhoneNumberId(signupPhoneNumberId);
+          if (data.verifyToken) setVerifyToken(data.verifyToken);
+          if (data.warnings?.length) {
+            setStep4Error(
+              `Conectado, mas com avisos: ${data.warnings.join(' · ')}`
+            );
+          }
+          setIsConnectedSimulated(true);
+        } catch {
+          setStep4Error('Erro ao salvar a conexão no servidor. Tente novamente.');
+        } finally {
+          setIsConnecting(false);
+        }
+      },
+      {
+        config_id: configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: { setup: {} },
+      }
+    );
+  };
+
   const segments: SegmentOption[] = [
     {
       id: 'imobiliario',
@@ -337,42 +476,6 @@ export default function OnboardingPage() {
       available: false,
     },
   ];
-
-  const handleSimulateConnection = async () => {
-    setStep4Error('');
-    setIsConnecting(true);
-
-    try {
-      const storedTenantId = getAuthItem('domu_tenant_id') || '';
-      const res = await fetch('/api/onboarding/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantId: storedTenantId,
-          connectionType: 'COEXISTENCE',
-          whatsappPhone,
-          companyName,
-          segment: selectedSegment,
-          ownerName,
-          cityState,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setStep4Error(data.error || 'Não foi possível registrar a conexão.');
-        setIsConnecting(false);
-        return;
-      }
-
-      setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
-      setIsConnectedSimulated(true);
-    } catch {
-      setStep4Error('Erro ao salvar conexão no servidor. Tente novamente.');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
 
   const handleSaveMetaCredentials = async () => {
     setStep4Error('');
@@ -607,7 +710,22 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans">
-      
+      {process.env.NEXT_PUBLIC_META_APP_ID && (
+        <Script
+          src="https://connect.facebook.net/en_US/sdk.js"
+          strategy="afterInteractive"
+          onLoad={() => {
+            window.FB?.init({
+              appId: process.env.NEXT_PUBLIC_META_APP_ID as string,
+              autoLogAppEvents: true,
+              xfbml: true,
+              version: 'v21.0',
+            });
+            setFbSdkReady(true);
+          }}
+        />
+      )}
+
       {/* Header Bar */}
       <header className="bg-white border-b border-slate-200 py-4 px-4 sm:px-10">
         <div className="max-w-5xl mx-auto flex flex-col gap-4">
@@ -1105,10 +1223,10 @@ export default function OnboardingPage() {
 
                       <ol className="space-y-3">
                         {[
-                          'Tenha o WhatsApp Business instalado no celular com o número informado.',
-                          'Clique em "Registrar meu WhatsApp" para vincular o número ao seu perfil Domu.',
-                          'Nossa equipe finaliza a conexão real assim que a verificação do seu Business for aprovada pela Meta.',
-                          'Você recebe um aviso assim que o canal estiver pronto para disparos.',
+                          'Clique em "Conectar com Meta" e faça login com a conta do Facebook do seu negócio.',
+                          'Escolha (ou crie) seu Business Manager, a conta do WhatsApp Business e o número atual.',
+                          'Autorize o acesso — a Meta mantém o app do celular funcionando junto com a plataforma.',
+                          'Pronto: seu número já sai ativo, sem perder histórico nem precisar reinstalar nada.',
                         ].map((step, idx) => (
                           <li key={step} className="flex gap-3 text-sm text-slate-600">
                             <span className="w-6 h-6 shrink-0 bg-[#0B132B] text-white text-xs font-bold flex items-center justify-center">
@@ -1122,28 +1240,32 @@ export default function OnboardingPage() {
                       <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 text-sm text-slate-600">
                         <Info className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
                         <p>
-                          Número a vincular:{' '}
+                          Número informado no passo anterior:{' '}
                           <strong className="text-slate-900">{whatsappPhone || '—'}</strong>
-                          . A ativação do canal depende da aprovação da verificação do seu Business
-                          na Meta — isso é feito uma vez e pode levar alguns dias.
+                          . A tela de autorização é da própria Meta — escolha o número certo lá dentro.
                         </p>
                       </div>
 
                       <button
                         type="button"
-                        onClick={handleSimulateConnection}
-                        disabled={isConnecting}
+                        onClick={handleEmbeddedSignup}
+                        disabled={isConnecting || !fbSdkReady}
                         className="w-full btn-domu-primary text-sm py-3 justify-center disabled:opacity-50"
                       >
                         {isConnecting ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            Registrando...
+                            Conectando...
+                          </>
+                        ) : !fbSdkReady ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Carregando conexão com a Meta...
                           </>
                         ) : (
                           <>
                             <ExternalLink className="w-4 h-4" />
-                            Registrar meu WhatsApp
+                            Conectar com Meta
                           </>
                         )}
                       </button>
@@ -1154,9 +1276,9 @@ export default function OnboardingPage() {
                         <QrCode className="w-full h-full text-slate-900" />
                       </div>
                       <div className="text-center space-y-1">
-                        <p className="text-sm font-semibold">Prévia do pareamento</p>
+                        <p className="text-sm font-semibold">Login oficial da Meta</p>
                         <p className="text-xs text-slate-400 leading-relaxed">
-                          A Meta pode pedir confirmação no celular após a autorização do Business Manager.
+                          Uma janela da Meta abre pra você fazer login e autorizar o acesso ao seu WhatsApp Business.
                         </p>
                       </div>
                     </div>
@@ -1294,18 +1416,18 @@ export default function OnboardingPage() {
                 <div className="space-y-1">
                   <h3 className="text-xl font-bold text-slate-900">
                     {connectionType === 'COEXISTENCE'
-                      ? 'Número registrado'
+                      ? 'WhatsApp conectado com sucesso'
                       : 'Credenciais Meta salvas com sucesso'}
                   </h3>
                   <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
                     {connectionType === 'COEXISTENCE'
-                      ? `O número ${whatsappPhone} foi registrado no seu perfil. A conexão real com a Meta depende da aprovação da verificação do seu Business — nossa equipe ativa o canal assim que ela sair, e você recebe um aviso.`
+                      ? `WABA ${wabaId} e número ${phoneNumberId} autorizados pela Meta e salvos com token criptografado no Supabase. Seu WhatsApp Business no celular continua funcionando normalmente.`
                       : `WABA ${wabaId} e Phone Number ID ${phoneNumberId} foram salvos com token criptografado no Supabase.`}
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {connectionType === 'COEXISTENCE' ? 'Você já pode seguir para o próximo passo' : 'Canal pronto para o próximo passo'}
+                  Canal pronto para o próximo passo
                 </span>
               </div>
             )}
