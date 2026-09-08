@@ -4,6 +4,7 @@ import {
   normalizePlanTier,
   PlanTier,
 } from '@/lib/planLimits';
+import { getLivePlanPrice } from '@/lib/planPricing';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export type CouponRow = {
@@ -29,14 +30,19 @@ export type PriceBreakdown = {
   finalPrice: number;
 };
 
-/** PIX: 5% off no valor base (antes ou depois do cupom — aplicamos cupom primeiro, depois PIX). */
+/**
+ * PIX: 5% off no valor base (antes ou depois do cupom — aplicamos cupom primeiro, depois PIX).
+ * `basePrice`, quando informado, sobrepõe o valor padrão de planLimits.ts — use o preço vigente
+ * de lib/planPricing.ts (editável no /interno) em vez do fallback estático sempre que possível.
+ */
 export function computeSubscriptionPrice(input: {
   planTier: string;
   paymentMethod: 'PIX' | 'CREDIT_CARD';
   coupon?: Pick<CouponRow, 'code' | 'percent_off' | 'amount_off_brl'> | null;
+  basePrice?: number;
 }): PriceBreakdown {
   const planTier = normalizePlanTier(input.planTier);
-  const listPrice = getPlanPrice(planTier);
+  const listPrice = input.basePrice ?? getPlanPrice(planTier);
   let price = listPrice;
   let couponPercent = 0;
   let couponAmount = 0;
@@ -295,7 +301,8 @@ export async function syncTenantSubscriptionFromAsaas(
   const planTier =
     parsePlanTierFromAsaasDescription(asaasSub.description || '') ||
     normalizePlanTier(sub?.plan_tier || 'STARTER');
-  const monthlyPrice = Number(asaasSub.value) || Number(sub?.monthly_price_brl) || getPlanPrice(planTier);
+  const monthlyPrice =
+    Number(asaasSub.value) || Number(sub?.monthly_price_brl) || (await getLivePlanPrice(planTier));
   const paymentMethod = asaasSub.billingType === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'PIX';
 
   await activateTenantSubscription({

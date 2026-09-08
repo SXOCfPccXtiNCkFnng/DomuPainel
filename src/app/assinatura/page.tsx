@@ -113,6 +113,7 @@ export default function AssinaturaPage() {
   const [modalProcessing, setModalProcessing] = useState(false);
   const [modalAcceptedTerms, setModalAcceptedTerms] = useState(false);
   const [legalModalDoc, setLegalModalDoc] = useState<LegalDoc | null>(null);
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
 
   // Payment result inside modal
   const [modalAwaitingPayment, setModalAwaitingPayment] = useState(false);
@@ -129,6 +130,14 @@ export default function AssinaturaPage() {
       setNeedsPayment(new URLSearchParams(window.location.search).get('pay') === '1');
     }
     fetchSubscription();
+    fetch('/api/plans')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.prices) setLivePrices(data.prices);
+      })
+      .catch(() => {
+        /* mantém os preços padrão em caso de falha */
+      });
   }, []);
 
   const fetchSubscription = async () => {
@@ -187,7 +196,7 @@ export default function AssinaturaPage() {
   };
 
   const modalPlanData = PLANS.find((p) => p.tier === modalPlan) || PLANS[0];
-  const modalBasePrice = PLAN_PRICES_BRL[modalPlan];
+  const modalBasePrice = livePrices[modalPlan] ?? PLAN_PRICES_BRL[modalPlan];
   const modalPixPrice = (modalBasePrice * (1 - PIX_DISCOUNT)).toFixed(2);
   const modalDisplayPrice = modalPaymentMethod === 'PIX' ? modalPixPrice : String(modalBasePrice);
 
@@ -452,7 +461,7 @@ export default function AssinaturaPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PLANS.map((plan) => {
             const isCurrent = subData.planTier === plan.tier;
-            const price = PLAN_PRICES_BRL[plan.tier];
+            const price = livePrices[plan.tier] ?? PLAN_PRICES_BRL[plan.tier];
             return (
               <div
                 key={plan.tier}

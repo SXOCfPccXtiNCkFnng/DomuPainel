@@ -25,6 +25,7 @@ import { generateSecureToken } from '@/lib/email';
 import { clientIpFromRequest } from '@/lib/rateLimit';
 import { isValidBrazilianPhone, isValidCpfCnpjLength } from '@/lib/validators';
 import { LEGAL_DOCS_VERSION } from '@/lib/legal';
+import { getLivePlanPrice } from '@/lib/planPricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +89,8 @@ export async function POST(req: NextRequest) {
       coupon = found.coupon;
     }
 
-    const price = computeSubscriptionPrice({ planTier, paymentMethod, coupon });
+    const basePrice = await getLivePlanPrice(planTier);
+    const price = computeSubscriptionPrice({ planTier, paymentMethod, coupon, basePrice });
 
     const { data: tenant } = await supabaseAdmin
       .from('tenants')

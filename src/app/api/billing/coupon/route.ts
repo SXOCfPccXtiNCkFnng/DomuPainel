@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/requireAuth';
 import { computeSubscriptionPrice, findActiveCoupon } from '@/lib/billing';
+import { getLivePlanPrice } from '@/lib/planPricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,10 +21,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: found.error }, { status: 400 });
     }
 
+    const basePrice = await getLivePlanPrice(planTier);
     const price = computeSubscriptionPrice({
       planTier,
       paymentMethod,
       coupon: found.coupon,
+      basePrice,
     });
 
     return NextResponse.json({

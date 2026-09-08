@@ -126,6 +126,7 @@ export default function OnboardingPage() {
 
   // Step 5 Pricing Plan States
   const [selectedPlan, setSelectedPlan] = useState<'STARTER' | 'PRO' | 'ENTERPRISE'>('STARTER');
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [legalModalDoc, setLegalModalDoc] = useState<LegalDoc | null>(null);
@@ -225,6 +226,17 @@ export default function OnboardingPage() {
 
     verifyOnboardingStatus();
   }, [router]);
+
+  useEffect(() => {
+    fetch('/api/plans')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.prices) setLivePrices(data.prices);
+      })
+      .catch(() => {
+        /* mantém os preços padrão em caso de falha */
+      });
+  }, []);
 
   const segments: SegmentOption[] = [
     {
@@ -1317,7 +1329,8 @@ export default function OnboardingPage() {
 
         {/* STEP 5: Pricing Plan & Payment Selection */}
         {currentStep === 5 && (() => {
-          const activePlan = PLAN_OPTIONS.find((p) => p.id === selectedPlan) || PLAN_OPTIONS[1];
+          const basePlan = PLAN_OPTIONS.find((p) => p.id === selectedPlan) || PLAN_OPTIONS[1];
+          const activePlan = { ...basePlan, price: livePrices[basePlan.id] ?? basePlan.price };
           const pixPrice = Math.round(activePlan.price * 0.95);
 
           return (
@@ -1398,7 +1411,7 @@ export default function OnboardingPage() {
 
                       <div className="flex items-baseline gap-1">
                         <span className={`text-3xl font-bold tracking-tight ${isPro ? 'text-white' : 'text-slate-900'}`}>
-                          R$ {plan.price}
+                          R$ {livePrices[plan.id] ?? plan.price}
                         </span>
                         <span className={`text-sm font-medium ${isPro ? 'text-slate-400' : 'text-slate-400'}`}>
                           /mês

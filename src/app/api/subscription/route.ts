@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { getPlanMonthlyLimit, getPlanPrice, PLAN_DISPATCH_LIMITS, PlanTier } from '@/lib/planLimits';
+import { getPlanMonthlyLimit, PLAN_DISPATCH_LIMITS, PlanTier } from '@/lib/planLimits';
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
 import { syncTenantSubscriptionFromAsaas } from '@/lib/billing';
+import { getLivePlanPrice } from '@/lib/planPricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
       .eq('tenant_id', tenantId);
 
     const planTier = (sub?.plan_tier || 'STARTER') as PlanTier;
-    const priceBrl = Number(sub?.monthly_price_brl) || getPlanPrice(planTier);
+    const priceBrl = Number(sub?.monthly_price_brl) || (await getLivePlanPrice(planTier));
     const messageLimit = getPlanMonthlyLimit(planTier);
     const dailyLimit = PLAN_DISPATCH_LIMITS[planTier]?.daily ?? null;
 

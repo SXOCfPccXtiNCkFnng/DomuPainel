@@ -53,7 +53,9 @@ function TermsBody() {
           solicitado a qualquer momento e produz efeito ao final do período já pago; não há reembolso
           proporcional de período já iniciado, salvo obrigação legal em contrário. Taxas cobradas diretamente
           pela Meta (ex.: conversas iniciadas por template fora da janela gratuita) são de responsabilidade do
-          contratante, diretamente junto à Meta.
+          contratante, diretamente junto à Meta. Os preços dos planos podem ser reajustados; para quem já é
+          assinante, qualquer reajuste é comunicado por e-mail com no mínimo 30 dias de antecedência antes de
+          entrar em vigor na cobrança, e o cancelamento sem ônus pode ser feito a qualquer momento antes disso.
         </p>
       </section>
       <section className="space-y-2">

@@ -111,6 +111,9 @@ export default function InternoPage() {
   const [couponMax, setCouponMax] = useState('5');
   const [couponMsg, setCouponMsg] = useState('');
   const [grantBusy, setGrantBusy] = useState<string | null>(null);
+  const [planPricesDraft, setPlanPricesDraft] = useState<Record<string, string>>({});
+  const [planPricesMsg, setPlanPricesMsg] = useState('');
+  const [planPricesSaving, setPlanPricesSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,6 +135,15 @@ export default function InternoPage() {
       if (couponsRes.ok) {
         const cjson = await couponsRes.json();
         if (cjson.success) setCoupons(cjson.coupons || []);
+      }
+      const plansRes = await fetch('/api/plans', { cache: 'no-store' });
+      if (plansRes.ok) {
+        const pjson = await plansRes.json();
+        if (pjson.success && pjson.prices) {
+          setPlanPricesDraft(
+            Object.fromEntries(Object.entries(pjson.prices).map(([k, v]) => [k, String(v)]))
+          );
+        }
       }
     } catch {
       setError('Não foi possível carregar o painel.');
@@ -174,6 +186,39 @@ export default function InternoPage() {
       body: JSON.stringify({ code, active }),
     });
     load();
+  }
+
+  async function savePlanPrices(e: React.FormEvent) {
+    e.preventDefault();
+    setPlanPricesMsg('');
+    setPlanPricesSaving(true);
+    try {
+      const prices: Record<string, number> = {};
+      for (const [tier, raw] of Object.entries(planPricesDraft)) {
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value <= 0) {
+          setPlanPricesMsg(`Preço inválido para ${tier}.`);
+          setPlanPricesSaving(false);
+          return;
+        }
+        prices[tier] = value;
+      }
+      const res = await fetch('/api/interno/plans', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prices }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setPlanPricesMsg(json.error || 'Não foi possível salvar.');
+        return;
+      }
+      setPlanPricesMsg('Preços atualizados. Valem para cadastros novos e trocas de plano a partir de agora.');
+    } catch {
+      setPlanPricesMsg('Erro de conexão ao salvar os preços.');
+    } finally {
+      setPlanPricesSaving(false);
+    }
   }
 
   async function grantAccess(tenantId: string) {
@@ -459,6 +504,42 @@ export default function InternoPage() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+        <div>
+          <h2 className="text-sm font-black text-slate-900">Preço dos planos</h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Vale para cadastro novo e troca/reativação de plano a partir de agora. Quem já é
+            assinante mantém o valor contratado até renovar ou trocar — reajuste em assinatura
+            ativa exige aviso prévio de 30 dias (Termos de Uso, seção 5); com poucos assinantes,
+            hoje isso é feito na mão via Asaas.
+          </p>
+        </div>
+        <form onSubmit={savePlanPrices} className="flex flex-wrap gap-3 items-end">
+          {(['STARTER', 'PRO', 'ENTERPRISE'] as const).map((tier) => (
+            <label key={tier} className="text-xs font-bold text-slate-600">
+              {tier}
+              <div className="mt-1 flex items-center gap-1">
+                <span className="text-slate-400 text-sm">R$</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={planPricesDraft[tier] ?? ''}
+                  onChange={(e) =>
+                    setPlanPricesDraft((prev) => ({ ...prev, [tier]: e.target.value }))
+                  }
+                  className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm font-mono"
+                />
+              </div>
+            </label>
+          ))}
+          <button type="submit" disabled={planPricesSaving} className="btn-domu-primary text-xs py-2 px-4 disabled:opacity-50">
+            {planPricesSaving ? 'Salvando…' : 'Salvar preços'}
+          </button>
+        </form>
+        {planPricesMsg ? <p className="text-xs text-slate-600">{planPricesMsg}</p> : null}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
