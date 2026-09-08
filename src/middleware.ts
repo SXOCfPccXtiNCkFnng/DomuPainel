@@ -18,6 +18,7 @@ const PUBLIC_API_PREFIXES = [
   '/api/campaigns/run-due',
   '/api/billing/webhook',
   '/api/billing/expiry-check',
+  '/api/billing/apply-price-changes',
 ];
 
 function b64urlDecode(input: string): Uint8Array {

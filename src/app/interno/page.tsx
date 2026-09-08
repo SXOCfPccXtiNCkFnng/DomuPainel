@@ -213,7 +213,16 @@ export default function InternoPage() {
         setPlanPricesMsg(json.error || 'Não foi possível salvar.');
         return;
       }
-      setPlanPricesMsg('Preços atualizados. Valem para cadastros novos e trocas de plano a partir de agora.');
+      const parts = ['Preço de tabela atualizado (vale para cadastros novos e trocas de plano já).'];
+      if (json.loweredNow > 0) {
+        parts.push(`${json.loweredNow} assinante(s) já teve(ram) o valor reduzido na hora.`);
+      }
+      if (json.scheduledIncreases > 0) {
+        parts.push(
+          `${json.scheduledIncreases} assinante(s) avisado(s) por e-mail — aumento entra em vigor em 30 dias.`
+        );
+      }
+      setPlanPricesMsg(parts.join(' '));
     } catch {
       setPlanPricesMsg('Erro de conexão ao salvar os preços.');
     } finally {
@@ -510,10 +519,9 @@ export default function InternoPage() {
         <div>
           <h2 className="text-sm font-black text-slate-900">Preço dos planos</h2>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            Vale para cadastro novo e troca/reativação de plano a partir de agora. Quem já é
-            assinante mantém o valor contratado até renovar ou trocar — reajuste em assinatura
-            ativa exige aviso prévio de 30 dias (Termos de Uso, seção 5); com poucos assinantes,
-            hoje isso é feito na mão via Asaas.
+            Vale na hora para cadastro novo e troca/reativação de plano. Quem já é assinante ativo
+            daquele plano: redução aplica na hora; aumento é avisado por e-mail agora e só entra
+            na cobrança da Asaas em 30 dias (Termos de Uso, seção 5) — tudo automático.
           </p>
         </div>
         <form onSubmit={savePlanPrices} className="flex flex-wrap gap-3 items-end">

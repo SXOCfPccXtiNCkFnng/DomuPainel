@@ -150,6 +150,17 @@ export async function asaasCancelSubscription(subscriptionId: string): Promise<v
   await asaasFetch(`/subscriptions/${subscriptionId}`, { method: 'DELETE' });
 }
 
+/** Atualiza o valor cobrado de uma assinatura já ativa (próximas cobranças passam a usar esse valor). */
+export async function asaasUpdateSubscriptionValue(
+  subscriptionId: string,
+  value: number
+): Promise<AsaasSubscription> {
+  return asaasFetch<AsaasSubscription>(`/subscriptions/${subscriptionId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value: Number(value.toFixed(2)) }),
+  });
+}
+
 export async function asaasCreateSubscription(input: {
   customer: string;
   billingType: AsaasBillingType;
