@@ -12,10 +12,12 @@ import {
   Save,
   RefreshCw,
   AlertCircle,
+  Check,
 } from 'lucide-react';
 import CoexistenceWidget from '@/components/dashboard/CoexistenceWidget';
 import TeamSettingsPanel from '@/components/configuracoes/TeamSettingsPanel';
 import ProfileSettingsPanel from '@/components/configuracoes/ProfileSettingsPanel';
+import { MetaConnectButton, MetaConnectResult } from '@/components/shared/MetaConnectButton';
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
 import { User } from 'lucide-react';
 
@@ -31,6 +33,8 @@ export default function ConfiguracoesPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState('');
   const [activeSection, setActiveSection] = useState<'profile' | 'meta' | 'team'>('profile');
+  const [isMetaConnected, setIsMetaConnected] = useState<boolean | null>(null);
+  const [connectionMode, setConnectionMode] = useState<'COEXISTENCE' | 'DIRECT_API'>('COEXISTENCE');
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -183,31 +187,114 @@ export default function ConfiguracoesPage() {
               <span className="px-3 py-1.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-domu-blue border border-blue-100 uppercase">
                 API Oficial
               </span>
-              <span className="px-3 py-1.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase inline-flex items-center gap-1.5">
-                <ShieldCheck className="w-3 h-3" />
-                Qualidade · Verde
-              </span>
             </div>
 
-            {/* Coexistence widget */}
-            <CoexistenceWidget />
+            {/* Coexistence widget (só renderiza quando conectado) */}
+            <CoexistenceWidget onStatusChange={setIsMetaConnected} />
 
-            {/* Tips */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { title: 'App no celular', text: 'Continue respondendo conversas no WhatsApp Business normalmente.' },
-                { title: 'Envios em massa', text: 'As campanhas são enviadas pelos servidores oficiais da Meta com segurança.' },
-                { title: 'Regra dos 14 dias', text: 'Abra o WhatsApp no celular pelo menos a cada 14 dias para manter o vínculo ativo.' },
-              ].map((item) => (
-                <div key={item.title} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-1.5">
-                  <p className="text-xs font-bold text-slate-900 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    {item.title}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">{item.text}</p>
+            {isMetaConnected === false && (
+              <div className="space-y-5">
+                {/* Mode picker */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setConnectionMode('COEXISTENCE')}
+                    className={`text-left p-5 border-2 rounded-2xl transition-all space-y-2 bg-white relative ${
+                      connectionMode === 'COEXISTENCE'
+                        ? 'border-domu-blue shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {connectionMode === 'COEXISTENCE' && (
+                      <div className="absolute top-3 right-3 bg-domu-blue text-white p-1 rounded">
+                        <Check className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                      Recomendado
+                    </p>
+                    <h3 className="text-sm font-bold text-slate-900">Continuar com seu WhatsApp atual</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Mantém o app no celular funcionando e conecta o mesmo número à plataforma (Coexistência oficial Meta).
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConnectionMode('DIRECT_API')}
+                    className={`text-left p-5 border-2 rounded-2xl transition-all space-y-2 bg-white relative ${
+                      connectionMode === 'DIRECT_API'
+                        ? 'border-domu-blue shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {connectionMode === 'DIRECT_API' && (
+                      <div className="absolute top-3 right-3 bg-domu-blue text-white p-1 rounded">
+                        <Check className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
+                      Alta escala
+                    </p>
+                    <h3 className="text-sm font-bold text-slate-900">Número dedicado para automação</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Número exclusivo, sem coexistência com o app. Ideal para volume alto e vários operadores.
+                    </p>
+                  </button>
                 </div>
-              ))}
-            </div>
+
+                {connectionMode === 'COEXISTENCE' ? (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-domu-blue flex items-center justify-center">
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900">Login oficial da Meta</h4>
+                        <p className="text-xs text-slate-500">Escolha seu número e autorize — o app no celular continua funcionando.</p>
+                      </div>
+                    </div>
+                    <MetaConnectButton
+                      whatsappPhone={whatsappPhone}
+                      onConnected={(result: MetaConnectResult) => {
+                        if (result.whatsappPhone) {
+                          setWhatsappPhone(result.whatsappPhone);
+                          setAuthItem('domu_whatsapp_phone', result.whatsappPhone);
+                        }
+                        setWabaId(result.wabaId);
+                        setPhoneNumberId(result.phoneNumberId);
+                        setHasToken(true);
+                        setIsMetaConnected(true);
+                      }}
+                      className="btn-domu-primary text-sm py-3 px-6"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Preencha as credenciais manualmente no formulário &ldquo;Credenciais da API&rdquo; abaixo.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Tips — só fazem sentido pra quem está em coexistência (app + API no mesmo número) */}
+            {(isMetaConnected || connectionMode === 'COEXISTENCE') && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  { title: 'App no celular', text: 'Continue respondendo conversas no WhatsApp Business normalmente.' },
+                  { title: 'Envios em massa', text: 'As campanhas são enviadas pelos servidores oficiais da Meta com segurança.' },
+                  { title: 'Regra dos 14 dias', text: 'Abra o WhatsApp no celular pelo menos a cada 14 dias para manter o vínculo ativo.' },
+                ].map((item) => (
+                  <div key={item.title} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-1.5">
+                    <p className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      {item.title}
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Credentials form */}
             <form
