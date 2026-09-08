@@ -218,14 +218,14 @@ export default function ConfiguracoesPage() {
                 <div>
                   <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
                     <Key className="w-4 h-4 text-domu-blue" />
-                    Credenciais da API
+                    Credenciais da API (avançado)
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
                     {isLoading
                       ? 'Carregando…'
                       : hasToken
                         ? 'Suas credenciais estão salvas e criptografadas.'
-                        : 'Preencha os campos abaixo e salve para conectar.'}
+                        : 'Alternativa manual ao botão "Conectar com Meta" acima — use se preferir colar as credenciais direto (número dedicado, sem coexistência).'}
                   </p>
                 </div>
                 <a

@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Smartphone, CheckCircle2, Info, Zap, Clock } from 'lucide-react';
+import { ShieldCheck, Smartphone, CheckCircle2, Info, Zap, Wifi } from 'lucide-react';
+import { MetaConnectButton, MetaConnectResult } from '@/components/shared/MetaConnectButton';
+import { setAuthItem } from '@/lib/authStorage';
 
 export default function CoexistenceWidget() {
   const [phone, setPhone] = useState<string>('');
@@ -56,6 +58,14 @@ export default function CoexistenceWidget() {
   }
 
   if (!isConnected) {
+    const handleConnected = (result: MetaConnectResult) => {
+      if (result.whatsappPhone) {
+        setAuthItem('domu_whatsapp_phone', result.whatsappPhone);
+      }
+      setIsConnected(true);
+      fetchMetaStats();
+    };
+
     return (
       <div className="card-domu p-5 bg-gradient-to-br from-white via-slate-50 to-amber-50/30 border border-amber-200 space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -63,16 +73,20 @@ export default function CoexistenceWidget() {
             Status da Conexão WhatsApp
           </span>
           <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-sm border border-amber-300">
-            <Clock className="w-3 h-3" />
-            Aguardando aprovação da Meta
+            <Wifi className="w-3 h-3" />
+            Nenhum número conectado
           </span>
         </div>
-        <h4 className="text-sm font-bold text-slate-900">Nenhum número conectado ainda</h4>
+        <h4 className="text-sm font-bold text-slate-900">Conecte seu WhatsApp Business</h4>
         <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
-          A ativação do canal depende da verificação do seu Business ser aprovada pela Meta — isso
-          é feito uma vez e pode levar alguns dias. Assim que sair, conectamos seu número e as
-          métricas reais (qualidade, limite diário) aparecem aqui automaticamente.
+          Conecte agora pelo login oficial da Meta — você mantém o WhatsApp Business normal no
+          celular e a plataforma passa a disparar campanhas pelo mesmo número. Assim que conectar,
+          as métricas reais (qualidade, limite diário) aparecem aqui automaticamente.
         </p>
+        <MetaConnectButton
+          onConnected={handleConnected}
+          className="btn-domu-primary text-xs py-2.5 px-5 disabled:opacity-50"
+        />
       </div>
     );
   }

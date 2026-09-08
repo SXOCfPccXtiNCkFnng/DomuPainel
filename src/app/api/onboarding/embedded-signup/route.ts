@@ -69,6 +69,23 @@ async function registerPhoneNumber(
   }
 }
 
+/** Busca o número de telefone real na Meta (mais confiável que confiar no que o cliente digitou). */
+async function fetchDisplayPhoneNumber(
+  phoneNumberId: string,
+  accessToken: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}?fields=display_phone_number`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const data = await res.json();
+    return res.ok ? data.display_phone_number || null : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Assina o app nos webhooks da WABA do cliente (mensagens, status etc.). */
 async function subscribeAppToWaba(
   wabaId: string,
@@ -204,12 +221,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const realPhoneNumber = await fetchDisplayPhoneNumber(String(phoneNumberId), accessToken);
+    const resolvedPhone = realPhoneNumber || whatsappPhone || undefined;
+
     await supabaseAdmin
       .from('tenants')
       .update({
         name: companyName || undefined,
         segment: segment || undefined,
-        whatsapp_number: whatsappPhone || '',
+        whatsapp_number: resolvedPhone,
         coexistence_status: 'CONNECTED',
         updated_at: new Date().toISOString(),
       })
@@ -218,7 +238,7 @@ export async function POST(req: NextRequest) {
     if (ownerName) {
       await supabaseAdmin
         .from('users')
-        .update({ name: ownerName, phone: whatsappPhone || undefined, updated_at: new Date().toISOString() })
+        .update({ name: ownerName, phone: resolvedPhone, updated_at: new Date().toISOString() })
         .eq('tenant_id', tenantId)
         .eq('role', 'ADMIN');
     }
@@ -230,6 +250,7 @@ export async function POST(req: NextRequest) {
       message: 'WhatsApp conectado via Meta Embedded Signup.',
       wabaId,
       phoneNumberId,
+      whatsappPhone: resolvedPhone || null,
       verifyToken,
       cityState: cityState || null,
       warnings,

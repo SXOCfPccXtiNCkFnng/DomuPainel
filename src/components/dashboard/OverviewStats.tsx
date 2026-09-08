@@ -227,7 +227,7 @@ export default function OverviewStats() {
                   href="/configuracoes"
                   className="font-bold px-1.5 py-0.2 rounded border text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
                 >
-                  Aguardando aprovação Meta
+                  Conectar WhatsApp
                 </Link>
               )}
             </div>

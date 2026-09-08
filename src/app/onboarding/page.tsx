@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import Script from 'next/script';
 import { useRouter } from 'next/navigation';
+import { MetaConnectButton, MetaConnectResult } from '@/components/shared/MetaConnectButton';
 import { 
   Check, 
   ArrowRight, 
@@ -119,36 +119,6 @@ interface SegmentOption {
   available: boolean;
 }
 
-type FbLoginResponse = { authResponse?: { code?: string } };
-
-declare global {
-  interface Window {
-    FB?: {
-      init: (params: {
-        appId: string;
-        autoLogAppEvents?: boolean;
-        xfbml?: boolean;
-        version: string;
-      }) => void;
-      login: (
-        callback: (response: FbLoginResponse) => void,
-        params: {
-          config_id: string;
-          response_type: string;
-          override_default_response_type: boolean;
-          extras?: Record<string, unknown>;
-        }
-      ) => void;
-    };
-  }
-}
-
-type EmbeddedSignupData = {
-  wabaId?: string;
-  phoneNumberId?: string;
-  businessId?: string;
-};
-
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -176,8 +146,6 @@ export default function OnboardingPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [step2Error, setStep2Error] = useState('');
   const [step4Error, setStep4Error] = useState('');
-  const [fbSdkReady, setFbSdkReady] = useState(false);
-  const embeddedSignupDataRef = useRef<EmbeddedSignupData>({});
   const [wabaId, setWabaId] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [accessToken, setAccessToken] = useState('');
@@ -281,110 +249,17 @@ export default function OnboardingPage() {
       });
   }, []);
 
-  // Embedded Signup manda o waba_id/phone_number_id por postMessage antes do
-  // FB.login fechar o popup e devolver o code — guarda num ref pra combinar os dois.
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (!event.origin.endsWith('facebook.com')) return;
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type !== 'WA_EMBEDDED_SIGNUP') return;
-        if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') {
-          embeddedSignupDataRef.current = {
-            wabaId: data.data?.waba_id,
-            phoneNumberId: data.data?.phone_number_id,
-            businessId: data.data?.business_id,
-          };
-        }
-      } catch {
-        /* mensagens que não são JSON do embedded signup são ignoradas */
-      }
+  const handleMetaConnected = (result: MetaConnectResult) => {
+    setAuthItem('domu_whatsapp_phone', result.whatsappPhone || whatsappPhone.trim());
+    setWabaId(result.wabaId);
+    setPhoneNumberId(result.phoneNumberId);
+    if (result.verifyToken) setVerifyToken(result.verifyToken);
+    if (result.warnings?.length) {
+      setStep4Error(`Conectado, mas com avisos: ${result.warnings.join(' · ')}`);
+    } else {
+      setStep4Error('');
     }
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  const handleEmbeddedSignup = () => {
-    if (!window.FB) {
-      setStep4Error('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
-      return;
-    }
-    const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID;
-    if (!configId) {
-      setStep4Error('Conexão com a Meta não configurada (NEXT_PUBLIC_META_CONFIG_ID ausente).');
-      return;
-    }
-
-    setStep4Error('');
-    setIsConnecting(true);
-    embeddedSignupDataRef.current = {};
-
-    window.FB.login(
-      async (response) => {
-        const code = response.authResponse?.code;
-        if (!code) {
-          setStep4Error('Conexão cancelada ou não autorizada na Meta.');
-          setIsConnecting(false);
-          return;
-        }
-
-        const { wabaId: signupWabaId, phoneNumberId: signupPhoneNumberId } =
-          embeddedSignupDataRef.current;
-        if (!signupWabaId || !signupPhoneNumberId) {
-          setStep4Error(
-            'Não recebemos o WABA/número da Meta. Tente conectar novamente.'
-          );
-          setIsConnecting(false);
-          return;
-        }
-
-        try {
-          const storedTenantId = getAuthItem('domu_tenant_id') || '';
-          const res = await fetch('/api/onboarding/embedded-signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tenantId: storedTenantId,
-              code,
-              wabaId: signupWabaId,
-              phoneNumberId: signupPhoneNumberId,
-              whatsappPhone,
-              companyName,
-              segment: selectedSegment,
-              ownerName,
-              cityState,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            setStep4Error(data.error || 'Não foi possível concluir a conexão com a Meta.');
-            setIsConnecting(false);
-            return;
-          }
-
-          setAuthItem('domu_whatsapp_phone', whatsappPhone.trim());
-          setWabaId(signupWabaId);
-          setPhoneNumberId(signupPhoneNumberId);
-          if (data.verifyToken) setVerifyToken(data.verifyToken);
-          if (data.warnings?.length) {
-            setStep4Error(
-              `Conectado, mas com avisos: ${data.warnings.join(' · ')}`
-            );
-          }
-          setIsConnectedSimulated(true);
-        } catch {
-          setStep4Error('Erro ao salvar a conexão no servidor. Tente novamente.');
-        } finally {
-          setIsConnecting(false);
-        }
-      },
-      {
-        config_id: configId,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: { setup: {} },
-      }
-    );
+    setIsConnectedSimulated(true);
   };
 
   const segments: SegmentOption[] = [
@@ -710,22 +585,6 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans">
-      {process.env.NEXT_PUBLIC_META_APP_ID && (
-        <Script
-          src="https://connect.facebook.net/en_US/sdk.js"
-          strategy="afterInteractive"
-          onLoad={() => {
-            window.FB?.init({
-              appId: process.env.NEXT_PUBLIC_META_APP_ID as string,
-              autoLogAppEvents: true,
-              xfbml: true,
-              version: 'v21.0',
-            });
-            setFbSdkReady(true);
-          }}
-        />
-      )}
-
       {/* Header Bar */}
       <header className="bg-white border-b border-slate-200 py-4 px-4 sm:px-10">
         <div className="max-w-5xl mx-auto flex flex-col gap-4">
@@ -1246,29 +1105,15 @@ export default function OnboardingPage() {
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={handleEmbeddedSignup}
-                        disabled={isConnecting || !fbSdkReady}
+                      <MetaConnectButton
+                        whatsappPhone={whatsappPhone}
+                        companyName={companyName}
+                        segment={selectedSegment}
+                        ownerName={ownerName}
+                        cityState={cityState}
+                        onConnected={handleMetaConnected}
                         className="w-full btn-domu-primary text-sm py-3 justify-center disabled:opacity-50"
-                      >
-                        {isConnecting ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            Conectando...
-                          </>
-                        ) : !fbSdkReady ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            Carregando conexão com a Meta...
-                          </>
-                        ) : (
-                          <>
-                            <ExternalLink className="w-4 h-4" />
-                            Conectar com Meta
-                          </>
-                        )}
-                      </button>
+                      />
                     </div>
 
                     <div className="lg:col-span-2 p-6 sm:p-8 bg-[#0B132B] text-white flex flex-col items-center justify-center gap-4">
