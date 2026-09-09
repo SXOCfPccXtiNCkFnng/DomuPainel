@@ -70,6 +70,20 @@ export function MetaConnectButton({
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState('');
   const embeddedSignupDataRef = useRef<EmbeddedSignupData>({});
+  const stuckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearStuckTimeout = () => {
+    if (stuckTimeoutRef.current) {
+      clearTimeout(stuckTimeoutRef.current);
+      stuckTimeoutRef.current = null;
+    }
+  };
+
+  // O SDK da Meta nem sempre chama o callback do FB.login quando a pessoa
+  // fecha o popup pelo X (em vez de cancelar pela própria tela da Meta) —
+  // sem isso o botão trava em "Conectando..." pra sempre. Esse timeout
+  // libera o botão de novo se isso acontecer.
+  useEffect(() => clearStuckTimeout, []);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -107,8 +121,17 @@ export function MetaConnectButton({
     setIsConnecting(true);
     embeddedSignupDataRef.current = {};
 
+    clearStuckTimeout();
+    // Se a pessoa fechar o popup pelo X, o SDK às vezes nunca chama esse
+    // callback — sem esse limite o botão ficaria travado pra sempre.
+    stuckTimeoutRef.current = setTimeout(() => {
+      setIsConnecting(false);
+      setError('Não detectamos resposta da Meta (o popup pode ter sido fechado). Tente novamente.');
+    }, 90_000);
+
     window.FB.login(
       async (response) => {
+        clearStuckTimeout();
         const code = response.authResponse?.code;
         if (!code) {
           setError('Conexão cancelada ou não autorizada na Meta.');
