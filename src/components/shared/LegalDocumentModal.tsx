@@ -14,7 +14,8 @@ function TermsBody() {
         <p>
           Estes Termos de Uso regem o acesso e uso da Plataforma Domu Tech (&quot;Plataforma&quot;), sistema de
           automação e gestão de atendimento via WhatsApp. Ao criar uma conta, contratar um plano ou usar a
-          Plataforma, você declara ter lido, compreendido e aceito integralmente estes termos.
+          Plataforma, você declara ter lido, compreendido e aceito integralmente estes termos, e que tem poderes
+          para aceitá-los em nome da empresa que está cadastrando.
         </p>
       </section>
       <section className="space-y-2">
@@ -23,56 +24,68 @@ function TermsBody() {
           A Plataforma oferece ferramentas de disparo de mensagens, automação de atendimento, gestão de contatos
           (leads) e relatórios, integradas à WhatsApp Business Platform (Meta Cloud API). A Plataforma depende de
           serviços de terceiros — Meta (WhatsApp), Asaas (pagamentos) e provedores de e-mail — cuja
-          disponibilidade não está sob nosso controle.
+          disponibilidade não está sob nosso controle. Podemos alterar, melhorar ou descontinuar funcionalidades
+          da Plataforma a qualquer momento, buscando sempre comunicar mudanças relevantes com antecedência
+          razoável.
         </p>
       </section>
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">3. Cadastro, conta e segurança de acesso</h4>
         <p>
           Você é responsável pela veracidade dos dados cadastrados, pela guarda de sua senha e por toda
-          atividade realizada com sua conta. Contas são de uso da empresa (tenant) contratante; usuários
-          adicionais (corretores, atendentes) podem ser convidados pelo administrador da conta, que responde
-          pelo uso feito por sua equipe.
+          atividade realizada com sua conta. Contas são de uso da empresa contratante; usuários adicionais
+          (corretores, atendentes) podem ser convidados pelo administrador da conta, que responde pelo uso
+          feito por sua equipe, inclusive após o desligamento de algum colaborador — é responsabilidade do
+          administrador remover o acesso de quem deixar a empresa.
         </p>
         <p>
-          O login e a senha de acesso são <strong>pessoais e intransferíveis</strong>. Você se compromete a
-          manter o sigilo de suas credenciais e a não compartilhá-las com terceiros, incluindo colaboradores
-          que devam ter acesso próprio (nesse caso, use o convite de equipe da Plataforma, que cria uma conta
-          individual com permissões próprias, em vez de compartilhar seu login). Não é possível alegar uso
-          indevido da conta após ato de compartilhamento, negligência ou imperícia do contratante ou de sua
-          equipe em manter as credenciais seguras — toda atividade realizada com credenciais válidas é
-          presumida como autorizada pelo contratante.
+          O login e a senha de acesso são pessoais e intransferíveis. Você se compromete a manter o sigilo de
+          suas credenciais e a não compartilhá-las com ninguém, incluindo colegas de trabalho que devam ter
+          acesso próprio (nesse caso, use o convite de equipe da Plataforma, que cria um acesso individual em
+          vez de dividir o seu). Depois que uma credencial é compartilhada, perdida ou usada por outra pessoa
+          com o seu conhecimento, não é possível alegar uso indevido da conta — toda atividade realizada com
+          um login e senha válidos é considerada feita pelo contratante ou por sua autorização.
         </p>
         <p>
-          Quando disponibilizarmos recomendações de segurança (ex.: senha forte, autenticação em duas etapas,
-          revisão periódica de quem tem acesso à conta, remoção de usuários que saíram da equipe), é sua
-          responsabilidade adotá-las. O não cumprimento de recomendações de segurança comunicadas por nós
-          isenta a Domu Tech de responsabilidade por incidentes que decorram diretamente dessa omissão.
+          Sempre que a Plataforma sugerir alguma recomendação de segurança — como usar uma senha forte e
+          exclusiva, ativar alguma camada extra de confirmação quando disponível, revisar periodicamente quem
+          tem acesso à conta, ou remover pessoas que já não fazem parte da equipe — é responsabilidade do
+          contratante seguir essas recomendações. Se um problema de segurança acontecer justamente porque uma
+          dessas recomendações não foi seguida, a Domu Tech não responde por esse problema.
         </p>
       </section>
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">4. Uso aceitável, anti-spam e responsabilidade sobre dados de terceiros</h4>
         <p>
-          É obrigatório obter <strong>opt-in válido</strong> (consentimento prévio) ou outra base legal prevista
-          na LGPD antes de enviar mensagens comerciais a qualquer contato. É proibido usar a Plataforma para
-          spam, phishing, conteúdo ilegal, discurso de ódio, aquisição de listas de contatos de origem duvidosa
-          ou qualquer prática que viole as políticas da WhatsApp Business Platform. O descumprimento pode levar
-          ao bloqueio do número pela Meta — evento fora do nosso controle — e à suspensão da conta na
-          Plataforma, sem reembolso de valores já pagos no período.
+          É obrigatório ter o consentimento prévio da pessoa (opt-in) ou outra justificativa legal válida antes
+          de enviar mensagens comerciais a qualquer contato. É proibido usar a Plataforma para spam, phishing,
+          conteúdo ilegal, discurso de ódio, listas de contatos comprada de origem duvidosa, ou qualquer prática
+          que viole as políticas da WhatsApp Business Platform. O descumprimento pode levar ao bloqueio do
+          número pela própria Meta — o que está fora do nosso controle — e à suspensão da conta na Plataforma,
+          sem reembolso de valores já pagos no período.
         </p>
         <p>
-          Para os dados de contatos, leads e demais dados pessoais de terceiros que você insere, importa ou
-          cadastra na Plataforma, <strong>você atua como controlador desses dados perante a LGPD</strong> e
-          declara possuir base legal válida (consentimento, legítimo interesse ou outra hipótese do art. 7º da
-          Lei 13.709/2018) para coletá-los e tratá-los. Você se compromete a indenizar e manter a Domu Tech
-          isenta de qualquer reclamação, multa, indenização ou dano decorrente de dados inseridos na Plataforma
-          sem base legal adequada, obtidos de forma ilícita, ou tratados em desacordo com os direitos dos
-          titulares — a Domu Tech atua como operadora desses dados, processando-os conforme suas instruções,
-          sem verificar a origem ou a licitude da coleta feita por você.
+          Todo contato, lead ou dado pessoal de terceiro que você insere, importa ou cadastra na Plataforma é
+          de sua responsabilidade exclusiva — inclusive quanto a de onde esse dado veio, se a pessoa consentiu
+          em ser contatada, e se essa coleta respeita a lei de proteção de dados. A Domu Tech apenas processa
+          esses dados seguindo as instruções que você dá através do uso da Plataforma, sem verificar a origem
+          ou a forma como você os coletou. Se algum contato, órgão fiscalizador ou terceiro reclamar, processar
+          ou multar a Domu Tech por causa de um dado que você inseriu sem ter esse direito, você se compromete
+          a assumir e reembolsar todo prejuízo, multa ou despesa (incluindo advogados) que isso gerar pra nós.
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">5. Planos, cobrança e cancelamento</h4>
+        <h4 className="font-bold text-slate-900">5. Conteúdo das mensagens e conformidade</h4>
+        <p>
+          O conteúdo das mensagens, campanhas, imagens e informações sobre imóveis ou serviços divulgados
+          através da Plataforma é de sua exclusiva responsabilidade — incluindo a veracidade das informações
+          anunciadas, o cumprimento do Código de Defesa do Consumidor, e qualquer regra específica de
+          publicidade do seu setor de atuação. A Domu Tech não revisa, aprova nem se responsabiliza pelo
+          conteúdo do que você envia através da Plataforma, apenas fornece a ferramenta de envio.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">6. Planos, cobrança e cancelamento</h4>
         <p>
           A assinatura é mensal, recorrente e cobrada via Asaas (PIX ou cartão de crédito), conforme o plano
           escolhido. Limites de disparo e recursos seguem a tabela vigente na Plataforma. O cancelamento pode ser
@@ -85,7 +98,7 @@ function TermsBody() {
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">6. Propriedade intelectual</h4>
+        <h4 className="font-bold text-slate-900">7. Propriedade intelectual</h4>
         <p>
           O software, marca, layout e demais elementos da Plataforma são de propriedade da Domu Tech. O uso da
           Plataforma não transfere qualquer direito de propriedade intelectual ao contratante. Os dados inseridos
@@ -93,34 +106,52 @@ function TermsBody() {
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">7. Limitação de responsabilidade</h4>
+        <h4 className="font-bold text-slate-900">8. Confidencialidade</h4>
+        <p>
+          Ambas as partes se comprometem a manter em sigilo informações confidenciais da outra parte às quais
+          venham a ter acesso por causa deste contrato (ex.: dados comerciais, estratégias, informações
+          técnicas não públicas), utilizando-as apenas para os fins deste contrato, mesmo após o seu término.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">9. Exportação e cópia de segurança dos seus dados</h4>
+        <p>
+          Você é responsável por manter suas próprias cópias e exportações dos dados que considerar
+          importantes (contatos, relatórios, histórico de campanhas) enquanto sua conta estiver ativa. A Domu
+          Tech não tem obrigação de guardar seus dados indefinidamente após o encerramento da conta, respeitados
+          os prazos mínimos de guarda descritos na Política de Privacidade.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">10. Limitação de responsabilidade</h4>
         <p>
           A Plataforma é fornecida &quot;como está&quot;. Não garantimos disponibilidade ininterrupta, nem nos
           responsabilizamos por indisponibilidade, bloqueio ou alteração de política por parte da Meta, Asaas
           ou outros provedores terceiros. Nossa responsabilidade, quando aplicável, está limitada ao valor
           pago pelo contratante nos 3 (três) meses anteriores ao evento, exceto nos casos em que a lei
-          brasileira não admita tal limitação (ex.: dolo ou culpa grave da Domu Tech).
+          brasileira não admita esse tipo de limitação (por exemplo, se o problema tiver sido causado de forma
+          intencional ou por erro grave da própria Domu Tech).
         </p>
         <p>
-          Sem prejuízo do disposto na Política de Privacidade, a Domu Tech <strong>não se responsabiliza</strong>{' '}
-          por incidentes de segurança, vazamento ou perda de dados que decorram, total ou parcialmente, de:
+          A Domu Tech <strong>não se responsabiliza</strong> por incidentes de segurança, vazamento ou perda de
+          dados que decorram, total ou parcialmente, de:
         </p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>Uso de senha fraca, reutilizada em outros serviços, ou compartilhamento de credenciais pelo contratante ou por sua equipe;</li>
-          <li>Não adoção de recomendações de segurança comunicadas pela Domu Tech (item 3);</li>
-          <li>Concessão de acesso à conta a pessoas não autorizadas ou à ex-colaboradores não removidos pelo administrador da conta;</li>
-          <li>Dispositivos, redes ou softwares de terceiros utilizados pelo contratante para acessar a Plataforma que estejam comprometidos (vírus, malware, phishing dirigido ao usuário);</li>
-          <li>Dados inseridos na Plataforma sem base legal adequada, conforme item 4;</li>
-          <li>Ações de terceiros fora do controle da Domu Tech, incluindo falhas de segurança da Meta, do Asaas ou de outros provedores integrados.</li>
+          <li>Senha fraca, reutilizada em outros serviços, ou compartilhamento de credenciais pelo contratante ou por sua equipe;</li>
+          <li>Não seguir alguma recomendação de segurança que a Domu Tech tenha comunicado (item 3);</li>
+          <li>Acesso concedido a pessoas não autorizadas, ou acesso de ex-colaboradores que não foi removido a tempo pelo administrador da conta;</li>
+          <li>Aparelhos, redes ou programas de terceiros usados pelo contratante para acessar a Plataforma que estejam infectados por vírus, praga digital, ou comprometidos por golpe direcionado ao próprio usuário;</li>
+          <li>Dados de terceiros inseridos na Plataforma sem o devido direito de coletá-los, conforme item 4;</li>
+          <li>Ações de terceiros fora do nosso controle, incluindo falhas de segurança da própria Meta, do Asaas ou de outros provedores usados na integração.</li>
         </ul>
         <p>
-          Nesses casos, a responsabilidade pelo incidente e por eventuais danos a titulares de dados ou a
-          terceiros é exclusiva do contratante, que se compromete a indenizar a Domu Tech por quaisquer
-          prejuízos, multas ou despesas (incluindo honorários advocatícios) decorrentes.
+          Nesses casos, quem responde pelo incidente e por eventuais danos a pessoas afetadas ou a terceiros é
+          exclusivamente o contratante, que se compromete a ressarcir a Domu Tech por qualquer prejuízo, multa
+          ou despesa (incluindo honorários de advogado) que isso gerar.
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">8. Suspensão e rescisão</h4>
+        <h4 className="font-bold text-slate-900">11. Suspensão e rescisão</h4>
         <p>
           Podemos suspender ou encerrar contas em caso de inadimplência, uso indevido ou violação destes
           termos, mediante aviso prévio quando possível. Dados poderão ser mantidos pelo período necessário
@@ -129,25 +160,42 @@ function TermsBody() {
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">9. Incidentes de segurança</h4>
+        <h4 className="font-bold text-slate-900">12. Incidentes de segurança</h4>
         <p>
-          Em caso de incidente de segurança que possa acarretar risco ou dano relevante aos titulares de
-          dados, a Domu Tech comunicará o contratante em prazo razoável, conforme exigido pelo art. 48 da LGPD,
-          informando a natureza dos dados afetados, as medidas técnicas adotadas e as orientações para
-          mitigação de riscos. Quando o incidente decorrer de causa listada no item 7 (culpa do contratante),
-          cabe a ele, na qualidade de controlador dos dados de terceiros afetados, avaliar e cumprir o dever de
-          comunicação à Autoridade Nacional de Proteção de Dados (ANPD) e aos titulares, conforme aplicável.
+          Se acontecer um incidente de segurança que possa gerar risco ou dano relevante às pessoas cujos
+          dados estão na Plataforma, a Domu Tech vai avisar o contratante em prazo razoável, contando o que
+          aconteceu, quais dados foram afetados e o que está sendo feito para resolver e reduzir o risco.
+          Quando o incidente tiver sido causado por uma das situações listadas no item 10 (culpa do
+          contratante), é o próprio contratante — não a Domu Tech — quem deve avaliar e, se necessário, avisar
+          formalmente a Autoridade Nacional de Proteção de Dados (ANPD) e as pessoas afetadas.
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">10. Alterações destes termos</h4>
+        <h4 className="font-bold text-slate-900">13. Força maior</h4>
+        <p>
+          Nenhuma das partes será responsável por atraso ou falha no cumprimento destes Termos causado por
+          evento fora de seu controle razoável — como falhas generalizadas de internet, desastres naturais,
+          decisões governamentais, greves, ataques em larga escala à infraestrutura de terceiros, ou
+          indisponibilidade dos serviços da Meta, do Asaas ou de outros provedores essenciais à Plataforma.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">14. Cessão do contrato</h4>
+        <p>
+          O contratante não pode transferir os direitos e obrigações destes Termos a terceiros sem autorização
+          prévia por escrito da Domu Tech. A Domu Tech pode transferir este contrato em caso de reorganização
+          societária, fusão ou venda do negócio, mantendo as condições já acordadas.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">15. Alterações destes termos</h4>
         <p>
           Podemos atualizar estes Termos periodicamente. Mudanças relevantes serão comunicadas na Plataforma antes
           de exigirem novo aceite. O uso continuado após a atualização implica concordância com a nova versão.
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">11. Lei aplicável e foro</h4>
+        <h4 className="font-bold text-slate-900">16. Lei aplicável e foro</h4>
         <p>
           Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro do
           domicílio do contratante para dirimir eventuais controvérsias, salvo disposição legal em contrário.
@@ -166,8 +214,8 @@ function PrivacyBody() {
           A Domu Tech atua como <strong>controladora</strong> dos dados pessoais do contratante e de sua
           equipe (dados de conta, cadastro e cobrança), nos termos da Lei 13.709/2018 (LGPD). Já em relação
           aos dados de contatos e leads que o contratante insere, importa ou cadastra na Plataforma, a Domu
-          Tech atua como <strong>operadora</strong> — trata esses dados apenas conforme as instruções do
-          contratante, que é o controlador responsável por sua origem, licitude e base legal (ver item 4 dos
+          Tech atua apenas como <strong>operadora</strong> — trata esses dados seguindo as instruções do
+          contratante, que é quem responde pela origem, licitude e base legal desses dados (ver item 4 dos
           Termos de Uso). Dúvidas ou solicitações sobre privacidade podem ser enviadas para{' '}
           <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold text-domu-blue hover:underline">
             {CONTACT_EMAIL}
@@ -179,7 +227,7 @@ function PrivacyBody() {
         <h4 className="font-bold text-slate-900">2. Dados que coletamos</h4>
         <p>Coletamos e tratamos, principalmente:</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>Dados de conta: nome, e-mail, telefone e senha (armazenada como hash, nunca em texto puro).</li>
+          <li>Dados de conta: nome, e-mail, telefone e senha.</li>
           <li>Dados da empresa: razão comercial, segmento de atuação, número de WhatsApp.</li>
           <li>Dados de cobrança: CPF/CNPJ e histórico de pagamento, processados pelo Asaas.</li>
           <li>
@@ -187,7 +235,7 @@ function PrivacyBody() {
             <strong>exclusiva</strong> dele quanto à origem, à licitude da coleta e ao consentimento (opt-in)
             desses contatos — conforme detalhado nos Termos de Uso, item 4.
           </li>
-          <li>Dados de uso da Plataforma (logs de acesso, campanhas enviadas, métricas de entrega).</li>
+          <li>Dados de uso da Plataforma (registros de acesso, campanhas enviadas, métricas de entrega).</li>
         </ul>
       </section>
       <section className="space-y-2">
@@ -196,7 +244,7 @@ function PrivacyBody() {
           Usamos os dados para: operar a Plataforma e suas funcionalidades; processar pagamentos; enviar
           comunicações operacionais (confirmação de conta, redefinição de senha, avisos de cobrança); cumprir
           obrigações legais e fiscais; e melhorar a segurança e a qualidade do serviço. Não usamos os dados
-          para publicidade de terceiros.
+          para publicidade de terceiros, nem vendemos dados de clientes ou de leads.
         </p>
       </section>
       <section className="space-y-2">
@@ -208,40 +256,56 @@ function PrivacyBody() {
           <li><strong>Supabase</strong> — hospedagem do banco de dados e infraestrutura.</li>
           <li><strong>Provedor de e-mail transacional</strong> — envio de e-mails de conta (convites, recuperação de senha).</li>
         </ul>
-        <p>Não vendemos dados de clientes ou de leads a terceiros.</p>
-      </section>
-      <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">5. Como protegemos os dados</h4>
-        <p>Adotamos medidas técnicas e organizacionais para proteger os dados tratados na Plataforma:</p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Senhas são armazenadas com hash bcrypt (irreversível) — nunca em texto puro, nem mesmo para nossa própria equipe.</li>
-          <li>Credenciais de integração com o WhatsApp (tokens de acesso) são criptografadas com AES-256-GCM antes de serem gravadas no banco.</li>
-          <li>A sessão de login é protegida por token assinado (HMAC-SHA256), com verificação de integridade a cada requisição.</li>
-          <li>O acesso direto ao banco de dados é restrito a rotinas internas autenticadas; não há acesso público direto às tabelas do sistema.</li>
-          <li>Os dados de cada empresa contratante (tenant) são isolados por controle de acesso próprio, impedindo que uma empresa visualize dados de outra.</li>
-          <li>Permissões por perfil de usuário (administrador, corretor, atendente) limitam quais telas e ações cada pessoa da sua equipe pode executar.</li>
-        </ul>
         <p>
-          Nenhum sistema é 100% imune a incidentes. Mantemos essas medidas atualizadas conforme a evolução de
-          boas práticas de segurança, mas a proteção efetiva também depende das ações do contratante — veja o
-          item 8 (&quot;Responsabilidade em caso de incidente&quot;) e o item 3 dos Termos de Uso.
+          Além dos casos acima, só compartilhamos dados com terceiros se você autorizar expressamente, se
+          formos obrigados por lei, ordem judicial ou autoridade competente, ou em caso de reorganização
+          societária, fusão ou venda do negócio (mantendo o mesmo nível de proteção).
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">6. Retenção e exclusão</h4>
+        <h4 className="font-bold text-slate-900">5. Transferência internacional de dados</h4>
+        <p>
+          Alguns dos provedores que usamos (como Meta e serviços de e-mail) podem processar dados em
+          servidores localizados fora do Brasil. Nesses casos, exigimos que esses provedores adotem padrões de
+          proteção compatíveis com a LGPD, seja por meio de cláusulas contratuais específicas, selos de
+          conformidade internacionalmente reconhecidos, ou por estarem sediados em país com nível de proteção
+          de dados considerado adequado.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">6. Como protegemos os dados</h4>
+        <p>Adotamos medidas para proteger os dados tratados na Plataforma, entre elas:</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>Sua senha é guardada de um jeito que nem a nossa própria equipe consegue ler ou recuperar o valor original — só você sabe qual é.</li>
+          <li>As credenciais de conexão com o WhatsApp de cada cliente são embaralhadas antes de serem guardadas, de forma que fiquem ilegíveis mesmo em caso de acesso indevido ao banco de dados.</li>
+          <li>Cada login gera uma chave de acesso própria, verificada a cada ação feita na Plataforma, o que impede que alguém finja ser você sem ter essa chave.</li>
+          <li>O acesso direto ao banco de dados é restrito a rotinas internas da própria Plataforma; não existe uma porta de acesso público direto aos dados.</li>
+          <li>Os dados de cada empresa contratante são isolados dos dados das demais empresas, impedindo que uma cliente veja informação de outra.</li>
+          <li>Diferentes perfis de usuário (administrador, corretor, atendente) têm acessos diferentes, limitando quem na sua equipe pode ver ou fazer o quê.</li>
+        </ul>
+        <p>
+          Nenhum sistema é 100% imune a incidentes. Mantemos essas medidas em revisão constante, mas a
+          proteção efetiva também depende das ações do contratante — veja o item 9 (&quot;Responsabilidade em
+          caso de incidente&quot;) e o item 3 dos Termos de Uso.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">7. Retenção, exclusão e cópia de segurança</h4>
         <p>
           Mantemos os dados enquanto a conta estiver ativa e pelo prazo necessário para cumprir obrigações
           legais/fiscais após o encerramento (ex.: registros de cobrança). Você pode solicitar a exclusão dos
           dados da sua conta a qualquer momento pelo canal de contato abaixo, respeitadas as retenções
-          legalmente obrigatórias.
+          legalmente obrigatórias. Como descrito nos Termos de Uso (item 9), é responsabilidade do contratante
+          manter suas próprias cópias dos dados que considerar importantes antes de encerrar a conta.
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">7. Seus direitos (LGPD)</h4>
+        <h4 className="font-bold text-slate-900">8. Seus direitos (LGPD)</h4>
         <p>
-          Nos termos do art. 18 da LGPD, você pode solicitar: confirmação de tratamento, acesso, correção,
-          anonimização, portabilidade, eliminação de dados e revogação do consentimento. Para exercer esses
-          direitos, entre em contato pelo e-mail{' '}
+          Você pode solicitar, a qualquer momento: confirmação de que tratamos seus dados, acesso a eles,
+          correção de informação incorreta, anonimização, portabilidade para outro serviço, eliminação dos
+          dados e revogação de um consentimento já dado. Respondemos a essas solicitações em até 15 dias.
+          Para exercer esses direitos, entre em contato pelo e-mail{' '}
           <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold text-domu-blue hover:underline">
             {CONTACT_EMAIL}
           </a>
@@ -249,43 +313,42 @@ function PrivacyBody() {
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">8. Responsabilidade em caso de incidente</h4>
+        <h4 className="font-bold text-slate-900">9. Responsabilidade em caso de incidente</h4>
         <p>
-          Em caso de incidente de segurança envolvendo dados pessoais, a Domu Tech atuará para conter o
-          problema, investigar a causa e comunicar o contratante em prazo razoável, conforme o art. 48 da
-          LGPD, informando os dados afetados e as medidas adotadas.
+          Se acontecer um incidente de segurança envolvendo dados pessoais, a Domu Tech age para conter o
+          problema, investigar a causa e avisar o contratante em prazo razoável, contando quais dados foram
+          afetados e o que estamos fazendo pra resolver.
         </p>
         <p>
-          Quando o incidente for causado, total ou parcialmente, por ação ou omissão do contratante — como
-          compartilhamento de senha, não adoção de recomendações de segurança, concessão de acesso a pessoas
-          não autorizadas, ou inserção de dados de terceiros sem base legal adequada — a responsabilidade por
-          eventuais danos a titulares de dados, multas da ANPD ou indenizações a terceiros é do contratante,
-          nos termos do item 7 dos Termos de Uso. Nesses casos, cabe ao contratante, na qualidade de
-          controlador dos dados afetados, avaliar e cumprir seu próprio dever de comunicação à ANPD e aos
-          titulares.
+          Quando o incidente tiver sido causado, total ou parcialmente, por uma ação ou falta do contratante —
+          como compartilhar senha, não seguir uma recomendação de segurança, deixar acesso aberto pra quem não
+          devia ter, ou colocar na Plataforma dados de terceiros sem ter o direito de fazer isso — quem
+          responde pelo problema é o contratante, conforme o item 10 dos Termos de Uso. Nesse caso, é o
+          contratante quem deve avaliar e, se necessário, avisar formalmente a Autoridade Nacional de Proteção
+          de Dados (ANPD) e as pessoas afetadas, já que ele é o responsável por esses dados de terceiros.
         </p>
         <p>
-          A Domu Tech responde pelos incidentes decorrentes de falha em suas próprias medidas de segurança
-          (item 5), na medida da sua responsabilidade, conforme a legislação aplicável.
-        </p>
-      </section>
-      <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">9. Cookies e sessão</h4>
-        <p>
-          Usamos apenas um cookie técnico, essencial para manter sua sessão autenticada (HttpOnly, não
-          acessível via JavaScript). Não utilizamos cookies de rastreamento, publicidade ou analytics de
-          terceiros.
+          A Domu Tech responde pelos incidentes que forem causados por falha em suas próprias medidas de
+          proteção (item 6), na medida da sua responsabilidade, conforme a legislação aplicável.
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">10. Alterações desta política</h4>
+        <h4 className="font-bold text-slate-900">10. Cookies e sessão</h4>
+        <p>
+          Usamos apenas um cookie técnico, essencial para manter você conectado enquanto usa a Plataforma, que
+          não pode ser lido por scripts no navegador. Não utilizamos cookies de rastreamento, publicidade ou
+          análise de comportamento de terceiros.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">11. Alterações desta política</h4>
         <p>
           Podemos atualizar esta Política periodicamente. A data da versão vigente é exibida no rodapé deste
           documento. Alterações relevantes serão comunicadas na Plataforma.
         </p>
       </section>
       <section className="space-y-2">
-        <h4 className="font-bold text-slate-900">11. Contato</h4>
+        <h4 className="font-bold text-slate-900">12. Contato</h4>
         <p>
           Para qualquer dúvida sobre este documento ou sobre o tratamento dos seus dados, escreva para{' '}
           <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold text-domu-blue hover:underline">

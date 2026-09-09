@@ -521,7 +521,7 @@ export default function InternoPage() {
           <p className="text-[11px] text-slate-500 mt-0.5">
             Vale na hora para cadastro novo e troca/reativação de plano. Quem já é assinante ativo
             daquele plano: redução aplica na hora; aumento é avisado por e-mail agora e só entra
-            na cobrança da Asaas em 30 dias (Termos de Uso, seção 5) — tudo automático.
+            na cobrança da Asaas em 30 dias (Termos de Uso, seção 6) — tudo automático.
           </p>
         </div>
         <form onSubmit={savePlanPrices} className="flex flex-wrap gap-3 items-end">
