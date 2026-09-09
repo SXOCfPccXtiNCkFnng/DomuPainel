@@ -126,7 +126,9 @@ export function MetaConnectButton({
     // callback — sem esse limite o botão ficaria travado pra sempre.
     stuckTimeoutRef.current = setTimeout(() => {
       setIsConnecting(false);
-      setError('Não detectamos resposta da Meta (o popup pode ter sido fechado). Tente novamente.');
+      setError(
+        'Não detectamos resposta da Meta. As causas mais comuns: você não estava logado no Facebook nesse navegador, ou um bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) bloqueou o domínio da Meta. Desative o bloqueador para este site, confirme o login no Facebook, e tente de novo.'
+      );
     }, 90_000);
 
     window.FB.login(
@@ -214,6 +216,11 @@ export function MetaConnectButton({
           setFbSdkReady(true);
         }}
       />
+      <p className="text-[11px] text-slate-400 leading-relaxed">
+        Antes de clicar: confirme que está logado no Facebook nesse navegador e desative
+        bloqueadores de anúncio (AdBlock, Brave, Opera, uBlock) para este site — eles costumam
+        bloquear o login da Meta.
+      </p>
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
           {error}
