@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomInt } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAdmin } from '@/lib/requireAuth';
 import { encryptData } from '@/lib/crypto';
@@ -47,7 +48,7 @@ async function registerPhoneNumber(
   accessToken: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const pin = String(Math.floor(100000 + Math.random() * 900000));
+    const pin = String(randomInt(100000, 1000000));
     const res = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}/register`,
       {

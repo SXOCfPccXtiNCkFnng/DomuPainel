@@ -7,6 +7,7 @@ import { getEncryptionSecret } from '@/lib/envSecrets';
  */
 
 const ALGORITHM = 'aes-256-gcm';
+const AUTH_TAG_LENGTH = 16; // 128 bits — tamanho máximo/padrão do GCM, explícito para não depender do default implícito.
 
 function getKey(): Buffer {
   return crypto.createHash('sha256').update(getEncryptionSecret()).digest();
@@ -16,7 +17,7 @@ export function encryptData(text: string): { encryptedText: string; iv: string }
   const key = getKey();
   const iv = crypto.randomBytes(16);
 
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
 
@@ -36,7 +37,7 @@ export function decryptData(encryptedText: string, ivHex: string): string {
   const [encrypted, authTagHex] = encryptedText.split(':');
   const authTag = Buffer.from(authTagHex, 'hex');
 
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
   decipher.setAuthTag(authTag);
 
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
