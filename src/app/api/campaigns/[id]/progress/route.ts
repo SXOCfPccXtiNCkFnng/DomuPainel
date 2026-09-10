@@ -17,13 +17,13 @@ function statusLabel(status: string): string {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
-    const campaignId = params.id;
+    const { id: campaignId } = await params;
 
     const { data: campaign, error } = await supabaseAdmin
       .from('campaigns')

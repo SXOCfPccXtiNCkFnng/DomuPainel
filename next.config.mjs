@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Evita o aviso de "workspace root" ambíguo quando há outro lockfile
+  // (ex.: de outro projeto) em uma pasta acima desta no disco do dev.
+  outputFileTracingRoot: process.cwd(),
   images: {
     remotePatterns: [
       {
