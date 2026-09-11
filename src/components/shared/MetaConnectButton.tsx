@@ -131,58 +131,13 @@ export function MetaConnectButton({
       );
     }, 90_000);
 
+    // O SDK da Meta valida em runtime que o callback é uma function comum
+    // ("Expression is of type asyncfunction, not function") — passar uma
+    // arrow function async direto quebra a chamada antes do popup abrir.
+    // Por isso o callback síncrono só dispara o handler async, sem esperá-lo.
     window.FB.login(
-      async (response) => {
-        clearStuckTimeout();
-        const code = response.authResponse?.code;
-        if (!code) {
-          setError('Conexão cancelada ou não autorizada na Meta.');
-          setIsConnecting(false);
-          return;
-        }
-
-        const { wabaId: signupWabaId, phoneNumberId: signupPhoneNumberId } =
-          embeddedSignupDataRef.current;
-        if (!signupWabaId || !signupPhoneNumberId) {
-          setError('Não recebemos o WABA/número da Meta. Tente conectar novamente.');
-          setIsConnecting(false);
-          return;
-        }
-
-        try {
-          const res = await fetch('/api/onboarding/embedded-signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code,
-              wabaId: signupWabaId,
-              phoneNumberId: signupPhoneNumberId,
-              whatsappPhone,
-              companyName,
-              segment,
-              ownerName,
-              cityState,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            setError(data.error || 'Não foi possível concluir a conexão com a Meta.');
-            setIsConnecting(false);
-            return;
-          }
-
-          onConnected({
-            wabaId: signupWabaId,
-            phoneNumberId: signupPhoneNumberId,
-            whatsappPhone: data.whatsappPhone,
-            verifyToken: data.verifyToken,
-            warnings: data.warnings,
-          });
-        } catch {
-          setError('Erro ao salvar a conexão no servidor. Tente novamente.');
-        } finally {
-          setIsConnecting(false);
-        }
+      (response) => {
+        void handleFbLoginResponse(response);
       },
       {
         config_id: configId,
@@ -191,6 +146,59 @@ export function MetaConnectButton({
         extras: { setup: {} },
       }
     );
+  };
+
+  const handleFbLoginResponse = async (response: FbLoginResponse) => {
+    clearStuckTimeout();
+    const code = response.authResponse?.code;
+    if (!code) {
+      setError('Conexão cancelada ou não autorizada na Meta.');
+      setIsConnecting(false);
+      return;
+    }
+
+    const { wabaId: signupWabaId, phoneNumberId: signupPhoneNumberId } =
+      embeddedSignupDataRef.current;
+    if (!signupWabaId || !signupPhoneNumberId) {
+      setError('Não recebemos o WABA/número da Meta. Tente conectar novamente.');
+      setIsConnecting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/onboarding/embedded-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          wabaId: signupWabaId,
+          phoneNumberId: signupPhoneNumberId,
+          whatsappPhone,
+          companyName,
+          segment,
+          ownerName,
+          cityState,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Não foi possível concluir a conexão com a Meta.');
+        setIsConnecting(false);
+        return;
+      }
+
+      onConnected({
+        wabaId: signupWabaId,
+        phoneNumberId: signupPhoneNumberId,
+        whatsappPhone: data.whatsappPhone,
+        verifyToken: data.verifyToken,
+        warnings: data.warnings,
+      });
+    } catch {
+      setError('Erro ao salvar a conexão no servidor. Tente novamente.');
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   if (!process.env.NEXT_PUBLIC_META_APP_ID) {
