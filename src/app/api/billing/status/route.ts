@@ -50,7 +50,12 @@ export async function GET(req: NextRequest) {
       console.warn('[Billing Status] Asaas sync failed:', syncErr);
     }
 
-    const reqPaymentId = req.nextUrl.searchParams.get('paymentId');
+    // paymentId da query só é aceito se bater com o pagamento pendente DESSE tenant —
+    // senão, alguém autenticado poderia apontar pro paymentId de outra empresa (vazado
+    // por print, e-mail, etc.) e ativar a própria assinatura sem nunca ter pago.
+    const rawReqPaymentId = req.nextUrl.searchParams.get('paymentId');
+    const reqPaymentId =
+      rawReqPaymentId && rawReqPaymentId === sub.pending_payment_id ? rawReqPaymentId : null;
     const hasPendingPayment = reqPaymentId || sub.pending_payment_id;
 
     // Only return early if there's no pending payment to check
@@ -72,8 +77,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const paymentId =
-      req.nextUrl.searchParams.get('paymentId') || sub.pending_payment_id || null;
+    const paymentId = reqPaymentId || sub.pending_payment_id || null;
 
     let pix = null;
     let invoiceUrl: string | null = null;

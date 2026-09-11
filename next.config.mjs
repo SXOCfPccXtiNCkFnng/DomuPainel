@@ -13,6 +13,14 @@ const nextConfig = {
     ],
   },
   async headers() {
+    // 'unsafe-eval' só é necessário em desenvolvimento (Fast Refresh/HMR do
+    // webpack). Em produção o Next não precisa disso — mantê-lo lá enfraquece
+    // a CSP contra XSS sem ganho nenhum.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net"
+      : "script-src 'self' 'unsafe-inline' https://connect.facebook.net";
+
     const csp = [
       "default-src 'self'",
       "base-uri 'self'",
@@ -22,7 +30,7 @@ const nextConfig = {
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net",
+      scriptSrc,
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.asaas.com https://api-sandbox.asaas.com https://graph.facebook.com https://api.resend.com https://connect.facebook.net https://*.facebook.com",
       "frame-src 'self' https://*.facebook.com",
     ].join('; ');

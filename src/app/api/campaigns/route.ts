@@ -197,7 +197,17 @@ export async function POST(req: NextRequest) {
       read_count: 0,
       failed_count: 0,
     };
-    if (propertyId) campaignPayload.property_id = propertyId;
+    if (propertyId) {
+      // Confirma que o imóvel é do próprio tenant antes de gravar a referência —
+      // senão daria pra criar uma campanha apontando pro property_id de outra empresa.
+      const { data: ownedProperty } = await supabaseAdmin
+        .from('properties')
+        .select('id')
+        .eq('id', propertyId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (ownedProperty) campaignPayload.property_id = propertyId;
+    }
 
     let { data: campaign, error: campError } = await supabaseAdmin
       .from('campaigns')

@@ -1,4 +1,12 @@
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
+
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 /** Autentica chamadas de cron externo via Authorization: Bearer CRON_SECRET (ou header customizado). */
 export function isCronRequest(req: NextRequest): boolean {
@@ -11,9 +19,9 @@ export function isCronRequest(req: NextRequest): boolean {
   const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
   const rawAuth = authHeader.trim();
 
-  if (bearer && bearer === secret) return true;
-  if (rawAuth && rawAuth === secret) return true;
-  if (customHeader && customHeader === secret) return true;
+  if (bearer && timingSafeStringEqual(bearer, secret)) return true;
+  if (rawAuth && timingSafeStringEqual(rawAuth, secret)) return true;
+  if (customHeader && timingSafeStringEqual(customHeader, secret)) return true;
 
   return false;
 }

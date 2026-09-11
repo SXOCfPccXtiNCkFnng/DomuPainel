@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import {
   activateTenantSubscription,
@@ -115,7 +116,11 @@ export async function POST(req: NextRequest) {
       req.headers.get('asaas-access-token') ||
       req.headers.get('Asaas-Access-Token') ||
       '';
-    if (got !== expected) {
+    const gotBuf = Buffer.from(got);
+    const expectedBuf = Buffer.from(expected);
+    const tokenMatches =
+      gotBuf.length === expectedBuf.length && crypto.timingSafeEqual(gotBuf, expectedBuf);
+    if (!tokenMatches) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized webhook.' },
         { status: 401 }
