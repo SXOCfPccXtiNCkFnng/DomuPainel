@@ -143,7 +143,10 @@ export function MetaConnectButton({
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        extras: { setup: {} },
+        // featureType avisa a Meta que é um fluxo de Coexistência — sem ele o
+        // número é tratado como um cadastro comum, que exige o número "livre"
+        // (sem WhatsApp ativo nele), e cai no erro de "já está registrado".
+        extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' },
       }
     );
   };
