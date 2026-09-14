@@ -5,7 +5,7 @@ import {
   processDueScheduledCampaigns,
 } from '@/lib/campaignDispatch';
 import { isCronRequest } from '@/lib/cronAuth';
-import { describeError } from '@/lib/errors';
+import { describeError, withTransientRetry } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 /** Disparo sequencial pode passar de 10s — Pro/Enterprise na Vercel. */
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     if (!allowCron(req)) {
       return NextResponse.json({ success: false, error: 'Unauthorized cron.' }, { status: 401 });
     }
-    return await handleRunDue(req, {});
+    return await withTransientRetry(() => handleRunDue(req, {}));
   } catch (error: unknown) {
     const message = describeError(error);
     console.error('[Campaigns run-due GET]', error);
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     } catch {
       body = {};
     }
-    return await handleRunDue(req, body);
+    return await withTransientRetry(() => handleRunDue(req, body));
   } catch (error: unknown) {
     const message = describeError(error);
     console.error('[Campaigns run-due POST]', error);

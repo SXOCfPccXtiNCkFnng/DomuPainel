@@ -20,3 +20,34 @@ export function describeError(err: unknown): string {
   }
   return String(err);
 }
+
+const TRANSIENT_PATTERNS = ['timeout', 'gateway', 'econnreset', 'fetch failed', 'socket hang up'];
+
+function isTransientError(err: unknown): boolean {
+  const msg = describeError(err).toLowerCase();
+  return TRANSIENT_PATTERNS.some((p) => msg.includes(p));
+}
+
+/**
+ * Tenta de novo (uma vez) quando o erro parece ser uma falha passageira de
+ * rede/infra (timeout do Supabase, gateway, conexão resetada) — comuns no
+ * tier gratuito do banco. Erros de lógica (validação, dado ausente etc.)
+ * não são desse tipo e sobem na primeira tentativa mesmo.
+ */
+export async function withTransientRetry<T>(
+  fn: () => Promise<T>,
+  attempts = 2,
+  delayMs = 600
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientError(err) || i === attempts - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastErr;
+}

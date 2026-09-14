@@ -4,7 +4,7 @@ import { isCronRequest } from '@/lib/cronAuth';
 import { isBillingMockEnabled, asaasUpdateSubscriptionValue } from '@/lib/asaasClient';
 import { logger } from '@/lib/logger';
 import { logOpsAlert } from '@/lib/opsAlert';
-import { describeError } from '@/lib/errors';
+import { describeError, withTransientRetry } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,13 +20,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const nowIso = new Date().toISOString();
-    const { data: due, error } = await supabaseAdmin
-      .from('subscription_price_changes')
-      .select('id, tenant_id, asaas_subscription_id, new_price_brl')
-      .is('applied_at', null)
-      .lte('effective_at', nowIso);
-
-    if (error) throw error;
+    const due = await withTransientRetry(async () => {
+      const { data, error } = await supabaseAdmin
+        .from('subscription_price_changes')
+        .select('id, tenant_id, asaas_subscription_id, new_price_brl')
+        .is('applied_at', null)
+        .lte('effective_at', nowIso);
+      if (error) throw error;
+      return data;
+    });
 
     let applied = 0;
     let failed = 0;

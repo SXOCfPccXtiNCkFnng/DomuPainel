@@ -58,6 +58,35 @@ function formatDate(iso: string | null) {
   });
 }
 
+/** "há 5 min" é mais fácil de escanear numa lista de erros do que a data cheia. */
+function formatRelativeTime(iso: string | null): string {
+  if (!iso) return '—';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60_000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `há ${d}d`;
+  return formatDate(iso);
+}
+
+/** Traduz o slug técnico (source) do alerta pra algo que faz sentido sem abrir o código. */
+const ALERT_SOURCE_LABELS: Record<string, string> = {
+  'cron.run-due': 'Disparo de campanhas agendadas',
+  'cron.apply-price-changes': 'Reajuste de preço automático',
+  'cron.expiry-check': 'Aviso de vencimento de assinatura',
+  'billing.webhook': 'Webhook de pagamento (Asaas)',
+  campanha: 'Campanha de disparo',
+  envio: 'Envio de mensagem',
+  'opsalert.email_failed': 'E-mail de alerta',
+};
+
+function alertSourceLabel(source: string): string {
+  return ALERT_SOURCE_LABELS[source] || source;
+}
+
 function StatCard({
   label,
   value,
@@ -485,7 +514,7 @@ export default function InternoPage() {
                     : 'bg-slate-50 text-slate-600 border-slate-200'
                 }`}
               >
-                {s.source}
+                {alertSourceLabel(s.source)}
                 <span className="opacity-70">
                   {s.count24h}/24h · {s.count7d}/7d
                 </span>
@@ -500,13 +529,25 @@ export default function InternoPage() {
             {(overview?.alerts || []).map((alert) => (
               <li key={alert.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-700 border border-red-100 rounded-full px-2 py-0.5">
-                    {alert.source}
+                  <span
+                    title={alert.source}
+                    className={`text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 border ${
+                      alert.level === 'warn'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-red-50 text-red-700 border-red-100'
+                    }`}
+                  >
+                    {alertSourceLabel(alert.source)}
                   </span>
                   {alert.tenantName ? (
                     <span className="text-[11px] text-slate-500">{alert.tenantName}</span>
                   ) : null}
-                  <span className="text-[11px] text-slate-400 ml-auto">{formatDate(alert.createdAt)}</span>
+                  <span
+                    className="text-[11px] text-slate-400 ml-auto"
+                    title={formatDate(alert.createdAt)}
+                  >
+                    {formatRelativeTime(alert.createdAt)}
+                  </span>
                 </div>
                 <p className="text-sm text-slate-800 mt-1">{alert.message}</p>
               </li>

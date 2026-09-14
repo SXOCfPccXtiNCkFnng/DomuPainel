@@ -5,7 +5,7 @@ import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
 import { brandedEmailHtml } from '@/lib/emailTemplates';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { logger } from '@/lib/logger';
-import { describeError } from '@/lib/errors';
+import { describeError, withTransientRetry } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,15 +32,17 @@ export async function GET(req: NextRequest) {
       Date.now() + REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000
     ).toISOString();
 
-    const { data: expiring, error } = await supabaseAdmin
-      .from('subscriptions')
-      .select('tenant_id, plan_tier, monthly_price_brl, current_period_end')
-      .eq('status', 'ACTIVE')
-      .gte('current_period_end', nowIso)
-      .lte('current_period_end', windowEndIso)
-      .is('expiry_reminder_sent_at', null);
-
-    if (error) throw error;
+    const expiring = await withTransientRetry(async () => {
+      const { data, error } = await supabaseAdmin
+        .from('subscriptions')
+        .select('tenant_id, plan_tier, monthly_price_brl, current_period_end')
+        .eq('status', 'ACTIVE')
+        .gte('current_period_end', nowIso)
+        .lte('current_period_end', windowEndIso)
+        .is('expiry_reminder_sent_at', null);
+      if (error) throw error;
+      return data;
+    });
 
     let notified = 0;
     const base = appBaseUrl();
