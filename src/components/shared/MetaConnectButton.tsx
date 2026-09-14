@@ -2,9 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
-import { ExternalLink, RefreshCw } from 'lucide-react';
+import { ExternalLink, RefreshCw, X } from 'lucide-react';
 
-type FbLoginResponse = { authResponse?: { code?: string } };
+type FbLoginResponse = { authResponse?: { code?: string; accessToken?: string } };
 
 declare global {
   interface Window {
@@ -17,11 +17,12 @@ declare global {
       }) => void;
       login: (
         callback: (response: FbLoginResponse) => void,
-        params: {
-          config_id: string;
-          response_type: string;
-          override_default_response_type: boolean;
+        params?: {
+          config_id?: string;
+          response_type?: string;
+          override_default_response_type?: boolean;
           extras?: Record<string, unknown>;
+          scope?: string;
         }
       ) => void;
     };
@@ -42,10 +43,19 @@ export type MetaConnectResult = {
   warnings?: string[];
 };
 
+type Step = 'login' | 'coexistencia';
+
 /**
  * Botão do Meta WhatsApp Embedded Signup (Coexistência real). Usado no
  * onboarding e em /configuracoes — mesma lógica, evita duplicar o
  * carregamento do SDK e a troca do code pelo token em dois lugares.
+ *
+ * Fluxo em duas etapas dentro de um modal: primeiro um FB.login() simples
+ * (sem config_id), só pra garantir que a pessoa está autenticada no
+ * Facebook — esse é o caminho mais simples e testado da Meta. Só depois
+ * disso confirmado é que chamamos o FB.login() específico do Embedded
+ * Signup (com config_id), que é mais delicado e falha de forma confusa
+ * quando chamado sem uma sessão do Facebook já ativa.
  */
 export function MetaConnectButton({
   whatsappPhone,
@@ -67,6 +77,8 @@ export function MetaConnectButton({
   className?: string;
 }) {
   const [fbSdkReady, setFbSdkReady] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [step, setStep] = useState<Step>('login');
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState('');
   const embeddedSignupDataRef = useRef<EmbeddedSignupData>({});
@@ -106,7 +118,48 @@ export function MetaConnectButton({
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const handleClick = () => {
+  const openModal = () => {
+    setError('');
+    setStep('login');
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    clearStuckTimeout();
+    setIsConnecting(false);
+    setModalOpen(false);
+  };
+
+  /** Passo 1: login simples no Facebook, sem nada específico do WhatsApp. */
+  const handleFacebookLoginClick = () => {
+    if (!window.FB) {
+      setError('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
+      return;
+    }
+
+    setError('');
+    setIsConnecting(true);
+    clearStuckTimeout();
+    stuckTimeoutRef.current = setTimeout(() => {
+      setIsConnecting(false);
+      setError(
+        'Não detectamos resposta do Facebook. Confirme se você tem uma conta do Facebook e se não há bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) ativo para este site, e tente de novo.'
+      );
+    }, 30_000);
+
+    window.FB.login((response) => {
+      clearStuckTimeout();
+      setIsConnecting(false);
+      if (!response.authResponse) {
+        setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
+        return;
+      }
+      setStep('coexistencia');
+    });
+  };
+
+  /** Passo 2: fluxo específico do Embedded Signup (Coexistência), já com sessão do Facebook ativa. */
+  const handleConnectWhatsAppClick = () => {
     if (!window.FB) {
       setError('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
       return;
@@ -127,7 +180,7 @@ export function MetaConnectButton({
     stuckTimeoutRef.current = setTimeout(() => {
       setIsConnecting(false);
       setError(
-        'Não detectamos resposta da Meta. As causas mais comuns: você não estava logado no Facebook nesse navegador, ou um bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) bloqueou o domínio da Meta. Desative o bloqueador para este site, confirme o login no Facebook, e tente de novo.'
+        'Não detectamos resposta da Meta. Tente de novo — se persistir, um bloqueador de anúncios pode estar interferindo.'
       );
     }, 90_000);
 
@@ -190,6 +243,7 @@ export function MetaConnectButton({
         return;
       }
 
+      setModalOpen(false);
       onConnected({
         wabaId: signupWabaId,
         phoneNumberId: signupPhoneNumberId,
@@ -227,23 +281,8 @@ export function MetaConnectButton({
           setFbSdkReady(true);
         }}
       />
-      <p className="text-[11px] text-slate-400 leading-relaxed">
-        Antes de clicar: confirme que está logado no Facebook nesse navegador e desative
-        bloqueadores de anúncio (AdBlock, Brave, Opera, uBlock) para este site — eles costumam
-        bloquear o login da Meta.
-      </p>
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-          {error}
-        </div>
-      )}
-      <button type="button" onClick={handleClick} disabled={isConnecting || !fbSdkReady} className={className}>
-        {isConnecting ? (
-          <>
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            Conectando...
-          </>
-        ) : !fbSdkReady ? (
+      <button type="button" onClick={openModal} disabled={!fbSdkReady} className={className}>
+        {!fbSdkReady ? (
           <>
             <RefreshCw className="w-4 h-4 animate-spin" />
             Carregando conexão com a Meta...
@@ -255,6 +294,102 @@ export function MetaConnectButton({
           </>
         )}
       </button>
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50">
+          <div className="bg-white w-full max-w-md border border-slate-200 shadow-xl rounded-xl">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900">Conectar WhatsApp</h3>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="text-slate-400 hover:text-slate-700"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-5 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <span
+                  className={`px-2 py-1 rounded-full ${
+                    step === 'login' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}
+                >
+                  1. Login no Facebook
+                </span>
+                <span className="text-slate-300">→</span>
+                <span
+                  className={`px-2 py-1 rounded-full ${
+                    step === 'coexistencia' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  2. Conectar WhatsApp
+                </span>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              {step === 'login' ? (
+                <>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Primeiro, confirme que você está conectado com a conta do Facebook do seu negócio
+                    nesse navegador. Se não estiver logado, uma tela de login da própria Meta vai
+                    aparecer.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleFacebookLoginClick}
+                    disabled={isConnecting}
+                    className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Conectando...
+                      </>
+                    ) : (
+                      'Conectar com Facebook'
+                    )}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Login confirmado. Agora escolha (ou crie) a conta do WhatsApp Business e o número
+                    que você quer usar — seu número atual continua funcionando normalmente no celular.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleConnectWhatsAppClick}
+                    disabled={isConnecting}
+                    className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Conectando...
+                      </>
+                    ) : (
+                      'Conectar WhatsApp Business'
+                    )}
+                  </button>
+                </>
+              )}
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Se um bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) estiver ativo para este
+                site, desative-o antes de continuar — ele costuma bloquear o login da Meta.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
