@@ -4,6 +4,7 @@ import { isCronRequest } from '@/lib/cronAuth';
 import { isBillingMockEnabled, asaasUpdateSubscriptionValue } from '@/lib/asaasClient';
 import { logger } from '@/lib/logger';
 import { logOpsAlert } from '@/lib/opsAlert';
+import { describeError } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
         applied += 1;
       } catch (err) {
         failed += 1;
-        const message = err instanceof Error ? err.message : String(err);
+        const message = describeError(err);
         logger.error('billing.apply_price_change_failed', { tenantId: change.tenant_id, message });
         await logOpsAlert({
           source: 'cron.apply-price-changes',
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, checked: (due || []).length, applied, failed });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erro ao aplicar reajustes.';
+    const message = describeError(error);
     logger.error('billing.apply_price_changes_error', { message });
     await logOpsAlert({ source: 'cron.apply-price-changes', message });
     return NextResponse.json({ success: false, error: message }, { status: 500 });

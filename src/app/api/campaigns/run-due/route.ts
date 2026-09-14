@@ -5,6 +5,7 @@ import {
   processDueScheduledCampaigns,
 } from '@/lib/campaignDispatch';
 import { isCronRequest } from '@/lib/cronAuth';
+import { describeError } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 /** Disparo sequencial pode passar de 10s — Pro/Enterprise na Vercel. */
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
     }
     return await handleRunDue(req, {});
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erro no cron.';
+    const message = describeError(error);
     console.error('[Campaigns run-due GET]', error);
     const { logOpsAlert } = await import('@/lib/opsAlert');
     await logOpsAlert({ source: 'cron.run-due', message });
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
     }
     return await handleRunDue(req, body);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erro no run-due.';
+    const message = describeError(error);
     console.error('[Campaigns run-due POST]', error);
     const { logOpsAlert } = await import('@/lib/opsAlert');
     await logOpsAlert({ source: 'cron.run-due', message });

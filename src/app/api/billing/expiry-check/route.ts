@@ -5,6 +5,7 @@ import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
 import { brandedEmailHtml } from '@/lib/emailTemplates';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { logger } from '@/lib/logger';
+import { describeError } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, checked: (expiring || []).length, notified });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erro no expiry-check.';
+    const message = describeError(error);
     logger.error('billing.expiry_check_error', { message });
     const { logOpsAlert } = await import('@/lib/opsAlert');
     await logOpsAlert({ source: 'cron.expiry-check', message });
