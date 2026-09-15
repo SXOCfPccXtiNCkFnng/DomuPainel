@@ -57,10 +57,10 @@ type Step = 'login' | 'coexistencia';
  * onboarding e em /configuracoes — mesma lógica, evita duplicar o
  * carregamento do SDK e a troca do code pelo token em dois lugares.
  *
- * Fluxo em duas etapas: passo 1 é FB.login da sessão Facebook (sem WhatsApp).
- * Login for Business recusa só public_profile/email; WhatsApp sem config_id
- * abre “criar número”. Por isso o passo 1 pede pages_show_list. O passo 2 é
- * o Embedded Signup com config_id + featureType de coexistência.
+ * Fluxo em duas etapas: passo 1 é FB.login com sessão Facebook
+ * (public_profile,email,whatsapp_business_management — Login for Business
+ * exige uma permissão empresarial). Passo 2 é Embedded Signup com config_id
+ * + featureType de coexistência.
  */
 export function MetaConnectButton({
   whatsappPhone,
@@ -180,10 +180,8 @@ export function MetaConnectButton({
     setStep('coexistencia');
   };
 
-  /** Passo 1: popup do Facebook para autenticar a conta. Login for Business
-   * exige 1 permissão empresarial além de public_profile/email — senão cai em
-   * “supported permission”. Não pedir WhatsApp aqui: sem config_id isso abre
-   * “criar número novo”. pages_show_list é o mínimo que a Meta aceita. */
+  /** Passo 1: popup do Facebook (igual ao que já funcionava). Login for Business
+   * precisa de uma permissão empresarial além de public_profile/email. */
   const handleFacebookLoginClick = () => {
     if (!window.FB) {
       setError('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
@@ -203,11 +201,6 @@ export function MetaConnectButton({
       );
     }, 30_000);
 
-    const loginConfigId = process.env.NEXT_PUBLIC_META_LOGIN_CONFIG_ID;
-    const loginParams = loginConfigId
-      ? { config_id: loginConfigId }
-      : { scope: 'public_profile,email,pages_show_list' };
-
     window.FB.login(
       (response) => {
         clearStuckTimeout();
@@ -215,15 +208,15 @@ export function MetaConnectButton({
         setIsConnecting(false);
         if (!response.authResponse) {
           if (stepRef.current === 'login') {
-            setError(
-              'Não foi possível confirmar o login no Facebook. Feche se a Meta pedir número de WhatsApp nesta etapa — o login ainda não terminou. Entre com a conta do negócio e tente de novo.'
-            );
+            setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
           }
           return;
         }
         goToCoexistencia();
       },
-      loginParams
+      {
+        scope: 'public_profile,email,whatsapp_business_management',
+      }
     );
   };
 
