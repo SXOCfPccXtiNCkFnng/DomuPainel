@@ -245,9 +245,9 @@ export function MetaConnectButton({
     // ("Expression is of type asyncfunction, not function") — passar uma
     // arrow function async direto quebra a chamada antes do popup abrir.
     // Por isso o callback síncrono só dispara o handler async, sem esperá-lo.
-    // Formato oficial de coexistência no Embedded Signup. Não enviar version v3
-    // numa config v4, nem JSON.stringify — os dois fazem a Meta ignorar o
-    // featureType e cair no cadastro de número novo / número virtual.
+    // Snippet oficial de coexistência (Onboard WhatsApp Business app users).
+    // extras.version v4 no link hospedado pela Meta NÃO muda a tela — o fluxo
+    // customizado só aparece se o app estiver habilitado como Tech Provider.
     window.FB.login(
       (response) => {
         void handleFbLoginResponse(response);
