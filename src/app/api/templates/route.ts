@@ -5,126 +5,50 @@ import { createMetaMessageTemplate } from '@/lib/metaClient';
 
 export const dynamic = 'force-dynamic';
 
-// Templates prontos (biblioteca Domu + utilitários no estilo da Biblioteca Meta)
+/**
+ * Exemplos baseados na Biblioteca de modelos da Meta (utilidade).
+ * São só referência visual no Domu — templates reais do cliente
+ * são os criados via POST (enviados à WABA na Graph API).
+ */
 const GLOBAL_SYSTEM_TEMPLATES = [
   {
-    id: 'meta-global-0',
-    name: 'lancamento_exclusivo_com_imagem',
-    category: 'MARKETING',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'meta_hsm_000',
-    header_type: 'IMAGE',
-    header_content:
-      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80',
-    body_text:
-      'Olá {{nome}}! Confira em primeira mão este lançamento exclusivo da nossa empresa. Gostaria de agendar uma apresentação?',
-    variables: ['nome'],
-  },
-  {
-    id: 'meta-global-1',
-    name: 'aviso_oferta_promocional',
-    category: 'MARKETING',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'meta_hsm_001',
-    header_type: 'NONE',
-    body_text:
-      'Olá {{nome}}! Temos uma oferta especial e imperdível para você hoje. Gostaria de saber mais detalhes?',
-    variables: ['nome'],
-  },
-  {
-    id: 'meta-global-2',
-    name: 'lembrete_agendamento_atendimento',
-    category: 'UTILITY',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'meta_hsm_002',
-    header_type: 'NONE',
-    body_text:
-      'Olá {{nome}}, passando para confirmar nosso atendimento agendado para {{horario}}. Podemos confirmar?',
-    variables: ['nome', 'horario'],
-  },
-  {
-    id: 'meta-global-3',
-    name: 'notificacao_atualizacao_pedido',
-    category: 'UTILITY',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'meta_hsm_003',
-    header_type: 'NONE',
-    body_text:
-      'Olá {{nome}}! Seu pedido/solicitação foi atualizado com sucesso. Acesse nossa plataforma para conferir.',
-    variables: ['nome'],
-  },
-  {
-    id: 'meta-global-4',
+    id: 'meta-lib-1',
     name: 'finalizar_configuracao_conta',
     category: 'UTILITY',
     language: 'pt_BR',
     status: 'APPROVED',
     is_global: true,
-    meta_template_id: 'meta_hsm_004',
+    meta_template_id: 'account_creation_confirmation_3',
     header_type: 'NONE',
     body_text:
-      'Oi, {{nome}}! Sua nova conta foi criada com sucesso. Verifique seus dados para concluir o perfil e começar a usar a plataforma.',
+      'Oi, {{nome}}! Sua nova conta foi criada com sucesso. Verifique seus dados para concluir o perfil.',
     variables: ['nome'],
   },
   {
-    id: 'meta-global-5',
+    id: 'meta-lib-2',
     name: 'compromisso_cancelado',
     category: 'UTILITY',
     language: 'pt_BR',
     status: 'APPROVED',
     is_global: true,
-    meta_template_id: 'meta_hsm_005',
+    meta_template_id: 'appointment_cancellation_1',
     header_type: 'NONE',
     body_text:
       'Olá {{nome}}. Seu compromisso com {{empresa}} em {{data}} às {{horario}} foi cancelado. Avise-nos se tiver alguma dúvida ou precisar reagendar.',
     variables: ['nome', 'empresa', 'data', 'horario'],
   },
   {
-    id: 'meta-global-6',
+    id: 'meta-lib-3',
     name: 'confirmacao_agendamento',
     category: 'UTILITY',
     language: 'pt_BR',
     status: 'APPROVED',
     is_global: true,
-    meta_template_id: 'meta_hsm_006',
+    meta_template_id: 'appointment_confirmation_1',
     header_type: 'NONE',
     body_text:
       'Olá {{nome}}! Seu agendamento foi confirmado para {{data}} às {{horario}}. Até lá!',
     variables: ['nome', 'data', 'horario'],
-  },
-  {
-    id: 'meta-global-7',
-    name: 'lembrete_pagamento',
-    category: 'UTILITY',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'meta_hsm_007',
-    header_type: 'NONE',
-    body_text:
-      'Olá {{nome}}, lembrando que o pagamento de {{valor}} vence em breve. Se já pagou, pode ignorar esta mensagem.',
-    variables: ['nome', 'valor'],
-  },
-  {
-    id: 'meta-global-8',
-    name: 'boas_vindas_cliente',
-    category: 'MARKETING',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'meta_hsm_008',
-    header_type: 'NONE',
-    body_text:
-      'Olá {{nome}}! Seja bem-vindo(a) à {{empresa}}. Estamos felizes em ter você conosco. Como podemos ajudar?',
-    variables: ['nome', 'empresa'],
   },
 ];
 
@@ -135,7 +59,6 @@ function mapMetaStatus(raw?: string): 'APPROVED' | 'PENDING' | 'REJECTED' {
   return 'PENDING';
 }
 
-// GET: templates do tenant + biblioteca padrão Domu
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
@@ -166,7 +89,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: cria template na Meta Cloud API e salva no Supabase
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireDispatcher(req);
