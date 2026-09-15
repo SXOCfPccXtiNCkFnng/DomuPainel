@@ -5,6 +5,10 @@ import Script from 'next/script';
 import { ExternalLink, RefreshCw, X } from 'lucide-react';
 
 type FbLoginResponse = { authResponse?: { code?: string; accessToken?: string } };
+type FbLoginStatusResponse = {
+  status?: 'connected' | 'not_authorized' | 'unknown';
+  authResponse?: { code?: string; accessToken?: string };
+};
 
 declare global {
   interface Window {
@@ -15,6 +19,7 @@ declare global {
         xfbml?: boolean;
         version: string;
       }) => void;
+      getLoginStatus: (callback: (response: FbLoginStatusResponse) => void) => void;
       login: (
         callback: (response: FbLoginResponse) => void,
         params?: {
@@ -43,14 +48,17 @@ export type MetaConnectResult = {
   warnings?: string[];
 };
 
+type Step = 'login' | 'coexistencia';
+
 /**
  * Botão do Meta WhatsApp Embedded Signup (Coexistência real). Usado no
  * onboarding e em /configuracoes — mesma lógica, evita duplicar o
  * carregamento do SDK e a troca do code pelo token em dois lugares.
  *
- * Um único FB.login() com config_id + featureType de coexistência. Um login
- * prévio pedindo whatsapp_business_management (sem config_id) abre o seletor
- * de “criar número novo” da Cloud API, que não é o fluxo de coexistência.
+ * Fluxo em duas etapas: primeiro só autentica no Facebook (sem permissão de
+ * WhatsApp). Só depois o FB.login() com config_id + featureType de
+ * coexistência. Pedir whatsapp_business_management no primeiro login abre o
+ * seletor de “criar número novo”, que não é coexistência.
  */
 export function MetaConnectButton({
   whatsappPhone,
@@ -73,10 +81,12 @@ export function MetaConnectButton({
 }) {
   const [fbSdkReady, setFbSdkReady] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [step, setStep] = useState<Step>('login');
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState('');
   const embeddedSignupDataRef = useRef<EmbeddedSignupData>({});
   const stuckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stepRef = useRef<Step>('login');
   const connectingRef = useRef(false);
 
   const clearStuckTimeout = () => {
@@ -91,6 +101,10 @@ export function MetaConnectButton({
   // sem isso o botão trava em "Conectando..." pra sempre. Esse timeout
   // libera o botão de novo se isso acontecer.
   useEffect(() => clearStuckTimeout, []);
+
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -128,6 +142,8 @@ export function MetaConnectButton({
 
   const openModal = () => {
     setError('');
+    setStep('login');
+    stepRef.current = 'login';
     setModalOpen(true);
   };
 
@@ -138,8 +154,65 @@ export function MetaConnectButton({
     setModalOpen(false);
   };
 
-  /** Embedded Signup de coexistência: config_id + featureType. Sem config_id a Meta
-   * abre o seletor de número novo da Cloud API, que não é coexistência. */
+  const goToCoexistencia = () => {
+    setError('');
+    connectingRef.current = false;
+    setIsConnecting(false);
+    stepRef.current = 'coexistencia';
+    setStep('coexistencia');
+  };
+
+  /** Passo 1: só sessão do Facebook. Sem permissão de WhatsApp — senão a Meta
+   * abre o seletor de número novo em vez do login. */
+  const handleFacebookLoginClick = () => {
+    if (!window.FB) {
+      setError('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
+      return;
+    }
+
+    setError('');
+    connectingRef.current = true;
+    setIsConnecting(true);
+    clearStuckTimeout();
+    stuckTimeoutRef.current = setTimeout(() => {
+      if (!connectingRef.current || stepRef.current !== 'login') return;
+      connectingRef.current = false;
+      setIsConnecting(false);
+      setError(
+        'Não detectamos resposta do Facebook. Confirme se você tem uma conta do Facebook e se não há bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) ativo para este site, e tente de novo.'
+      );
+    }, 30_000);
+
+    window.FB.getLoginStatus((statusResponse) => {
+      if (statusResponse.status === 'connected') {
+        clearStuckTimeout();
+        goToCoexistencia();
+        return;
+      }
+
+      // Login for Business recusa public_profile/email sozinhos. business_management
+      // autentica a conta sem abrir o seletor de número do WhatsApp.
+      window.FB?.login(
+        (response) => {
+          clearStuckTimeout();
+          connectingRef.current = false;
+          setIsConnecting(false);
+          if (!response.authResponse) {
+            if (stepRef.current === 'login') {
+              setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
+            }
+            return;
+          }
+          goToCoexistencia();
+        },
+        {
+          scope: 'public_profile,email,business_management',
+        }
+      );
+    });
+  };
+
+  /** Passo 2: Embedded Signup de coexistência (config_id + featureType). */
   const handleConnectWhatsAppClick = () => {
     if (!window.FB) {
       setError('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
@@ -160,7 +233,7 @@ export function MetaConnectButton({
     // Se a pessoa fechar o popup pelo X, o SDK às vezes nunca chama esse
     // callback — sem esse limite o botão ficaria travado pra sempre.
     stuckTimeoutRef.current = setTimeout(() => {
-      if (!connectingRef.current) return;
+      if (!connectingRef.current || stepRef.current !== 'coexistencia') return;
       connectingRef.current = false;
       setIsConnecting(false);
       setError(
@@ -180,11 +253,11 @@ export function MetaConnectButton({
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        // featureType avisa a Meta que é um fluxo de Coexistência — sem ele o
-        // número é tratado como um cadastro comum, que exige o número "livre"
-        // (sem WhatsApp ativo nele), e cai no erro de "já está registrado".
         extras: {
           setup: {},
+          // Sem version a config v4 (Cloud API + Marketing) ignora o featureType
+          // e cai no cadastro de número novo / número virtual.
+          version: 'v3',
           featureType: 'whatsapp_business_app_onboarding',
           sessionInfoVersion: '3',
         },
@@ -302,33 +375,78 @@ export function MetaConnectButton({
             </div>
 
             <div className="px-5 py-5 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <span
+                  className={`px-2 py-1 rounded-full ${
+                    step === 'login' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}
+                >
+                  1. Login no Facebook
+                </span>
+                <span className="text-slate-300">→</span>
+                <span
+                  className={`px-2 py-1 rounded-full ${
+                    step === 'coexistencia' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  2. Conectar WhatsApp
+                </span>
+              </div>
+
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
                   {error}
                 </div>
               )}
 
-              <p className="text-sm text-slate-600 leading-relaxed">
-                No popup da Meta, escolha{' '}
-                <strong>conectar o WhatsApp Business que já está no celular</strong> (coexistência).
-                Se aparecer só “criar número novo” ou “adicione seu número de telefone”, feche e avise
-                a equipe — isso ainda não é o fluxo de coexistência.
-              </p>
-              <button
-                type="button"
-                onClick={handleConnectWhatsAppClick}
-                disabled={isConnecting}
-                className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
-              >
-                {isConnecting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Conectando...
-                  </>
-                ) : (
-                  'Conectar WhatsApp Business'
-                )}
-              </button>
+              {step === 'login' ? (
+                <>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Primeiro, confirme que você está conectado com a conta do Facebook do seu negócio
+                    nesse navegador. Se não estiver logado, uma tela de login da própria Meta vai
+                    aparecer.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleFacebookLoginClick}
+                    disabled={isConnecting}
+                    className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Conectando...
+                      </>
+                    ) : (
+                      'Conectar com Facebook'
+                    )}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Login confirmado. No próximo popup da Meta, escolha{' '}
+                    <strong>conectar o WhatsApp Business que já está no celular</strong> (coexistência).
+                    Se aparecer só “criar número novo” ou “número virtual”, feche — isso ainda não é o
+                    fluxo de coexistência.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleConnectWhatsAppClick}
+                    disabled={isConnecting}
+                    className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Conectando...
+                      </>
+                    ) : (
+                      'Conectar WhatsApp Business'
+                    )}
+                  </button>
+                </>
+              )}
 
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 Se um bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) estiver ativo para este
