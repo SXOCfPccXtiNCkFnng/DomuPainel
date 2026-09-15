@@ -29,6 +29,7 @@ declare global {
           override_default_response_type?: boolean;
           extras?: Record<string, unknown> | string;
           scope?: string;
+          auth_type?: 'rerequest' | 'reauthenticate' | 'reauthorize';
         }
       ) => void;
     };
@@ -56,9 +57,10 @@ type Step = 'login' | 'coexistencia';
  * onboarding e em /configuracoes — mesma lógica, evita duplicar o
  * carregamento do SDK e a troca do code pelo token em dois lugares.
  *
- * Fluxo em duas etapas: o passo 1 não chama FB.login (Login for Business
- * recusa public_profile/email e WhatsApp sem config_id abre “criar número”).
- * O passo 2 é o FB.login() com config_id + featureType de coexistência.
+ * Fluxo em duas etapas: passo 1 é FB.login da sessão Facebook (sem WhatsApp).
+ * Login for Business recusa só public_profile/email; WhatsApp sem config_id
+ * abre “criar número”. Por isso o passo 1 pede pages_show_list. O passo 2 é
+ * o Embedded Signup com config_id + featureType de coexistência.
  */
 export function MetaConnectButton({
   whatsappPhone,
@@ -178,16 +180,51 @@ export function MetaConnectButton({
     setStep('coexistencia');
   };
 
-  /** Passo 1: não chama FB.login. Este app é Facebook Login for Business —
-   * login só com public_profile/email cai em “precisa de uma supported
-   * permission”. Pedir WhatsApp sem config_id abre “criar número novo”.
-   * A sessão oficial só existe no passo 2, com o config_id de coexistência. */
+  /** Passo 1: popup do Facebook para autenticar a conta. Login for Business
+   * exige 1 permissão empresarial além de public_profile/email — senão cai em
+   * “supported permission”. Não pedir WhatsApp aqui: sem config_id isso abre
+   * “criar número novo”. pages_show_list é o mínimo que a Meta aceita. */
   const handleFacebookLoginClick = () => {
     if (!window.FB) {
       setError('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
       return;
     }
-    goToCoexistencia();
+
+    setError('');
+    connectingRef.current = true;
+    setIsConnecting(true);
+    clearStuckTimeout();
+    stuckTimeoutRef.current = setTimeout(() => {
+      if (!connectingRef.current || stepRef.current !== 'login') return;
+      connectingRef.current = false;
+      setIsConnecting(false);
+      setError(
+        'Não detectamos resposta do Facebook. Confirme se você tem uma conta do Facebook e se não há bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) ativo para este site, e tente de novo.'
+      );
+    }, 30_000);
+
+    const loginConfigId = process.env.NEXT_PUBLIC_META_LOGIN_CONFIG_ID;
+    const loginParams = loginConfigId
+      ? { config_id: loginConfigId }
+      : { scope: 'public_profile,email,pages_show_list' };
+
+    window.FB.login(
+      (response) => {
+        clearStuckTimeout();
+        connectingRef.current = false;
+        setIsConnecting(false);
+        if (!response.authResponse) {
+          if (stepRef.current === 'login') {
+            setError(
+              'Não foi possível confirmar o login no Facebook. Feche se a Meta pedir número de WhatsApp nesta etapa — o login ainda não terminou. Entre com a conta do negócio e tente de novo.'
+            );
+          }
+          return;
+        }
+        goToCoexistencia();
+      },
+      loginParams
+    );
   };
 
   /** Passo 2: Embedded Signup de coexistência (config_id + featureType). */
@@ -398,9 +435,8 @@ export function MetaConnectButton({
                 {step === 'login' ? (
                   <>
                     <p className="text-sm text-slate-600 leading-relaxed">
-                      No próximo passo a Meta abre o login oficial, já com as permissões do WhatsApp
-                      Business. Use a conta do Facebook do seu negócio — não um perfil pessoal, se
-                      forem contas diferentes.
+                      Uma janela do Facebook vai abrir para você entrar com a conta do seu negócio.
+                      Se você já estiver logado, ela pode fechar sozinha e seguimos para o WhatsApp.
                     </p>
                     <button
                       type="button"
@@ -411,10 +447,10 @@ export function MetaConnectButton({
                       {isConnecting ? (
                         <>
                           <RefreshCw className="w-4 h-4 animate-spin" />
-                          Continuando...
+                          Conectando...
                         </>
                       ) : (
-                        'Continuar'
+                        'Conectar com Facebook'
                       )}
                     </button>
                   </>
