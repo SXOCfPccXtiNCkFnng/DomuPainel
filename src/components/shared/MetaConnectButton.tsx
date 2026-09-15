@@ -245,15 +245,9 @@ export function MetaConnectButton({
     // ("Expression is of type asyncfunction, not function") — passar uma
     // arrow function async direto quebra a chamada antes do popup abrir.
     // Por isso o callback síncrono só dispara o handler async, sem esperá-lo.
-    // extras precisa ir como JSON: se passar objeto cru, o SDK manda
-    // [object Object] na URL do OAuth e a Meta ignora o featureType.
-    const extras = JSON.stringify({
-      setup: {},
-      version: 'v3',
-      featureType: 'whatsapp_business_app_onboarding',
-      sessionInfoVersion: '3',
-    });
-
+    // Formato oficial de coexistência no Embedded Signup. Não enviar version v3
+    // numa config v4, nem JSON.stringify — os dois fazem a Meta ignorar o
+    // featureType e cair no cadastro de número novo / número virtual.
     window.FB.login(
       (response) => {
         void handleFbLoginResponse(response);
@@ -262,7 +256,11 @@ export function MetaConnectButton({
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        extras,
+        extras: {
+          setup: {},
+          featureType: 'whatsapp_business_app_onboarding',
+          sessionInfoVersion: '3',
+        },
       }
     );
   };
