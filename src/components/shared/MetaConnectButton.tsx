@@ -26,7 +26,7 @@ declare global {
           config_id?: string;
           response_type?: string;
           override_default_response_type?: boolean;
-          extras?: Record<string, unknown>;
+          extras?: Record<string, unknown> | string;
           scope?: string;
         }
       ) => void;
@@ -162,8 +162,8 @@ export function MetaConnectButton({
     setStep('coexistencia');
   };
 
-  /** Passo 1: só sessão do Facebook. Sem permissão de WhatsApp — senão a Meta
-   * abre o seletor de número novo em vez do login. */
+  /** Passo 1: só sessão do Facebook. Qualquer permissão empresarial (WhatsApp ou
+   * business_management) faz a Meta pular o login e abrir “criar número novo”. */
   const handleFacebookLoginClick = () => {
     if (!window.FB) {
       setError('SDK da Meta ainda não carregou. Aguarde alguns segundos e tente de novo.');
@@ -190,8 +190,6 @@ export function MetaConnectButton({
         return;
       }
 
-      // Login for Business recusa public_profile/email sozinhos. business_management
-      // autentica a conta sem abrir o seletor de número do WhatsApp.
       window.FB?.login(
         (response) => {
           clearStuckTimeout();
@@ -199,14 +197,16 @@ export function MetaConnectButton({
           setIsConnecting(false);
           if (!response.authResponse) {
             if (stepRef.current === 'login') {
-              setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
+              setError(
+                'Não foi possível confirmar o login no Facebook. Se a Meta pedir um número de WhatsApp nesta etapa, feche — o login ainda não terminou. Entre em facebook.com neste navegador e tente de novo.'
+              );
             }
             return;
           }
           goToCoexistencia();
         },
         {
-          scope: 'public_profile,email,business_management',
+          scope: 'public_profile,email',
         }
       );
     });
@@ -245,6 +245,15 @@ export function MetaConnectButton({
     // ("Expression is of type asyncfunction, not function") — passar uma
     // arrow function async direto quebra a chamada antes do popup abrir.
     // Por isso o callback síncrono só dispara o handler async, sem esperá-lo.
+    // extras precisa ir como JSON: se passar objeto cru, o SDK manda
+    // [object Object] na URL do OAuth e a Meta ignora o featureType.
+    const extras = JSON.stringify({
+      setup: {},
+      version: 'v3',
+      featureType: 'whatsapp_business_app_onboarding',
+      sessionInfoVersion: '3',
+    });
+
     window.FB.login(
       (response) => {
         void handleFbLoginResponse(response);
@@ -253,14 +262,7 @@ export function MetaConnectButton({
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        extras: {
-          setup: {},
-          // Sem version a config v4 (Cloud API + Marketing) ignora o featureType
-          // e cai no cadastro de número novo / número virtual.
-          version: 'v3',
-          featureType: 'whatsapp_business_app_onboarding',
-          sessionInfoVersion: '3',
-        },
+        extras,
       }
     );
   };
@@ -360,7 +362,7 @@ export function MetaConnectButton({
       </button>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/50">
           <div className="bg-white w-full max-w-md border border-slate-200 shadow-xl rounded-xl">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">Conectar WhatsApp</h3>
@@ -402,9 +404,9 @@ export function MetaConnectButton({
               {step === 'login' ? (
                 <>
                   <p className="text-sm text-slate-600 leading-relaxed">
-                    Primeiro, confirme que você está conectado com a conta do Facebook do seu negócio
-                    nesse navegador. Se não estiver logado, uma tela de login da própria Meta vai
-                    aparecer.
+                    Primeiro, confirme o Facebook do seu negócio neste navegador. Se você já estiver
+                    logado, esta etapa não abre popup — a Meta pula o login e vamos direto para o
+                    WhatsApp no passo 2.
                   </p>
                   <button
                     type="button"
