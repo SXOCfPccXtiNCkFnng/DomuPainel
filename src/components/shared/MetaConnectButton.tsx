@@ -147,15 +147,22 @@ export function MetaConnectButton({
       );
     }, 30_000);
 
-    window.FB.login((response) => {
-      clearStuckTimeout();
-      setIsConnecting(false);
-      if (!response.authResponse) {
-        setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
-        return;
+    // Login for Business exige pelo menos 1 permissão empresarial além de
+    // public_profile/email — sem isso a Meta responde "supported permission".
+    window.FB.login(
+      (response) => {
+        clearStuckTimeout();
+        setIsConnecting(false);
+        if (!response.authResponse) {
+          setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
+          return;
+        }
+        setStep('coexistencia');
+      },
+      {
+        scope: 'public_profile,email,whatsapp_business_management',
       }
-      setStep('coexistencia');
-    });
+    );
   };
 
   /** Passo 2: fluxo específico do Embedded Signup (Coexistência), já com sessão do Facebook ativa. */
