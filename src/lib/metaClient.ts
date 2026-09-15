@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger';
 export type MetaCredentials = {
   accessToken: string;
   phoneNumberId: string;
+  wabaId?: string;
   source: 'tenant' | 'env';
 };
 
@@ -34,8 +35,9 @@ const META_GRAPH_API_VERSION = 'v20.0';
 function envMetaCredentials(): MetaCredentials | null {
   const accessToken = process.env.META_ACCESS_TOKEN || process.env.META_WHATSAPP_TOKEN;
   const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
+  const wabaId = process.env.META_WABA_ID || undefined;
   if (!accessToken || !phoneNumberId) return null;
-  return { accessToken, phoneNumberId, source: 'env' };
+  return { accessToken, phoneNumberId, wabaId, source: 'env' };
 }
 
 /** Credenciais do tenant (criptografadas) com fallback para env global. */
@@ -43,7 +45,7 @@ export async function resolveMetaCredentials(tenantId?: string): Promise<MetaCre
   if (tenantId) {
     const { data: cred } = await supabaseAdmin
       .from('tenant_credentials')
-      .select('phone_number_id, encrypted_access_token, token_encryption_iv')
+      .select('phone_number_id, waba_id, encrypted_access_token, token_encryption_iv')
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
@@ -58,6 +60,7 @@ export async function resolveMetaCredentials(tenantId?: string): Promise<MetaCre
           return {
             accessToken,
             phoneNumberId: cred.phone_number_id,
+            wabaId: cred.waba_id || undefined,
             source: 'tenant',
           };
         }
@@ -246,4 +249,138 @@ export function isOptOutMessage(text: string): boolean {
     /\b(stop|unsubscribe|sair|cancelar)\b/.test(t) ||
     /remover (meu )?(numero|telefone)/.test(t)
   );
+}
+
+/**
+ * Converte variáveis nomeadas Domu ({{nome}}) para posição Meta ({{1}}, {{2}}).
+ * A Meta Cloud API exige exemplos quando há placeholders.
+ */
+export function toMetaPositionalBody(bodyText: string): {
+  metaBody: string;
+  variables: string[];
+  examples: string[];
+} {
+  const variables: string[] = [];
+  const examples: string[] = [];
+  const exampleByName: Record<string, string> = {
+    nome: 'Maria',
+    horario: '15:00',
+    data: '31/12/2026',
+    produto: 'Oferta Especial',
+    valor: 'R$ 299,00',
+    texto: 'cliente',
+    empresa: 'Sua Empresa',
+  };
+
+  const metaBody = bodyText.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_full, rawName: string) => {
+    const name = String(rawName).trim();
+    let idx = variables.indexOf(name);
+    if (idx < 0) {
+      variables.push(name);
+      examples.push(exampleByName[name.toLowerCase()] || 'exemplo');
+      idx = variables.length - 1;
+    }
+    return `{{${idx + 1}}}`;
+  });
+
+  return { metaBody, variables, examples };
+}
+
+/** Cria um template HSM na WABA do cliente via Graph API. */
+export async function createMetaMessageTemplate(options: {
+  tenantId: string;
+  name: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+  language?: string;
+  bodyText: string;
+  headerType?: 'NONE' | 'IMAGE';
+}): Promise<{
+  success: boolean;
+  metaTemplateId?: string;
+  status?: string;
+  metaBody?: string;
+  variables?: string[];
+  error?: string;
+  warning?: string;
+}> {
+  let creds: MetaCredentials;
+  try {
+    creds = await resolveMetaCredentials(options.tenantId);
+  } catch (err: any) {
+    return {
+      success: false,
+      error:
+        err?.message ||
+        'Conecte o WhatsApp (credenciais Meta) antes de criar um template.',
+    };
+  }
+
+  const wabaId = creds.wabaId || process.env.META_WABA_ID;
+  if (!wabaId) {
+    return {
+      success: false,
+      error:
+        'WABA ID ausente. Conecte o WhatsApp pelo onboarding/configurações para criar templates na Meta.',
+    };
+  }
+
+  const { metaBody, variables, examples } = toMetaPositionalBody(options.bodyText);
+  const components: any[] = [
+    {
+      type: 'BODY',
+      text: metaBody,
+      ...(examples.length > 0
+        ? { example: { body_text: [examples] } }
+        : {}),
+    },
+  ];
+
+  // HEADER IMAGE exige media handle (upload resumable). Por enquanto enviamos
+  // só o texto à Meta e mantemos a imagem no Domu para preview local.
+  let warning: string | undefined;
+  if (options.headerType === 'IMAGE') {
+    warning =
+      'A imagem foi salva no Domu para preview; a Meta recebeu o template só com o texto (upload de mídia em breve).';
+  }
+
+  const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/message_templates`;
+  const payload = {
+    name: options.name,
+    language: options.language || 'pt_BR',
+    category: options.category,
+    allow_category_change: true,
+    components,
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${creds.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    logger.warn('meta.create_template_failed', {
+      tenantId: options.tenantId,
+      wabaId,
+      message: data?.error?.message,
+      code: data?.error?.code,
+    });
+    return {
+      success: false,
+      error: data?.error?.message || 'A Meta rejeitou a criação do template.',
+    };
+  }
+
+  return {
+    success: true,
+    metaTemplateId: String(data.id || ''),
+    status: String(data.status || 'PENDING').toUpperCase(),
+    metaBody,
+    variables,
+    warning,
+  };
 }

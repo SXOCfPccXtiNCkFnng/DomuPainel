@@ -35,6 +35,7 @@ export default function TemplatesPage() {
   const [previewTestName, setPreviewTestName] = useState('Carlos Eduardo');
   const [companyName, setCompanyName] = useState('Sua Empresa');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -64,6 +65,7 @@ export default function TemplatesPage() {
     if (!name.trim() || !bodyText.trim()) return;
 
     setIsSubmitting(true);
+    setSubmitError('');
     try {
       const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
       const res = await fetch('/api/templates', {
@@ -85,10 +87,14 @@ export default function TemplatesPage() {
         setName('');
         setBodyText('Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa. Podemos conversar?');
         setHeaderType('NONE');
+        setSubmitError('');
         fetchTemplates();
+      } else {
+        setSubmitError(json.error || 'Não foi possível enviar o template para a Meta.');
       }
     } catch (err) {
       console.error('Erro ao criar template:', err);
+      setSubmitError('Erro de conexão ao enviar o template. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -107,22 +113,22 @@ export default function TemplatesPage() {
   const renderStatusBadge = (status: string) => {
     if (status === 'APPROVED') {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
           APROVADO META
         </span>
       );
     } else if (status === 'PENDING') {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-          <Clock className="w-3 h-3 text-amber-600 animate-spin" />
+        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+          <Clock className="w-3 h-3 text-amber-600 shrink-0" />
           EM ANÁLISE META
         </span>
       );
     } else {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3 text-rose-600" />
+        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
+          <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
           REJEITADO META
         </span>
       );
@@ -156,7 +162,10 @@ export default function TemplatesPage() {
           </button>
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setSubmitError('');
+              setIsModalOpen(true);
+            }}
             className="btn-domu-primary text-xs py-2 px-4 flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
@@ -190,12 +199,14 @@ export default function TemplatesPage() {
               }`}
             >
               <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-domu-blue" />
-                    <h3 className="text-xs font-black text-slate-900 font-mono tracking-tight">{tpl.name}</h3>
+                <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <FileText className="w-4 h-4 text-domu-blue shrink-0" />
+                    <h3 className="text-xs font-black text-slate-900 font-mono tracking-tight truncate">
+                      {tpl.name}
+                    </h3>
                   </div>
-                  {renderStatusBadge(tpl.status)}
+                  <div className="shrink-0 max-w-[45%]">{renderStatusBadge(tpl.status)}</div>
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold text-slate-500 uppercase">
@@ -357,8 +368,15 @@ export default function TemplatesPage() {
                 </div>
 
                 <p className="text-[11px] text-slate-500 border-l-2 border-slate-300 pl-3">
-                  Ao salvar, o modelo é registrado e enviado para aprovação da Meta.
+                  Ao salvar, o modelo é enviado de verdade para a Meta (WABA da sua conta). O status
+                  inicial fica em análise até a aprovação.
                 </p>
+
+                {submitError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+                    {submitError}
+                  </div>
+                )}
 
               </form>
 
