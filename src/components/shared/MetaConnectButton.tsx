@@ -83,6 +83,8 @@ export function MetaConnectButton({
   const [error, setError] = useState('');
   const embeddedSignupDataRef = useRef<EmbeddedSignupData>({});
   const stuckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stepRef = useRef<Step>('login');
+  const connectingRef = useRef(false);
 
   const clearStuckTimeout = () => {
     if (stuckTimeoutRef.current) {
@@ -98,12 +100,29 @@ export function MetaConnectButton({
   useEffect(() => clearStuckTimeout, []);
 
   useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
+
+  useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (!event.origin.endsWith('facebook.com')) return;
+      if (
+        typeof event.origin !== 'string' ||
+        (!event.origin.endsWith('facebook.com') && !event.origin.endsWith('instagram.com'))
+      ) {
+        return;
+      }
       try {
-        const data = JSON.parse(event.data);
+        const raw = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+        const data = JSON.parse(raw);
         if (data.type !== 'WA_EMBEDDED_SIGNUP') return;
-        if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') {
+
+        // Coexistência usa FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING; o fluxo
+        // Cloud API comum usa FINISH / FINISH_ONLY_WABA.
+        if (
+          data.event === 'FINISH' ||
+          data.event === 'FINISH_ONLY_WABA' ||
+          data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
+        ) {
           embeddedSignupDataRef.current = {
             wabaId: data.data?.waba_id,
             phoneNumberId: data.data?.phone_number_id,
@@ -121,11 +140,13 @@ export function MetaConnectButton({
   const openModal = () => {
     setError('');
     setStep('login');
+    stepRef.current = 'login';
     setModalOpen(true);
   };
 
   const closeModal = () => {
     clearStuckTimeout();
+    connectingRef.current = false;
     setIsConnecting(false);
     setModalOpen(false);
   };
@@ -138,9 +159,14 @@ export function MetaConnectButton({
     }
 
     setError('');
+    connectingRef.current = true;
     setIsConnecting(true);
     clearStuckTimeout();
     stuckTimeoutRef.current = setTimeout(() => {
+      // Se o login já avançou e o callback atrasou/não veio ao fechar o X,
+      // não sobrescreve a tela de sucesso com erro fantasma.
+      if (!connectingRef.current || stepRef.current !== 'login') return;
+      connectingRef.current = false;
       setIsConnecting(false);
       setError(
         'Não detectamos resposta do Facebook. Confirme se você tem uma conta do Facebook e se não há bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) ativo para este site, e tente de novo.'
@@ -152,11 +178,16 @@ export function MetaConnectButton({
     window.FB.login(
       (response) => {
         clearStuckTimeout();
+        connectingRef.current = false;
         setIsConnecting(false);
         if (!response.authResponse) {
-          setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
+          if (stepRef.current === 'login') {
+            setError('Não foi possível confirmar o login no Facebook. Tente novamente.');
+          }
           return;
         }
+        setError('');
+        stepRef.current = 'coexistencia';
         setStep('coexistencia');
       },
       {
@@ -178,6 +209,7 @@ export function MetaConnectButton({
     }
 
     setError('');
+    connectingRef.current = true;
     setIsConnecting(true);
     embeddedSignupDataRef.current = {};
 
@@ -185,6 +217,8 @@ export function MetaConnectButton({
     // Se a pessoa fechar o popup pelo X, o SDK às vezes nunca chama esse
     // callback — sem esse limite o botão ficaria travado pra sempre.
     stuckTimeoutRef.current = setTimeout(() => {
+      if (!connectingRef.current || stepRef.current !== 'coexistencia') return;
+      connectingRef.current = false;
       setIsConnecting(false);
       setError(
         'Não detectamos resposta da Meta. Tente de novo — se persistir, um bloqueador de anúncios pode estar interferindo.'
@@ -206,16 +240,23 @@ export function MetaConnectButton({
         // featureType avisa a Meta que é um fluxo de Coexistência — sem ele o
         // número é tratado como um cadastro comum, que exige o número "livre"
         // (sem WhatsApp ativo nele), e cai no erro de "já está registrado".
-        extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' },
+        extras: {
+          setup: {},
+          featureType: 'whatsapp_business_app_onboarding',
+          sessionInfoVersion: '3',
+        },
       }
     );
   };
 
   const handleFbLoginResponse = async (response: FbLoginResponse) => {
     clearStuckTimeout();
+    connectingRef.current = false;
     const code = response.authResponse?.code;
     if (!code) {
-      setError('Conexão cancelada ou não autorizada na Meta.');
+      setError(
+        'Conexão cancelada ou incompleta na Meta. No popup, escolha conectar o WhatsApp Business que já está no celular (coexistência) — não “criar número novo”.'
+      );
       setIsConnecting(false);
       return;
     }
@@ -368,8 +409,10 @@ export function MetaConnectButton({
               ) : (
                 <>
                   <p className="text-sm text-slate-600 leading-relaxed">
-                    Login confirmado. Agora escolha (ou crie) a conta do WhatsApp Business e o número
-                    que você quer usar — seu número atual continua funcionando normalmente no celular.
+                    Login confirmado. No próximo popup da Meta, escolha{' '}
+                    <strong>conectar o WhatsApp Business que já está no celular</strong> (coexistência).
+                    Se aparecer só “criar número novo”, o número em uso no WhatsApp vai dar erro — isso
+                    ainda não é o fluxo de coexistência.
                   </p>
                   <button
                     type="button"
