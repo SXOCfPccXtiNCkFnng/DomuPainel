@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
-import { createMetaMessageTemplate } from '@/lib/metaClient';
+import { createMetaMessageTemplate, fetchMetaMessageTemplates } from '@/lib/metaClient';
 import { GLOBAL_SYSTEM_TEMPLATES } from '@/lib/globalTemplates';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +18,58 @@ export async function GET(req: NextRequest) {
     const auth = requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
+
+    const { searchParams } = new URL(req.url);
+    const shouldSync = searchParams.get('sync') === 'true';
+
+    if (shouldSync) {
+      try {
+        const metaRes = await fetchMetaMessageTemplates(tenantId);
+        if (metaRes.success && Array.isArray(metaRes.templates)) {
+          for (const metaTpl of metaRes.templates) {
+            const bodyComp = metaTpl.components?.find((c: any) => c.type === 'BODY');
+            const headerComp = metaTpl.components?.find((c: any) => c.type === 'HEADER');
+            const formattedStatus = mapMetaStatus(metaTpl.status);
+
+            const { data: existing } = await supabaseAdmin
+              .from('hsm_templates')
+              .select('id')
+              .eq('tenant_id', tenantId)
+              .eq('name', metaTpl.name)
+              .maybeSingle();
+
+            if (existing) {
+              await supabaseAdmin
+                .from('hsm_templates')
+                .update({
+                  status: formattedStatus,
+                  meta_template_id: metaTpl.id,
+                  category: metaTpl.category || 'MARKETING',
+                  body_text: bodyComp?.text || '',
+                  header_type: headerComp?.format || 'NONE',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existing.id);
+            } else {
+              await supabaseAdmin.from('hsm_templates').insert({
+                tenant_id: tenantId,
+                name: metaTpl.name,
+                status: formattedStatus,
+                meta_template_id: metaTpl.id,
+                category: metaTpl.category || 'MARKETING',
+                language: metaTpl.language || 'pt_BR',
+                body_text: bodyComp?.text || '',
+                header_type: headerComp?.format || 'NONE',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[Templates Sync Warning]', syncErr);
+      }
+    }
 
     let customTemplates: any[] = [];
     const { data, error } = await supabaseAdmin

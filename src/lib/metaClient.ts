@@ -384,3 +384,57 @@ export async function createMetaMessageTemplate(options: {
     warning,
   };
 }
+
+/**
+ * Consulta todos os templates cadastrados diretamente na WABA da Meta Cloud API.
+ */
+export async function fetchMetaMessageTemplates(tenantId?: string): Promise<{
+  success: boolean;
+  templates?: any[];
+  error?: string;
+}> {
+  let creds: MetaCredentials;
+  try {
+    creds = await resolveMetaCredentials(tenantId);
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Conecte o WhatsApp (credenciais Meta) para consultar templates.',
+    };
+  }
+
+  const wabaId = creds.wabaId || process.env.META_WABA_ID;
+  if (!wabaId) {
+    return {
+      success: false,
+      error: 'WABA ID ausente. Conecte o WhatsApp para consultar templates da Meta.',
+    };
+  }
+
+  try {
+    const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/message_templates?fields=name,status,category,language,components,id&limit=100`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${creds.accessToken}`,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data?.error?.message || 'Falha ao consultar templates na Meta.',
+      };
+    }
+
+    return {
+      success: true,
+      templates: data.data || [],
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Erro de conexão com a Graph API da Meta.',
+    };
+  }
+}

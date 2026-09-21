@@ -19,12 +19,14 @@ import {
   ImageIcon,
   Lock,
 } from 'lucide-react';
+import { useBackdropClose } from '@/hooks/useModalA11y';
 
 export default function TemplatesPage() {
   const [mounted, setMounted] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const backdropProps = useBackdropClose(() => setIsModalOpen(false));
 
   // New Template Form State
   const [name, setName] = useState('');
@@ -48,7 +50,7 @@ export default function TemplatesPage() {
     setIsLoading(true);
     try {
       const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
-      const res = await fetch(`/api/templates?tenantId=${storedTenantId}`);
+      const res = await fetch(`/api/templates?tenantId=${storedTenantId}&sync=true`);
       const json = await res.json();
       if (json.success && json.templates) {
         setTemplates(json.templates);
@@ -123,6 +125,13 @@ export default function TemplatesPage() {
         <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
           <Clock className="w-3 h-3 text-amber-600 shrink-0" />
           EM ANÁLISE META
+        </span>
+      );
+    } else if (status === 'SUGGESTED') {
+      return (
+        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-100 text-domu-blue border border-blue-200">
+          <Sparkles className="w-3 h-3 text-domu-blue shrink-0" />
+          SUGESTÃO DOMU
         </span>
       );
     } else {
@@ -253,6 +262,23 @@ export default function TemplatesPage() {
                   <span className="text-domu-blue font-extrabold flex items-center gap-1">
                     Pronto p/ Disparo
                   </span>
+                ) : tpl.status === 'SUGGESTED' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setName(tpl.name);
+                      setCategory(tpl.category || 'UTILITY');
+                      setBodyText(tpl.body_text || '');
+                      setHeaderType(tpl.header_type === 'IMAGE' ? 'IMAGE' : 'NONE');
+                      setHeaderContent(tpl.header_content || '');
+                      setSubmitError('');
+                      setIsModalOpen(true);
+                    }}
+                    className="text-xs font-bold text-domu-blue hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Enviar à Meta
+                  </button>
                 ) : (
                   <span className="text-amber-700 font-extrabold text-[11px]">
                     Aguardando Meta
@@ -268,11 +294,12 @@ export default function TemplatesPage() {
       {isModalOpen && mounted && createPortal(
         <div
           className="fixed inset-0 z-[99999] bg-slate-900/50 flex items-center justify-center p-4 font-sans"
-          onClick={() => setIsModalOpen(false)}
+          {...backdropProps}
           role="presentation"
         >
           <div
             className="bg-white border border-slate-200 shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden rounded-2xl"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"

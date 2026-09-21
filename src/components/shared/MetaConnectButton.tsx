@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Script from 'next/script';
 import { ExternalLink, RefreshCw, X } from 'lucide-react';
+import { useBackdropClose } from '@/hooks/useModalA11y';
 
 type FbLoginResponse = { authResponse?: { code?: string; accessToken?: string } };
 type FbLoginStatusResponse = {
@@ -157,6 +158,8 @@ export function MetaConnectButton({
     setIsConnecting(false);
     setModalOpen(false);
   }, []);
+
+  const backdropProps = useBackdropClose(closeModal);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -376,7 +379,7 @@ export function MetaConnectButton({
           >
             <div
               className="absolute inset-0 bg-slate-950/50"
-              onClick={closeModal}
+              {...backdropProps}
               aria-hidden
             />
             <div
@@ -384,6 +387,7 @@ export function MetaConnectButton({
               role="dialog"
               aria-modal="true"
               aria-labelledby="meta-connect-title"
+              onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
             >
               <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">

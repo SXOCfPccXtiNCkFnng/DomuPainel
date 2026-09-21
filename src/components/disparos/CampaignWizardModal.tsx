@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
 import { BILLING_PAY_PATH, redirectIfDispatchBlocked } from '@/lib/billingGuard';
-import { useModalA11y } from '@/hooks/useModalA11y';
+import { useModalA11y, useBackdropClose } from '@/hooks/useModalA11y';
 import {
   INTEREST_OPTIONS,
   REGION_OPTIONS,
@@ -184,16 +184,17 @@ export default function CampaignWizardModal({
   const fetchTemplates = async () => {
     try {
       const storedTenantId = getAuthItem('domu_tenant_id') || '';
-      const res = await fetch(`/api/templates?tenantId=${storedTenantId}`);
+      const res = await fetch(`/api/templates?tenantId=${storedTenantId}&sync=true`);
       const json = await res.json();
       if (json.success && json.templates) {
         const approvedOnly = json.templates.filter((t: any) => t.status === 'APPROVED');
-        const activeList = approvedOnly.length > 0 ? approvedOnly : json.templates;
-        setTemplates(activeList);
-        if (activeList.length > 0) {
-          const initialTpl = activeList[0];
+        setTemplates(approvedOnly);
+        if (approvedOnly.length > 0) {
+          const initialTpl = approvedOnly[0];
           setSelectedTemplate(initialTpl);
           if (initialTpl.header_content) setCampaignImageUrl(initialTpl.header_content);
+        } else {
+          setSelectedTemplate(null);
         }
       }
     } catch (err) {
@@ -252,6 +253,7 @@ export default function CampaignWizardModal({
   const selectAll = () => setSelectedIds(new Set(contacts.map((c) => c.id)));
   const clearSelection = () => setSelectedIds(new Set());
   const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
+  const backdropProps = useBackdropClose(onClose);
 
   if (!isOpen || !mounted) return null;
 
@@ -341,13 +343,14 @@ export default function CampaignWizardModal({
   const modalMarkup = (
     <div
       className="fixed inset-0 z-[99999] bg-slate-900/55 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6 font-sans"
-      onClick={onClose}
+      {...backdropProps}
       role="presentation"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
         className="bg-white border border-slate-200 shadow-2xl w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden rounded-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -681,62 +684,88 @@ export default function CampaignWizardModal({
 
             {step === 2 && (
               <>
-                <div>
-                  <SectionLabel>Template aprovado pela Meta</SectionLabel>
-                  <select
-                    value={selectedTemplate?.name || ''}
-                    onChange={(e) => {
-                      const found = templates.find((t) => t.name === e.target.value);
-                      if (found) {
-                        setSelectedTemplate(found);
-                        if (found.header_content) setCampaignImageUrl(found.header_content);
-                      }
-                    }}
-                    className={inputClass}
-                  >
-                    {templates.map((tpl) => (
-                      <option key={tpl.id} value={tpl.name}>
-                        {tpl.is_global !== false ? '[PADRÃO DOMU] ' : '[MINHA EMPRESA] '}
-                        {tpl.name} — {tpl.category}
-                        {tpl.header_type === 'IMAGE' ? ' (com imagem)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {templates.length === 0 ? (
+                  <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-amber-900">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <span className="text-sm">Nenhum template aprovado na Meta ainda</span>
+                    </div>
+                    <p className="text-slate-600 leading-relaxed text-xs">
+                      A Meta (WhatsApp) exige que todo disparo de campanha utilize um modelo de mensagem cadastrado e <strong>aprovado diretamente na sua conta oficial de WhatsApp Business (WABA)</strong>.
+                    </p>
+                    <p className="text-slate-600 leading-relaxed text-[11px]">
+                      Acesse a área de <strong>Templates</strong> para criar seus modelos ou sincronizar da sua conta da Meta (a aprovação costuma levar poucos minutos).
+                    </p>
+                    <div className="pt-1">
+                      <Link
+                        href="/templates"
+                        target="_blank"
+                        className="btn-domu-primary text-xs py-2 px-4 inline-flex items-center gap-1.5 shadow-sm"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Cadastrar / Sincronizar Templates
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <SectionLabel>Template aprovado pela Meta</SectionLabel>
+                      <select
+                        value={selectedTemplate?.name || ''}
+                        onChange={(e) => {
+                          const found = templates.find((t) => t.name === e.target.value);
+                          if (found) {
+                            setSelectedTemplate(found);
+                            if (found.header_content) setCampaignImageUrl(found.header_content);
+                          }
+                        }}
+                        className={inputClass}
+                      >
+                        {templates.map((tpl) => (
+                          <option key={tpl.id} value={tpl.name}>
+                            {tpl.name} — {tpl.category}
+                            {tpl.header_type === 'IMAGE' ? ' (com imagem)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {hasImageHeader && (
-                  <ImageSourceField
-                    value={campaignImageUrl}
-                    onChange={setCampaignImageUrl}
-                    label="Imagem do banner da campanha"
-                    hint="Cole uma URL ou faça upload. A Meta usa essa imagem no disparo."
-                  />
+                    {hasImageHeader && (
+                      <ImageSourceField
+                        value={campaignImageUrl}
+                        onChange={setCampaignImageUrl}
+                        label="Imagem do banner da campanha"
+                        hint="Cole uma URL ou faça upload. A Meta usa essa imagem no disparo."
+                      />
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <SectionLabel>Texto do template</SectionLabel>
+                        <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Aprovado Meta
+                        </span>
+                      </div>
+                      <div className="p-3 bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed rounded-xl">
+                        {selectedTemplate?.body_text ||
+                          'Olá {{nome}}! Temos uma novidade especial para você.'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <SectionLabel>Nome de teste no preview</SectionLabel>
+                      <input
+                        type="text"
+                        value={variableTestName}
+                        onChange={(e) => setVariableTestName(e.target.value)}
+                        placeholder="ex: Carlos Eduardo"
+                        className={inputClass}
+                      />
+                    </div>
+                  </>
                 )}
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <SectionLabel>Texto do template</SectionLabel>
-                    <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Aprovado Meta
-                    </span>
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed rounded-xl">
-                    {selectedTemplate?.body_text ||
-                      'Olá {{nome}}! Temos uma novidade especial para você.'}
-                  </div>
-                </div>
-
-                <div>
-                  <SectionLabel>Nome de teste no preview</SectionLabel>
-                  <input
-                    type="text"
-                    value={variableTestName}
-                    onChange={(e) => setVariableTestName(e.target.value)}
-                    placeholder="ex: Carlos Eduardo"
-                    className={inputClass}
-                  />
-                </div>
               </>
             )}
           </div>

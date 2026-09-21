@@ -13,7 +13,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
-import { useModalA11y } from '@/hooks/useModalA11y';
+import { useModalA11y, useBackdropClose } from '@/hooks/useModalA11y';
 
 interface ImportContactsModalProps {
   isOpen: boolean;
@@ -84,6 +84,7 @@ export default function ImportContactsModal({
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
+  const backdropProps = useBackdropClose(onClose);
 
   useEffect(() => {
     setMounted(true);
@@ -95,12 +96,24 @@ export default function ImportContactsModal({
     setPasteText('');
     setFileName('');
     setParsedContacts([]);
-    setSuccessMsg('');
     setErrorMsg('');
+    setSuccessMsg('');
     setIsImporting(false);
   }, [isOpen]);
 
   if (!isOpen || !mounted) return null;
+
+  const handleTextChange = (value: string) => {
+    setPasteText(value);
+    setErrorMsg('');
+    setSuccessMsg('');
+    if (value.trim()) {
+      const contacts = parseRawTextToContacts(value);
+      setParsedContacts(contacts);
+    } else {
+      setParsedContacts([]);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,15 +122,17 @@ export default function ImportContactsModal({
 
     setFileName(file.name);
     setErrorMsg('');
+    setSuccessMsg('');
+
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) {
+      const content = event.target?.result as string;
+      if (!content) {
         setParsedContacts([]);
         setErrorMsg('Não foi possível ler o arquivo.');
         return;
       }
-      const contacts = parseRawTextToContacts(text);
+      const contacts = parseRawTextToContacts(content);
       setParsedContacts(contacts);
       if (contacts.length === 0) {
         setErrorMsg('Nenhum contato válido encontrado no arquivo. Use Nome,Telefone por linha.');
@@ -131,7 +146,11 @@ export default function ImportContactsModal({
     setErrorMsg('');
 
     const contactsToSubmit =
-      activeTab === 'TYPE' ? parseRawTextToContacts(pasteText) : parsedContacts;
+      activeTab === 'TYPE'
+        ? parsedContacts.length > 0
+          ? parsedContacts
+          : parseRawTextToContacts(pasteText)
+        : parsedContacts;
 
     if (contactsToSubmit.length === 0) {
       setErrorMsg(
@@ -179,13 +198,14 @@ export default function ImportContactsModal({
   const modalMarkup = (
     <div
       className="fixed inset-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 font-sans"
-      onClick={onClose}
+      {...backdropProps}
       role="presentation"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
         className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 sm:p-8 space-y-5 max-h-[92vh] overflow-y-auto"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

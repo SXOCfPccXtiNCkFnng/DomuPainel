@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import ImportContactsModal from '@/components/disparos/ImportContactsModal';
 import { getAuthItem } from '@/lib/authStorage';
+import { useBackdropClose } from '@/hooks/useModalA11y';
 import {
   INTEREST_OPTIONS,
   REGION_OPTIONS,
@@ -110,6 +111,7 @@ export default function ContatosPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [editError, setEditError] = useState('');
+  const editBackdropProps = useBackdropClose(() => setEditing(null));
 
   const fetchContacts = async () => {
     setIsLoading(true);
@@ -479,11 +481,12 @@ export default function ContatosPage() {
       {editing && (
         <div
           className="fixed inset-0 z-[99999] bg-slate-900/50 flex items-center justify-center p-4"
-          onClick={() => setEditing(null)}
+          {...editBackdropProps}
           role="presentation"
         >
           <div
             className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md p-5 space-y-4"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"

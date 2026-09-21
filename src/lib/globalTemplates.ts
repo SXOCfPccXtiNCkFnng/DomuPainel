@@ -5,7 +5,7 @@ export interface GlobalTemplateDef {
   name: string;
   category: string;
   language: string;
-  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'SUGGESTED';
   is_global: boolean;
   meta_template_id: string;
   header_type: string;
@@ -19,7 +19,7 @@ export const GLOBAL_SYSTEM_TEMPLATES: GlobalTemplateDef[] = [
     name: 'finalizar_configuracao_conta',
     category: 'UTILITY',
     language: 'pt_BR',
-    status: 'APPROVED',
+    status: 'SUGGESTED',
     is_global: true,
     meta_template_id: 'account_creation_confirmation_3',
     header_type: 'NONE',
@@ -32,7 +32,7 @@ export const GLOBAL_SYSTEM_TEMPLATES: GlobalTemplateDef[] = [
     name: 'compromisso_cancelado',
     category: 'UTILITY',
     language: 'pt_BR',
-    status: 'APPROVED',
+    status: 'SUGGESTED',
     is_global: true,
     meta_template_id: 'appointment_cancellation_1',
     header_type: 'NONE',
@@ -45,7 +45,7 @@ export const GLOBAL_SYSTEM_TEMPLATES: GlobalTemplateDef[] = [
     name: 'confirmacao_agendamento',
     category: 'UTILITY',
     language: 'pt_BR',
-    status: 'APPROVED',
+    status: 'SUGGESTED',
     is_global: true,
     meta_template_id: 'appointment_confirmation_1',
     header_type: 'NONE',

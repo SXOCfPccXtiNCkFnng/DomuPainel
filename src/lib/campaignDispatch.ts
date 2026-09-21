@@ -16,15 +16,38 @@ export type DispatchResult = {
 
 function formatMetaError(err: unknown): string {
   if (!err) return 'Falha no envio via Meta Cloud API.';
-  if (typeof err === 'string') return err;
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    return String((err as { message: unknown }).message);
+  let raw = '';
+  if (typeof err === 'string') raw = err;
+  else if (typeof err === 'object' && err !== null && 'message' in err) {
+    raw = String((err as { message: unknown }).message);
+  } else {
+    try {
+      raw = JSON.stringify(err);
+    } catch {
+      raw = 'Falha no envio via Meta Cloud API.';
+    }
   }
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return 'Falha no envio via Meta Cloud API.';
+
+  const lower = raw.toLowerCase();
+  if (lower.includes('132001') || lower.includes('does not exist in the translation')) {
+    return 'Template não encontrado ou não aprovado na sua conta da Meta (WABA). Acesse "Templates" para criar e aguardar aprovação oficial da Meta antes de disparar.';
   }
+  if (lower.includes('131030') || lower.includes('not in allowed list')) {
+    return 'O telefone de destino não está na lista de números de teste autorizados na sua conta de desenvolvedor da Meta.';
+  }
+  if (lower.includes('131047') || lower.includes('24 hours')) {
+    return 'Janela de 24 horas encerrada. Para iniciar uma nova conversa comercial, é necessário usar um template oficial aprovado pela Meta.';
+  }
+  if (lower.includes('131026') || lower.includes('undeliverable')) {
+    return 'Número de telefone inválido ou sem conta do WhatsApp ativa.';
+  }
+  if (lower.includes('130429') || lower.includes('rate limit')) {
+    return 'Limite temporário de requisições atingido na Meta. Aguarde alguns minutos e tente novamente.';
+  }
+  if (lower.includes('190') || lower.includes('session') || lower.includes('expired') || lower.includes('access token')) {
+    return 'As credenciais de acesso da Meta expiraram. Reconecte seu WhatsApp em Configurações.';
+  }
+  return raw;
 }
 
 /**

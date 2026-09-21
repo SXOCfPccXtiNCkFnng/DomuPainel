@@ -55,3 +55,29 @@ export function useModalA11y<T extends HTMLElement>(isOpen: boolean, onClose: ()
 
   return ref;
 }
+
+/**
+ * Evita o fechamento acidental de modais quando o usuário clica e arrasta de dentro
+ * para fora do modal (selecionando texto, arrastando cursor ou scrollbar).
+ * O modal só fecha se o clique começar (mousedown) E terminar (click) diretamente
+ * na área escura de fundo (backdrop overlay).
+ */
+export function useBackdropClose(onClose: () => void) {
+  const isMouseDownOnBackdrop = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isMouseDownOnBackdrop.current = e.target === e.currentTarget;
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isMouseDownOnBackdrop.current && e.target === e.currentTarget) {
+      onClose();
+    }
+    isMouseDownOnBackdrop.current = false;
+  };
+
+  return {
+    onMouseDown: handleMouseDown,
+    onClick: handleClick,
+  };
+}

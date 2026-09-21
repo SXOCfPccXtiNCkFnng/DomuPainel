@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Template } from '@/types';
 import WhatsAppPreview, { renderTemplateVariables } from '@/components/shared/WhatsAppPreview';
-import { useModalA11y } from '@/hooks/useModalA11y';
+import { useModalA11y, useBackdropClose } from '@/hooks/useModalA11y';
 
 interface CriarTemplateModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
   const [previewTestName, setPreviewTestName] = useState('Carlos Eduardo');
   const [companyName, setCompanyName] = useState('Sua Empresa');
   const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
+  const backdropProps = useBackdropClose(onClose);
 
   useEffect(() => {
     const saved = localStorage.getItem('domu_company_name');
@@ -69,13 +70,14 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
   return (
     <div
       className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
-      onClick={onClose}
+      {...backdropProps}
       role="presentation"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
         className="bg-white border border-slate-200 shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden rounded-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
