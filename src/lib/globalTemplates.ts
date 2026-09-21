@@ -16,19 +16,6 @@ export interface GlobalTemplateDef {
 
 export const GLOBAL_SYSTEM_TEMPLATES: GlobalTemplateDef[] = [
   {
-    id: 'meta-tpl-hello-world',
-    name: 'hello_world',
-    category: 'UTILITY',
-    language: 'en_US',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'hello_world',
-    header_type: 'NONE',
-    body_text:
-      'Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.',
-    variables: [],
-  },
-  {
     id: 'meta-tpl-novidades-oportunidades',
     name: 'novidades_oportunidades',
     category: 'MARKETING',

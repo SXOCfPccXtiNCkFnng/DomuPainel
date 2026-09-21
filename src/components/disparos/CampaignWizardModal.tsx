@@ -726,19 +726,19 @@ export default function CampaignWizardModal({
                         {templates.map((tpl) => (
                           <option key={tpl.id} value={tpl.name}>
                             {tpl.name} — {tpl.category} [{tpl.language || 'pt_BR'}]
-                            {tpl.name === 'hello_world' ? ' 🧪 (Teste Oficial Meta)' : ''}
+                            {tpl.name.startsWith('jaspers_') ? ' ⚡ (Ativo Meta)' : ''}
                             {tpl.header_type === 'IMAGE' ? ' (com imagem)' : ''}
                           </option>
                         ))}
                       </select>
 
-                      {selectedTemplate?.name === 'hello_world' && (
-                        <div className="mt-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5 leading-relaxed">
-                          <Sparkles className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
+                      {selectedTemplate?.name === 'jaspers_market_order_confirmation_v1' && (
+                        <div className="mt-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2.5 leading-relaxed">
+                          <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                           <div>
-                            <p className="font-bold">Template oficial de teste da Meta (en_US)</p>
-                            <p className="text-[11px] text-blue-800 mt-0.5">
-                              Este modelo é ativado de fábrica pela Meta em todas as contas WhatsApp Cloud API. Perfeito para disparar um teste imediato para o seu próprio número e verificar o recebimento no aparelho.
+                            <p className="font-bold">Template aprovado na sua conta da Meta (en_US)</p>
+                            <p className="text-[11px] text-emerald-800 mt-0.5">
+                              Este modelo comercial está 100% ativo na sua WABA. Os parâmetros de teste são preenchidos automaticamente no disparo para testar a entrega no seu aparelho celular.
                             </p>
                           </div>
                         </div>

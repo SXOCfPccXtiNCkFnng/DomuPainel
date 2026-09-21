@@ -64,7 +64,7 @@ export async function dispatchCampaignPending(
 ): Promise<DispatchResult> {
   let query = supabaseAdmin
     .from('campaigns')
-    .select('id, tenant_id, status, scheduled_at, template_id, name, hsm_templates(name, language)')
+    .select('id, tenant_id, status, scheduled_at, template_id, name, hsm_templates(name, language, variables)')
     .eq('id', campaignId);
 
   if (options?.tenantId) {
@@ -136,15 +136,16 @@ export async function dispatchCampaignPending(
     ? {
         name: templateObj.name,
         language:
-          templateObj.name.toLowerCase() === 'hello_world'
+          templateObj.name.startsWith('jaspers_')
             ? 'en_US'
             : templateObj.language || 'pt_BR',
+        variables: templateObj.variables || [],
       }
     : await resolveTemplateDetails(campaign.template_id, campaign.tenant_id);
 
   const templateName = templateMeta?.name || null;
   const languageCode =
-    templateName?.toLowerCase() === 'hello_world'
+    templateName?.startsWith('jaspers_')
       ? 'en_US'
       : templateMeta?.language || 'pt_BR';
 
@@ -272,11 +273,40 @@ export async function dispatchCampaignPending(
       failed += 1;
     } else {
       try {
+        let components: any[] | undefined = undefined;
+        if (templateName === 'jaspers_market_order_confirmation_v1') {
+          components = [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: lead?.name || 'Cliente' },
+                { type: 'text', text: '#1001' },
+                { type: 'text', text: 'Hoje' },
+              ],
+            },
+          ];
+        } else if (
+          templateMeta?.variables &&
+          Array.isArray(templateMeta.variables) &&
+          templateMeta.variables.length > 0
+        ) {
+          components = [
+            {
+              type: 'body',
+              parameters: templateMeta.variables.map(() => ({
+                type: 'text',
+                text: lead?.name || 'Cliente',
+              })),
+            },
+          ];
+        }
+
         const result = await sendMetaTemplate({
           to: phone,
           templateName,
           languageCode,
           credentials,
+          components,
         });
         if (result.success && result.messageId) {
           patch.status = 'SENT';
@@ -358,11 +388,11 @@ export async function dispatchCampaignPending(
 async function resolveTemplateDetails(
   templateId: string | null,
   tenantId: string
-): Promise<{ name: string; language: string } | null> {
+): Promise<{ name: string; language: string; variables?: string[] } | null> {
   if (!templateId) return null;
   const { data } = await supabaseAdmin
     .from('hsm_templates')
-    .select('name, language')
+    .select('name, language, variables')
     .eq('id', templateId)
     .eq('tenant_id', tenantId)
     .maybeSingle();
@@ -370,7 +400,8 @@ async function resolveTemplateDetails(
   if (data?.name) {
     return {
       name: data.name,
-      language: data.name.toLowerCase() === 'hello_world' ? 'en_US' : data.language || 'pt_BR',
+      language: data.language || (data.name.startsWith('jaspers_') ? 'en_US' : 'pt_BR'),
+      variables: data.variables || [],
     };
   }
 
@@ -382,7 +413,8 @@ async function resolveTemplateDetails(
   if (globalTpl) {
     return {
       name: globalTpl.name,
-      language: globalTpl.language || (globalTpl.name === 'hello_world' ? 'en_US' : 'pt_BR'),
+      language: globalTpl.language || 'pt_BR',
+      variables: globalTpl.variables || [],
     };
   }
 

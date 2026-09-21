@@ -74,44 +74,6 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Garantir que hello_world esteja salvo no banco com status APPROVED e idioma en_US
-    try {
-      const { data: helloRow } = await supabaseAdmin
-        .from('hsm_templates')
-        .select('id, status, language')
-        .eq('tenant_id', tenantId)
-        .eq('name', 'hello_world')
-        .maybeSingle();
-
-      if (!helloRow) {
-        await supabaseAdmin.from('hsm_templates').insert({
-          tenant_id: tenantId,
-          name: 'hello_world',
-          category: 'UTILITY',
-          language: 'en_US',
-          status: 'APPROVED',
-          meta_template_id: 'hello_world',
-          header_type: 'NONE',
-          body_text:
-            'Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.',
-          variables: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      } else if (helloRow.status !== 'APPROVED' || helloRow.language !== 'en_US') {
-        await supabaseAdmin
-          .from('hsm_templates')
-          .update({
-            status: 'APPROVED',
-            language: 'en_US',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', helloRow.id);
-      }
-    } catch (helloErr) {
-      console.warn('[Templates Auto-Seed hello_world Warning]', helloErr);
-    }
-
     let customTemplates: any[] = [];
     const { data, error } = await supabaseAdmin
       .from('hsm_templates')
