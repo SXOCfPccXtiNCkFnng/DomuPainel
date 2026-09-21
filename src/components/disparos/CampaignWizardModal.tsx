@@ -19,6 +19,7 @@ import {
   Search,
   ExternalLink,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
 import { BILLING_PAY_PATH, redirectIfDispatchBlocked } from '@/lib/billingGuard';
@@ -724,11 +725,24 @@ export default function CampaignWizardModal({
                       >
                         {templates.map((tpl) => (
                           <option key={tpl.id} value={tpl.name}>
-                            {tpl.name} — {tpl.category}
+                            {tpl.name} — {tpl.category} [{tpl.language || 'pt_BR'}]
+                            {tpl.name === 'hello_world' ? ' 🧪 (Teste Oficial Meta)' : ''}
                             {tpl.header_type === 'IMAGE' ? ' (com imagem)' : ''}
                           </option>
                         ))}
                       </select>
+
+                      {selectedTemplate?.name === 'hello_world' && (
+                        <div className="mt-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5 leading-relaxed">
+                          <Sparkles className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Template oficial de teste da Meta (en_US)</p>
+                            <p className="text-[11px] text-blue-800 mt-0.5">
+                              Este modelo é ativado de fábrica pela Meta em todas as contas WhatsApp Cloud API. Perfeito para disparar um teste imediato para o seu próprio número e verificar o recebimento no aparelho.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {hasImageHeader && (

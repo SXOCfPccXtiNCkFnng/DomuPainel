@@ -220,6 +220,14 @@ export default function TemplatesPage() {
 
                 <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold text-slate-500 uppercase">
                   <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700">{tpl.category}</span>
+                  <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700 font-mono">
+                    {tpl.language || (tpl.name === 'hello_world' ? 'en_US' : 'pt_BR')}
+                  </span>
+                  {tpl.name === 'hello_world' && (
+                    <span className="px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded font-extrabold">
+                      🧪 TESTE OFICIAL META
+                    </span>
+                  )}
                   {tpl.is_global !== false ? (
                     <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded font-extrabold">
                       PADRÃO DOMU

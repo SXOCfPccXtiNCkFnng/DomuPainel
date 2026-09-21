@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
             const bodyComp = metaTpl.components?.find((c: any) => c.type === 'BODY');
             const headerComp = metaTpl.components?.find((c: any) => c.type === 'HEADER');
             const formattedStatus = mapMetaStatus(metaTpl.status);
+            const templateLang =
+              metaTpl.language || (metaTpl.name === 'hello_world' ? 'en_US' : 'pt_BR');
 
             const { data: existing } = await supabaseAdmin
               .from('hsm_templates')
@@ -45,6 +47,7 @@ export async function GET(req: NextRequest) {
                   status: formattedStatus,
                   meta_template_id: metaTpl.id,
                   category: metaTpl.category || 'MARKETING',
+                  language: templateLang,
                   body_text: bodyComp?.text || '',
                   header_type: headerComp?.format || 'NONE',
                   updated_at: new Date().toISOString(),
@@ -57,7 +60,7 @@ export async function GET(req: NextRequest) {
                 status: formattedStatus,
                 meta_template_id: metaTpl.id,
                 category: metaTpl.category || 'MARKETING',
-                language: metaTpl.language || 'pt_BR',
+                language: templateLang,
                 body_text: bodyComp?.text || '',
                 header_type: headerComp?.format || 'NONE',
                 created_at: new Date().toISOString(),
@@ -69,6 +72,44 @@ export async function GET(req: NextRequest) {
       } catch (syncErr) {
         console.warn('[Templates Sync Warning]', syncErr);
       }
+    }
+
+    // Garantir que hello_world esteja salvo no banco com status APPROVED e idioma en_US
+    try {
+      const { data: helloRow } = await supabaseAdmin
+        .from('hsm_templates')
+        .select('id, status, language')
+        .eq('tenant_id', tenantId)
+        .eq('name', 'hello_world')
+        .maybeSingle();
+
+      if (!helloRow) {
+        await supabaseAdmin.from('hsm_templates').insert({
+          tenant_id: tenantId,
+          name: 'hello_world',
+          category: 'UTILITY',
+          language: 'en_US',
+          status: 'APPROVED',
+          meta_template_id: 'hello_world',
+          header_type: 'NONE',
+          body_text:
+            'Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.',
+          variables: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      } else if (helloRow.status !== 'APPROVED' || helloRow.language !== 'en_US') {
+        await supabaseAdmin
+          .from('hsm_templates')
+          .update({
+            status: 'APPROVED',
+            language: 'en_US',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', helloRow.id);
+      }
+    } catch (helloErr) {
+      console.warn('[Templates Auto-Seed hello_world Warning]', helloErr);
     }
 
     let customTemplates: any[] = [];

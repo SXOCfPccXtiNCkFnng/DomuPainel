@@ -9,49 +9,64 @@ export interface GlobalTemplateDef {
   is_global: boolean;
   meta_template_id: string;
   header_type: string;
+  header_content?: string;
   body_text: string;
   variables: string[];
 }
 
 export const GLOBAL_SYSTEM_TEMPLATES: GlobalTemplateDef[] = [
   {
-    id: 'meta-lib-1',
-    name: 'finalizar_configuracao_conta',
+    id: 'meta-tpl-hello-world',
+    name: 'hello_world',
     category: 'UTILITY',
+    language: 'en_US',
+    status: 'APPROVED',
+    is_global: true,
+    meta_template_id: 'hello_world',
+    header_type: 'NONE',
+    body_text:
+      'Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.',
+    variables: [],
+  },
+  {
+    id: 'meta-tpl-novidades-oportunidades',
+    name: 'novidades_oportunidades',
+    category: 'MARKETING',
     language: 'pt_BR',
     status: 'SUGGESTED',
     is_global: true,
-    meta_template_id: 'account_creation_confirmation_3',
-    header_type: 'NONE',
+    meta_template_id: '',
+    header_type: 'IMAGE',
+    header_content: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80',
     body_text:
-      'Oi, {{nome}}! Sua nova conta foi criada com sucesso. Verifique seus dados para concluir o perfil.',
+      'Olá {{nome}}! Temos novidades e oportunidades selecionadas especialmente para você. Gostaria de receber nossa seleção exclusiva com as melhores opções da semana?',
     variables: ['nome'],
   },
   {
-    id: 'meta-lib-2',
-    name: 'compromisso_cancelado',
+    id: 'meta-tpl-agendamento-atendimento',
+    name: 'agendamento_atendimento',
     category: 'UTILITY',
     language: 'pt_BR',
     status: 'SUGGESTED',
     is_global: true,
-    meta_template_id: 'appointment_cancellation_1',
+    meta_template_id: '',
     header_type: 'NONE',
     body_text:
-      'Olá {{nome}}. Seu compromisso com {{empresa}} em {{data}} às {{horario}} foi cancelado. Avise-nos se tiver alguma dúvida ou precisar reagendar.',
-    variables: ['nome', 'empresa', 'data', 'horario'],
+      'Olá {{nome}}! Confirmamos seu interesse em nossos serviços. Qual seria o melhor dia e horário para agendarmos uma conversa rápida sobre o que você procura?',
+    variables: ['nome'],
   },
   {
-    id: 'meta-lib-3',
-    name: 'confirmacao_agendamento',
-    category: 'UTILITY',
+    id: 'meta-tpl-contato-consultor',
+    name: 'contato_consultor',
+    category: 'MARKETING',
     language: 'pt_BR',
     status: 'SUGGESTED',
     is_global: true,
-    meta_template_id: 'appointment_confirmation_1',
+    meta_template_id: '',
     header_type: 'NONE',
     body_text:
-      'Olá {{nome}}! Seu agendamento foi confirmado para {{data}} às {{horario}}. Até lá!',
-    variables: ['nome', 'data', 'horario'],
+      'Olá {{nome}}! Sou consultor da nossa equipe e gostaria de saber se você ainda está em busca de opções no mercado ou se precisa de apoio hoje.',
+    variables: ['nome'],
   },
 ];
 
@@ -64,7 +79,7 @@ export function isUuid(val: unknown): boolean {
 
 /**
  * Garante que a campanha receba um UUID real e válido para template_id.
- * Se o template for um dos modelos padrão do Domu (ex: meta-lib-1) ou passado por nome,
+ * Se o template for um dos modelos padrão do Domu (ex: hello_world) ou passado por nome,
  * busca ou cria o registro correspondente em public.hsm_templates para o tenant.
  */
 export async function ensureTemplateIdForTenant(
@@ -76,12 +91,20 @@ export async function ensureTemplateIdForTenant(
   if (templateId && isUuid(templateId)) {
     const { data: existing } = await supabaseAdmin
       .from('hsm_templates')
-      .select('id')
+      .select('id, name, language')
       .eq('id', templateId)
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (existing?.id) return existing.id;
+    if (existing?.id) {
+      if (existing.name?.toLowerCase() === 'hello_world' && existing.language !== 'en_US') {
+        await supabaseAdmin
+          .from('hsm_templates')
+          .update({ language: 'en_US', status: 'APPROVED' })
+          .eq('id', existing.id);
+      }
+      return existing.id;
+    }
   }
 
   // 2. Identifica se é um dos templates globais
@@ -97,13 +120,19 @@ export async function ensureTemplateIdForTenant(
   // 3. Procura no banco se esse tenant já tem um template com esse nome
   const { data: byName } = await supabaseAdmin
     .from('hsm_templates')
-    .select('id')
+    .select('id, language')
     .eq('tenant_id', tenantId)
     .eq('name', targetName)
     .limit(1)
     .maybeSingle();
 
   if (byName?.id && isUuid(byName.id)) {
+    if (targetName.toLowerCase() === 'hello_world' && byName.language !== 'en_US') {
+      await supabaseAdmin
+        .from('hsm_templates')
+        .update({ language: 'en_US', status: 'APPROVED' })
+        .eq('id', byName.id);
+    }
     return byName.id;
   }
 
@@ -115,10 +144,11 @@ export async function ensureTemplateIdForTenant(
         tenant_id: tenantId,
         name: globalTpl.name,
         category: globalTpl.category,
-        language: globalTpl.language,
-        status: 'APPROVED',
+        language: globalTpl.language || (globalTpl.name === 'hello_world' ? 'en_US' : 'pt_BR'),
+        status: globalTpl.status === 'APPROVED' ? 'APPROVED' : 'SUGGESTED',
         meta_template_id: globalTpl.meta_template_id || null,
         header_type: globalTpl.header_type || 'NONE',
+        header_content: globalTpl.header_content || null,
         body_text: globalTpl.body_text,
         variables: globalTpl.variables || [],
         created_at: new Date().toISOString(),

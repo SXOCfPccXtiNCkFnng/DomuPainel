@@ -3,6 +3,7 @@ import { resolveMetaCredentials, sendMetaTemplate } from '@/lib/metaClient';
 import { logOpsAlert } from '@/lib/opsAlert';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { notifyTenantAdmins } from '@/lib/notify';
+import { GLOBAL_SYSTEM_TEMPLATES } from '@/lib/globalTemplates';
 
 export type DispatchResult = {
   processed: number;
@@ -60,7 +61,7 @@ export async function dispatchCampaignPending(
 ): Promise<DispatchResult> {
   let query = supabaseAdmin
     .from('campaigns')
-    .select('id, tenant_id, status, scheduled_at, template_id, name, hsm_templates(name)')
+    .select('id, tenant_id, status, scheduled_at, template_id, name, hsm_templates(name, language)')
     .eq('id', campaignId);
 
   if (options?.tenantId) {
@@ -127,9 +128,22 @@ export async function dispatchCampaignPending(
     };
   }
 
-  const templateName =
-    (campaign as any).hsm_templates?.name ||
-    (await resolveTemplateName(campaign.template_id, campaign.tenant_id));
+  const templateObj = (campaign as any).hsm_templates;
+  const templateMeta = templateObj?.name
+    ? {
+        name: templateObj.name,
+        language:
+          templateObj.name.toLowerCase() === 'hello_world'
+            ? 'en_US'
+            : templateObj.language || 'pt_BR',
+      }
+    : await resolveTemplateDetails(campaign.template_id, campaign.tenant_id);
+
+  const templateName = templateMeta?.name || null;
+  const languageCode =
+    templateName?.toLowerCase() === 'hello_world'
+      ? 'en_US'
+      : templateMeta?.language || 'pt_BR';
 
   if (!templateName) {
     await supabaseAdmin
@@ -258,7 +272,7 @@ export async function dispatchCampaignPending(
         const result = await sendMetaTemplate({
           to: phone,
           templateName,
-          languageCode: 'pt_BR',
+          languageCode,
           credentials,
         });
         if (result.success && result.messageId) {
@@ -338,18 +352,38 @@ export async function dispatchCampaignPending(
   };
 }
 
-async function resolveTemplateName(
+async function resolveTemplateDetails(
   templateId: string | null,
   tenantId: string
-): Promise<string | null> {
+): Promise<{ name: string; language: string } | null> {
   if (!templateId) return null;
   const { data } = await supabaseAdmin
     .from('hsm_templates')
-    .select('name')
+    .select('name, language')
     .eq('id', templateId)
     .eq('tenant_id', tenantId)
     .maybeSingle();
-  return data?.name || null;
+
+  if (data?.name) {
+    return {
+      name: data.name,
+      language: data.name.toLowerCase() === 'hello_world' ? 'en_US' : data.language || 'pt_BR',
+    };
+  }
+
+  const globalTpl = GLOBAL_SYSTEM_TEMPLATES.find(
+    (g) =>
+      g.id === templateId ||
+      g.name.toLowerCase() === templateId.toLowerCase()
+  );
+  if (globalTpl) {
+    return {
+      name: globalTpl.name,
+      language: globalTpl.language || (globalTpl.name === 'hello_world' ? 'en_US' : 'pt_BR'),
+    };
+  }
+
+  return null;
 }
 
 export async function recountCampaignLogs(campaignId: string, tenantId: string) {
