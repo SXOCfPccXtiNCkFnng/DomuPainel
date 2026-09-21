@@ -31,7 +31,7 @@ function formatMetaError(err: unknown): string {
 
   const lower = raw.toLowerCase();
   if (lower.includes('131058') || lower.includes('public test numbers')) {
-    return 'O template "hello_world" é uma trava da Meta exclusiva para o número sandbox de testes. Como você conectou um número real (+55...), a Meta exige o uso de um modelo comercial aprovado. Acesse "Templates" para usar os modelos sugeridos ou cadastrar um novo.';
+    return 'Os modelos de exemplo da Meta (como "hello_world" e "jaspers_market_*") possuem uma trava da Meta e só podem ser enviados pelo número de testes fictício da Meta. Como sua conta conectou um número real (+55...), a Meta exige o envio através de um modelo próprio aprovado da sua empresa. Acesse o menu Templates para cadastrar e aprovar seu modelo.';
   }
   if (lower.includes('132001') || lower.includes('does not exist in the translation')) {
     return 'Template não encontrado ou não aprovado na sua conta da Meta (WABA). Acesse "Templates" para criar e aguardar aprovação oficial da Meta antes de disparar.';
