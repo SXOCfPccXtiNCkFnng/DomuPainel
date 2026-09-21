@@ -82,35 +82,76 @@ export async function POST(req: NextRequest) {
     }
 
     const leadsToInsert = contacts
-      .map((c: any) => ({
-        tenant_id: tenantId,
-        name: c.name?.trim() || 'Contato Importado',
-        phone: formatWhatsAppPhone(c.phone),
-        status: c.status || 'NOVO',
-        interest_segment: c.interest || c.interest_segment || null,
-        region: c.region || null,
-        interest_property_type: c.propertyType || c.interest_property_type || null,
-        budget_max:
-          c.budgetMax != null && c.budgetMax !== ''
-            ? Number(c.budgetMax)
-            : c.budget_max != null
-              ? Number(c.budget_max)
-              : null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }))
+      .map((c: any) => {
+        const item: Record<string, unknown> = {
+          tenant_id: tenantId,
+          name: c.name?.trim() || 'Contato Importado',
+          phone: formatWhatsAppPhone(c.phone),
+          status: c.status || 'NOVO',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const interest = c.interest || c.interest_segment;
+        if (interest) item.interest_segment = interest;
+
+        if (c.region) item.region = c.region;
+
+        const propType = c.propertyType || c.interest_property_type;
+        if (propType) item.interest_property_type = propType;
+
+        const rawBudget = c.budgetMax ?? c.budget_max;
+        if (rawBudget != null && rawBudget !== '') {
+          const num = Number(rawBudget);
+          if (!Number.isNaN(num)) item.budget_max = num;
+        }
+
+        return item;
+      })
       .filter((c: any) => c.phone.length >= 10);
 
-    const { data: inserted, error } = await supabaseAdmin
+    let { data: inserted, error } = await supabaseAdmin
       .from('leads')
       .upsert(leadsToInsert, { onConflict: 'tenant_id,phone' })
       .select('*');
 
+    if (error && (error.message?.includes("'region'") || error.message?.includes('schema cache'))) {
+      const sanitized = leadsToInsert.map((item) => {
+        const copy = { ...item };
+        delete copy.region;
+        return copy;
+      });
+      const retryUpsert = await supabaseAdmin
+        .from('leads')
+        .upsert(sanitized, { onConflict: 'tenant_id,phone' })
+        .select('*');
+      inserted = retryUpsert.data;
+      error = retryUpsert.error;
+    }
+
     if (error) {
-      const { data: fallbackInserted, error: insertError } = await supabaseAdmin
+      let { data: fallbackInserted, error: insertError } = await supabaseAdmin
         .from('leads')
         .insert(leadsToInsert)
         .select('*');
+
+      if (
+        insertError &&
+        (insertError.message?.includes("'region'") || insertError.message?.includes('schema cache'))
+      ) {
+        const sanitized = leadsToInsert.map((item) => {
+          const copy = { ...item };
+          delete copy.region;
+          return copy;
+        });
+        const retryInsert = await supabaseAdmin
+          .from('leads')
+          .insert(sanitized)
+          .select('*');
+        fallbackInserted = retryInsert.data;
+        insertError = retryInsert.error;
+      }
+
       if (insertError) throw insertError;
       return NextResponse.json({
         success: true,
@@ -166,12 +207,24 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('leads')
       .update(payload)
       .eq('tenant_id', tenantId)
       .in('id', targetIds)
       .select('*');
+
+    if (error && error.message?.includes("'region'") && 'region' in payload) {
+      delete payload.region;
+      const retry = await supabaseAdmin
+        .from('leads')
+        .update(payload)
+        .eq('tenant_id', tenantId)
+        .in('id', targetIds)
+        .select('*');
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
 

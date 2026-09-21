@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [companyName, setCompanyName] = useState('Sua Empresa');
   const [whatsappPhone, setWhatsappPhone] = useState('(11) 99999-9999');
   const [segment, setSegment] = useState<TenantSegment>('geral');
+  const [metaConnected, setMetaConnected] = useState<boolean | null>(null);
   const [roiMetrics, setRoiMetrics] = useState([
     { label: 'Contatos atingidos', value: '0', hint: 'Entregas no período' },
     { label: 'Taxa de resposta', value: '0%', hint: 'Quem engajou' },
@@ -49,7 +50,20 @@ export default function DashboardPage() {
     }
     setSegment(getSegmentFromStorage());
     fetchDashboardData();
+    fetchMetaStatus();
   }, []);
+
+  // Consulta ao vivo na Graph API da Meta — mesma fonte do header e do
+  // widget de coexistência, evita mostrar "Conectado" fixo no JSX.
+  const fetchMetaStatus = async () => {
+    try {
+      const res = await fetch('/api/whatsapp/stats');
+      const json = await res.json();
+      if (json.success) setMetaConnected(Boolean(json.stats?.isConnected));
+    } catch (err) {
+      console.error('Erro ao buscar status do WhatsApp na Meta:', err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -252,9 +266,19 @@ export default function DashboardPage() {
               <Smartphone className="w-4 h-4 text-domu-blue" />
               <h3 className="text-sm font-bold text-slate-900">Status do WhatsApp</h3>
             </div>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5">
-              Conectado
-            </span>
+            {metaConnected === null ? (
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-200 px-2.5 py-0.5">
+                Verificando…
+              </span>
+            ) : metaConnected ? (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5">
+                Conectado
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5">
+                Pendente
+              </span>
+            )}
           </div>
 
           <p className="text-sm text-slate-600 leading-relaxed">
@@ -264,7 +288,14 @@ export default function DashboardPage() {
 
           <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
             <span>
-              Sessão: <strong className="text-emerald-600">Ativa</strong>
+              Sessão:{' '}
+              {metaConnected === null ? (
+                <strong className="text-slate-400">…</strong>
+              ) : metaConnected ? (
+                <strong className="text-emerald-600">Ativa</strong>
+              ) : (
+                <strong className="text-amber-600">Pendente</strong>
+              )}
             </span>
             <Link href="/configuracoes" className="text-domu-blue font-semibold hover:underline">
               Configurações

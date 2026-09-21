@@ -76,10 +76,12 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
     fetchNotifications();
     const poll = setInterval(fetchNotifications, 60000);
 
-    fetch('/api/dashboard/stats')
+    // Consulta ao vivo na Graph API da Meta (não só "tem credencial salva") —
+    // reflete o status real do número, igual ao CoexistenceWidget.
+    fetch('/api/whatsapp/stats')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) setMetaConnected(Boolean(data.metrics?.metaConnected));
+        if (data.success) setMetaConnected(Boolean(data.stats?.isConnected));
       })
       .catch(() => {
         /* mantém metaConnected null (esconde a pill) em caso de falha */
@@ -171,7 +173,7 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
               {metaConnected === null ? (
                 <strong className="text-slate-400 font-bold">…</strong>
               ) : metaConnected ? (
-                <strong className="text-emerald-700 font-bold">Online</strong>
+                <strong className="text-emerald-700 font-bold">Conectado</strong>
               ) : (
                 <strong className="text-amber-700 font-bold">Pendente</strong>
               )}
