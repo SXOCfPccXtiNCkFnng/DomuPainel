@@ -109,6 +109,7 @@ export default function ContatosPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editError, setEditError] = useState('');
 
   const fetchContacts = async () => {
     setIsLoading(true);
@@ -175,6 +176,7 @@ export default function ContatosPage() {
 
   const openEdit = (contact: LeadContact) => {
     setEditing(contact);
+    setEditError('');
     setEditForm({
       name: contact.name || '',
       interest: contact.interest_segment || '',
@@ -188,6 +190,7 @@ export default function ContatosPage() {
   const saveEdit = async () => {
     if (!editing) return;
     setIsSaving(true);
+    setEditError('');
     try {
       const tenantId = getAuthItem('domu_tenant_id') || '';
       const res = await fetch('/api/leads', {
@@ -211,11 +214,11 @@ export default function ContatosPage() {
         setEditing(null);
         await fetchContacts();
       } else {
-        alert(json.error || 'Erro ao salvar.');
+        setEditError(json.error || 'Não foi possível salvar as alterações.');
       }
     } catch (err) {
       console.error(err);
-      alert('Erro ao salvar contato.');
+      setEditError('Falha de conexão ao salvar contato. Tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -567,6 +570,11 @@ export default function ContatosPage() {
                 </select>
               </div>
             </div>
+            {editError && (
+              <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
+                {editError}
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"

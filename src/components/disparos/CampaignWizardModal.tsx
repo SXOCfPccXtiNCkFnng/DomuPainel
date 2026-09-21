@@ -18,6 +18,7 @@ import {
   Zap,
   Search,
   ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
 import { BILLING_PAY_PATH, redirectIfDispatchBlocked } from '@/lib/billingGuard';
@@ -116,6 +117,7 @@ export default function CampaignWizardModal({
   );
   const [variableTestName, setVariableTestName] = useState('Carlos Eduardo');
   const [companyName, setCompanyName] = useState('Sua Empresa');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -139,6 +141,7 @@ export default function CampaignWizardModal({
     setPropertyId(initialPropertyId || '');
     setDispatchTiming('IMMEDIATE');
     setIsSubmitting(false);
+    setErrorMessage('');
     fetchLeads();
     fetchTemplates();
     fetchProperties();
@@ -277,6 +280,7 @@ export default function CampaignWizardModal({
     const leadIds = Array.from(selectedIds).slice(0, metaTierLimit);
 
     try {
+      setErrorMessage('');
       const tenantId = getAuthItem('domu_tenant_id') || '';
       const res = await fetch('/api/campaigns', {
         method: 'POST',
@@ -298,7 +302,16 @@ export default function CampaignWizardModal({
         return;
       }
       if (!json.success) {
-        alert(json.error || 'Erro ao criar campanha.');
+        let friendly = json.error || 'Não foi possível registrar o disparo.';
+        const lower = String(friendly).toLowerCase();
+        if (lower.includes('uuid') || lower.includes('syntax') || lower.includes('invalid input')) {
+          friendly = 'O modelo de mensagem precisa ser revalidado. Selecione o modelo novamente.';
+        } else if (lower.includes('fkey') || lower.includes('foreign key')) {
+          friendly = 'O modelo ou imóvel selecionado não está disponível.';
+        } else if (lower.includes('schema cache') || lower.includes('column')) {
+          friendly = 'O sistema está sincronizando seus recursos. Tente novamente em instantes.';
+        }
+        setErrorMessage(friendly);
         setIsSubmitting(false);
         return;
       }
@@ -316,7 +329,7 @@ export default function CampaignWizardModal({
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Falha ao registrar campanha.');
+      setErrorMessage('Falha de conexão ao registrar o disparo. Verifique sua rede e tente novamente.');
       setIsSubmitting(false);
     }
   };
@@ -755,6 +768,25 @@ export default function CampaignWizardModal({
             />
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="mx-6 mb-2 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start justify-between gap-2.5 animate-in fade-in duration-200">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <div className="leading-snug">
+                <p className="font-semibold text-red-800">Atenção</p>
+                <p className="text-red-600 mt-0.5">{errorMessage}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage('')}
+              className="text-red-400 hover:text-red-600 p-0.5 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         <div className="px-6 py-3 border-t border-slate-200 flex items-center justify-between shrink-0 bg-white">
           <button

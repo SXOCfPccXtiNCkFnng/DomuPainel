@@ -2,55 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { createMetaMessageTemplate } from '@/lib/metaClient';
+import { GLOBAL_SYSTEM_TEMPLATES } from '@/lib/globalTemplates';
 
 export const dynamic = 'force-dynamic';
-
-/**
- * Exemplos baseados na Biblioteca de modelos da Meta (utilidade).
- * São só referência visual no Domu — templates reais do cliente
- * são os criados via POST (enviados à WABA na Graph API).
- */
-const GLOBAL_SYSTEM_TEMPLATES = [
-  {
-    id: 'meta-lib-1',
-    name: 'finalizar_configuracao_conta',
-    category: 'UTILITY',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'account_creation_confirmation_3',
-    header_type: 'NONE',
-    body_text:
-      'Oi, {{nome}}! Sua nova conta foi criada com sucesso. Verifique seus dados para concluir o perfil.',
-    variables: ['nome'],
-  },
-  {
-    id: 'meta-lib-2',
-    name: 'compromisso_cancelado',
-    category: 'UTILITY',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'appointment_cancellation_1',
-    header_type: 'NONE',
-    body_text:
-      'Olá {{nome}}. Seu compromisso com {{empresa}} em {{data}} às {{horario}} foi cancelado. Avise-nos se tiver alguma dúvida ou precisar reagendar.',
-    variables: ['nome', 'empresa', 'data', 'horario'],
-  },
-  {
-    id: 'meta-lib-3',
-    name: 'confirmacao_agendamento',
-    category: 'UTILITY',
-    language: 'pt_BR',
-    status: 'APPROVED',
-    is_global: true,
-    meta_template_id: 'appointment_confirmation_1',
-    header_type: 'NONE',
-    body_text:
-      'Olá {{nome}}! Seu agendamento foi confirmado para {{data}} às {{horario}}. Até lá!',
-    variables: ['nome', 'data', 'horario'],
-  },
-];
 
 function mapMetaStatus(raw?: string): 'APPROVED' | 'PENDING' | 'REJECTED' {
   const s = String(raw || 'PENDING').toUpperCase();
@@ -79,9 +33,14 @@ export async function GET(req: NextRequest) {
       }));
     }
 
+    const customNames = new Set(customTemplates.map((t) => t.name.toLowerCase()));
+    const unseededGlobals = GLOBAL_SYSTEM_TEMPLATES.filter(
+      (g) => !customNames.has(g.name.toLowerCase())
+    );
+
     return NextResponse.json({
       success: true,
-      templates: [...customTemplates, ...GLOBAL_SYSTEM_TEMPLATES],
+      templates: [...customTemplates, ...unseededGlobals],
     });
   } catch (error: any) {
     console.error('[Templates API GET Error]', error);

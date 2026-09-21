@@ -9,6 +9,7 @@ import {
   normalizePlanTier,
 } from '@/lib/planLimits';
 import { dispatchCampaignPending } from '@/lib/campaignDispatch';
+import { ensureTemplateIdForTenant } from '@/lib/globalTemplates';
 
 export const dynamic = 'force-dynamic';
 
@@ -171,16 +172,20 @@ export async function POST(req: NextRequest) {
     const isScheduled = Boolean(scheduledAt);
     const nowIso = new Date().toISOString();
 
-    let resolvedTemplateId = templateId || null;
-    if (!resolvedTemplateId && templateName) {
-      const { data: tpl } = await supabaseAdmin
-        .from('hsm_templates')
-        .select('id, name')
-        .eq('tenant_id', tenantId)
-        .eq('name', templateName)
-        .limit(1)
-        .maybeSingle();
-      resolvedTemplateId = tpl?.id || null;
+    const resolvedTemplateId = await ensureTemplateIdForTenant(
+      tenantId,
+      templateId,
+      templateName
+    );
+
+    if (!resolvedTemplateId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Por favor, selecione um modelo de mensagem aprovado para iniciar o disparo.',
+        },
+        { status: 400 }
+      );
     }
 
     const campaignPayload: Record<string, unknown> = {
@@ -254,10 +259,14 @@ export async function POST(req: NextRequest) {
     let failed = 0;
 
     if (!isScheduled) {
-      const result = await dispatchCampaignPending(campaign.id, { tenantId });
-      finalStatus = result.campaignStatus;
-      sent = result.sent;
-      failed = result.failed;
+      try {
+        const result = await dispatchCampaignPending(campaign.id, { tenantId });
+        finalStatus = result.campaignStatus;
+        sent = result.sent;
+        failed = result.failed;
+      } catch (dispatchErr) {
+        console.error('[Campaigns API Immediate Dispatch Error]', dispatchErr);
+      }
     }
 
     return NextResponse.json({
@@ -277,7 +286,16 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('[Campaigns POST]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('[Campaigns API POST Error]', error);
+    let friendly = error.message || 'Erro ao registrar o disparo.';
+    const lower = String(friendly).toLowerCase();
+    if (lower.includes('uuid') || lower.includes('syntax') || lower.includes('invalid input')) {
+      friendly = 'O modelo de mensagem selecionado precisa ser revalidado. Selecione o modelo novamente.';
+    } else if (lower.includes('fkey') || lower.includes('foreign key')) {
+      friendly = 'O modelo ou imóvel selecionado não foi encontrado na sua conta.';
+    } else if (lower.includes('schema cache') || lower.includes('column') || lower.includes('relation')) {
+      friendly = 'O banco de dados está sincronizando seus recursos. Tente novamente em instantes.';
+    }
+    return NextResponse.json({ success: false, error: friendly }, { status: 500 });
   }
 }
