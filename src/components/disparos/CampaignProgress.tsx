@@ -258,6 +258,18 @@ export default function CampaignProgress({ campaignId, onClose }: CampaignProgre
         </p>
       ) : null}
 
+      {logs.some((l) => l.status === 'FAILED' && l.errorMessage) && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-start gap-2.5 leading-relaxed">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-extrabold text-rose-950">Aviso sobre o envio:</p>
+            <p className="text-[11.5px] text-rose-800">
+              {logs.find((l) => l.status === 'FAILED' && l.errorMessage)?.errorMessage}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="pt-2">
         <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-2">
           <span className="flex items-center gap-1.5 text-slate-900">
