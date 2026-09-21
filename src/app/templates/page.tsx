@@ -46,8 +46,8 @@ export default function TemplatesPage() {
     fetchTemplates();
   }, []);
 
-  const fetchTemplates = async () => {
-    setIsLoading(true);
+  const fetchTemplates = async (showSpinner = true) => {
+    if (showSpinner) setIsLoading(true);
     try {
       const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
       const res = await fetch(`/api/templates?tenantId=${storedTenantId}&sync=true`);
@@ -58,9 +58,21 @@ export default function TemplatesPage() {
     } catch (err) {
       console.error('Erro ao buscar templates:', err);
     } finally {
-      setIsLoading(false);
+      if (showSpinner) setIsLoading(false);
     }
   };
+
+  // Se houver algum template em análise na Meta, atualiza automaticamente a cada 15 segundos
+  useEffect(() => {
+    const hasPending = templates.some((t) => t.status === 'PENDING');
+    if (!hasPending) return;
+
+    const timer = setInterval(() => {
+      fetchTemplates(false);
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, [templates]);
 
   const handleCreateTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,7 +175,7 @@ export default function TemplatesPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchTemplates}
+            onClick={() => fetchTemplates(true)}
             className="p-2 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
             title="Atualizar lista com a Meta"
           >
