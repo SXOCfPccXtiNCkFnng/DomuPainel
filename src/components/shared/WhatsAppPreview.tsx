@@ -28,12 +28,14 @@ export function renderTemplateVariables(
   vars: Record<string, string> = {}
 ): string {
   const defaults: Record<string, string> = {
-    nome: 'Cliente',
+    '1': 'Carlos',
+    '2': 'amanhã',
+    '3': '15:00',
+    nome: 'Carlos',
     horario: '15:00',
     produto: 'Oferta Especial',
     valor: 'R$ 299,00',
     empresa: 'Sua Empresa',
-    imovel: 'Produto Premium',
     bairro: 'Centro',
     ...vars,
   };

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { createMetaMessageTemplate, fetchMetaMessageTemplates } from '@/lib/metaClient';
-import { GLOBAL_SYSTEM_TEMPLATES } from '@/lib/globalTemplates';
+import { GLOBAL_SYSTEM_TEMPLATES, seedGenericTemplatesForTenant } from '@/lib/globalTemplates';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,6 +74,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Garante que o tenant tenha os 6 templates genéricos universais provisionados
+    await seedGenericTemplatesForTenant(tenantId);
+
     let customTemplates: any[] = [];
     const { data, error } = await supabaseAdmin
       .from('hsm_templates')
@@ -81,11 +84,17 @@ export async function GET(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
 
+    const genericNames = new Set(GLOBAL_SYSTEM_TEMPLATES.map((g) => g.name.toLowerCase()));
+
     if (!error && data) {
-      customTemplates = data.map((t) => ({
-        ...t,
-        is_global: false,
-      }));
+      customTemplates = data.map((t) => {
+        const isGeneric = genericNames.has(t.name.toLowerCase());
+        return {
+          ...t,
+          is_global: isGeneric,
+          is_generic: isGeneric,
+        };
+      });
     }
 
     const customNames = new Set(customTemplates.map((t) => t.name.toLowerCase()));

@@ -13,6 +13,7 @@ import { LEGAL_DOCS_VERSION } from '@/lib/legal';
 import { appBaseUrl, sendEmail } from '@/lib/email';
 import { brandedEmailHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
+import { seedGenericTemplatesForTenant } from '@/lib/globalTemplates';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,6 +106,9 @@ export async function POST(req: NextRequest) {
       console.error('[Register Tenant Error]', tenantError);
       throw new Error('Falha ao registrar dados da empresa no banco de dados.');
     }
+
+    // Provisiona automaticamente os 6 templates genéricos universais para a nova conta
+    await seedGenericTemplatesForTenant(newTenant.id);
 
     const passwordHash = await hashPassword(password);
 
