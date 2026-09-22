@@ -117,29 +117,25 @@ export default function TemplatesPage() {
   const renderStatusBadge = (status: string) => {
     if (status === 'APPROVED') {
       return (
-        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
-          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+        <span className="inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wide">
           APROVADO META
         </span>
       );
     } else if (status === 'PENDING') {
       return (
-        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
-          <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+        <span className="inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wide">
           EM ANÁLISE META
         </span>
       );
     } else if (status === 'SUGGESTED') {
       return (
-        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-50 text-domu-blue border border-blue-200">
-          <Sparkles className="w-3 h-3 text-domu-blue shrink-0" />
+        <span className="inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-50 text-domu-blue border border-blue-200 uppercase tracking-wide">
           DISPONÍVEL • PRONTO
         </span>
       );
     } else {
       return (
-        <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
-          <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+        <span className="inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200 uppercase tracking-wide">
           REJEITADO META
         </span>
       );
@@ -211,13 +207,12 @@ export default function TemplatesPage() {
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <FileText className="w-4 h-4 text-domu-blue shrink-0" />
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-xs font-black text-slate-900 font-mono tracking-tight truncate">
                       {tpl.name}
                     </h3>
                   </div>
-                  <div className="shrink-0 max-w-[45%]">{renderStatusBadge(tpl.status)}</div>
+                  <div className="shrink-0 max-w-[48%]">{renderStatusBadge(tpl.status)}</div>
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold text-slate-500 uppercase">
@@ -226,18 +221,16 @@ export default function TemplatesPage() {
                     {tpl.language || 'pt_BR'}
                   </span>
                   {tpl.is_generic || tpl.is_global ? (
-                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-black tracking-wide flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-indigo-600" />
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-black tracking-wide">
                       MODELO GENÉRICO
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-black">
-                      🏢 PERSONALIZADO
+                      PERSONALIZADO
                     </span>
                   )}
                   {hasImage && (
-                    <span className="px-2 py-0.5 bg-blue-100 text-domu-blue rounded flex items-center gap-1 font-black">
-                      <ImageIcon className="w-3 h-3" />
+                    <span className="px-2 py-0.5 bg-blue-100 text-domu-blue rounded font-black">
                       COM IMAGEM
                     </span>
                   )}
@@ -265,8 +258,7 @@ export default function TemplatesPage() {
                 </span>
 
                 {isApproved ? (
-                  <span className="text-emerald-700 font-extrabold flex items-center gap-1 text-[11px]">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-extrabold text-[11px]">
                     Pronto p/ Disparo
                   </span>
                 ) : tpl.status === 'SUGGESTED' ? (
@@ -283,7 +275,6 @@ export default function TemplatesPage() {
                     }}
                     className="btn-domu-primary text-[11px] py-1 px-3 flex items-center gap-1 font-extrabold cursor-pointer"
                   >
-                    <Plus className="w-3 h-3" />
                     <span>Ativar na Meta</span>
                   </button>
                 ) : (

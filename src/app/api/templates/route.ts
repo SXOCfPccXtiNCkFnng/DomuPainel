@@ -27,6 +27,10 @@ export async function GET(req: NextRequest) {
         const metaRes = await fetchMetaMessageTemplates(tenantId);
         if (metaRes.success && Array.isArray(metaRes.templates)) {
           for (const metaTpl of metaRes.templates) {
+            // Ignora modelos de teste internos/sandbox da Meta
+            if (metaTpl.name?.startsWith('jaspers_') || metaTpl.name === 'hello_world') {
+              continue;
+            }
             const bodyComp = metaTpl.components?.find((c: any) => c.type === 'BODY');
             const headerComp = metaTpl.components?.find((c: any) => c.type === 'HEADER');
             const formattedStatus = mapMetaStatus(metaTpl.status);

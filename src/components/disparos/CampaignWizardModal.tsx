@@ -188,7 +188,12 @@ export default function CampaignWizardModal({
       const res = await fetch(`/api/templates?tenantId=${storedTenantId}&sync=true`);
       const json = await res.json();
       if (json.success && json.templates) {
-        const approvedOnly = json.templates.filter((t: any) => t.status === 'APPROVED');
+        const approvedOnly = json.templates.filter(
+          (t: any) =>
+            t.status === 'APPROVED' &&
+            !t.name.startsWith('jaspers_') &&
+            t.name !== 'hello_world'
+        );
         setTemplates(approvedOnly);
         if (approvedOnly.length > 0) {
           const initialTpl = approvedOnly[0];
@@ -726,23 +731,10 @@ export default function CampaignWizardModal({
                         {templates.map((tpl) => (
                           <option key={tpl.id} value={tpl.name}>
                             {tpl.name} — {tpl.category} [{tpl.language || 'pt_BR'}]
-                            {tpl.name.startsWith('jaspers_') ? ' ⚡ (Ativo Meta)' : ''}
                             {tpl.header_type === 'IMAGE' ? ' (com imagem)' : ''}
                           </option>
                         ))}
                       </select>
-
-                      {selectedTemplate?.name === 'jaspers_market_order_confirmation_v1' && (
-                        <div className="mt-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2.5 leading-relaxed">
-                          <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-bold">Template aprovado na sua conta da Meta (en_US)</p>
-                            <p className="text-[11px] text-emerald-800 mt-0.5">
-                              Este modelo comercial está 100% ativo na sua WABA. Os parâmetros de teste são preenchidos automaticamente no disparo para testar a entrega no seu aparelho celular.
-                            </p>
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {hasImageHeader && (
