@@ -147,8 +147,8 @@ export function MetaConnectButton({
 
   const openModal = () => {
     setError('');
-    setStep('login');
-    stepRef.current = 'login';
+    setStep('coexistencia');
+    stepRef.current = 'coexistencia';
     setModalOpen(true);
   };
 
@@ -406,20 +406,9 @@ export function MetaConnectButton({
 
               <div className="px-5 py-5 space-y-4">
                 <div className="flex items-center gap-2 text-xs font-semibold">
-                  <span
-                    className={`px-2 py-1 rounded-full ${
-                      step === 'login' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    1. Login no Facebook
-                  </span>
-                  <span className="text-slate-300">→</span>
-                  <span
-                    className={`px-2 py-1 rounded-full ${
-                      step === 'coexistencia' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'
-                    }`}
-                  >
-                    2. Conectar WhatsApp
+                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Conexão Oficial com Coexistência
                   </span>
                 </div>
 
@@ -429,53 +418,27 @@ export function MetaConnectButton({
                   </div>
                 )}
 
-                {step === 'login' ? (
-                  <>
-                    <p className="text-sm text-slate-600 leading-relaxed">
-                      Uma janela do Facebook vai abrir para você entrar com a conta do seu negócio.
-                      Se você já estiver logado, ela pode fechar sozinha e seguimos para o WhatsApp.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleFacebookLoginClick}
-                      disabled={isConnecting}
-                      className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          Conectando...
-                        </>
-                      ) : (
-                        'Conectar com Facebook'
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-slate-600 leading-relaxed">
-                      No popup da Meta, entre com o Facebook do negócio e escolha{' '}
-                      <strong>conectar o WhatsApp Business que já está no celular</strong>{' '}
-                      (coexistência). Se aparecer só “criar número novo” ou “número virtual”, feche —
-                      isso ainda não é o fluxo de coexistência.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleConnectWhatsAppClick}
-                      disabled={isConnecting}
-                      className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          Conectando...
-                        </>
-                      ) : (
-                        'Conectar WhatsApp Business'
-                      )}
-                    </button>
-                  </>
-                )}
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  No popup oficial da Meta, entre com a conta do seu negócio e selecione{' '}
+                  <strong>o WhatsApp Business que já está no seu celular</strong> para ativar a coexistência.
+                  Seu WhatsApp continuará funcionando no aparelho e no Portal Domu ao mesmo tempo.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleConnectWhatsAppClick}
+                  disabled={isConnecting}
+                  className="btn-domu-primary w-full text-sm py-3 justify-center disabled:opacity-50"
+                >
+                  {isConnecting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Conectando...
+                    </>
+                  ) : (
+                    'Conectar WhatsApp Business'
+                  )}
+                </button>
 
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   Se um bloqueador de anúncios (AdBlock, Brave, Opera, uBlock) estiver ativo para este
