@@ -6,7 +6,7 @@ import { CONTACT_EMAIL } from '@/lib/contact';
 
 export type LegalDoc = 'terms' | 'privacy';
 
-function TermsBody() {
+export function TermsBody() {
   return (
     <>
       <section className="space-y-2">
@@ -205,7 +205,7 @@ function TermsBody() {
   );
 }
 
-function PrivacyBody() {
+export function PrivacyBody() {
   return (
     <>
       <section className="space-y-2">
