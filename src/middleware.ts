@@ -7,6 +7,8 @@ const PUBLIC_PATHS = [
   '/recuperar-senha',
   '/redefinir-senha',
   '/convite',
+  '/privacidade',
+  '/termos',
 ];
 const PUBLIC_API_PREFIXES = [
   '/api/auth/login',
