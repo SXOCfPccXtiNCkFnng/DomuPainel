@@ -12,6 +12,9 @@ import {
   X,
   RefreshCw,
   AlertTriangle,
+  CreditCard,
+  Info,
+  ExternalLink,
 } from 'lucide-react';
 
 interface CampaignProgressProps {
@@ -250,6 +253,33 @@ export default function CampaignProgress({ campaignId, onClose }: CampaignProgre
           </span>
         </div>
       </div>
+
+      {/* Diagnóstico Inteligente de Entrega Meta (ausência de cartão/pagamento) */}
+      {(counts?.sentTotal || 0) > 0 && (counts?.deliveredTotal || 0) === 0 && (
+        <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-md text-xs text-amber-900 flex items-start gap-3">
+          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold text-amber-950 text-[11.5px]">
+              Mensagens enviadas pela API, mas ainda não entregues no aparelho?
+            </p>
+            <p className="text-[11px] leading-relaxed text-amber-800">
+              A API da Meta aceitou o disparo com sucesso. Porém, para entregar mensagens de <strong>MARKETING</strong> pela rede do WhatsApp, a Meta exige que a sua conta do WhatsApp Business possua um <strong>cartão de crédito cadastrado</strong> no Gerenciador da Meta para cobrir o custo por conversa entregue.
+            </p>
+            <div className="pt-0.5">
+              <a
+                href="https://business.facebook.com/latest/whatsapp_manager/overview/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-bold text-amber-900 underline hover:text-amber-700 text-[11px]"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                Abrir Configurações de Pagamento na Meta
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {data?.waitingSchedule ? (
         <p className="text-xs text-slate-500 leading-relaxed">

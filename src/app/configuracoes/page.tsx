@@ -13,6 +13,7 @@ import {
   RefreshCw,
   AlertCircle,
   Check,
+  CreditCard,
 } from 'lucide-react';
 import CoexistenceWidget from '@/components/dashboard/CoexistenceWidget';
 import TeamSettingsPanel from '@/components/configuracoes/TeamSettingsPanel';
@@ -295,6 +296,34 @@ export default function ConfiguracoesPage() {
                 ))}
               </div>
             )}
+
+            {/* Informação Oficial de Pagamento e Faturamento Meta */}
+            <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-5 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-domu-blue/10 text-domu-blue flex items-center justify-center shrink-0 mt-0.5">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Como funciona a cobrança oficial do WhatsApp (Meta)?
+                    </h4>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed max-w-2xl">
+                      A Meta oferece até <strong>1.000 conversas de atendimento gratuitas por mês</strong> para cada conta. Para disparos de campanhas em massa (categoria <em>MARKETING</em>), a Meta exige que a sua conta do WhatsApp possua um <strong>cartão de crédito cadastrado</strong> nas Configurações de Pagamento para que as mensagens sejam entregues fisicamente nos aparelhos dos clientes.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="https://business.facebook.com/latest/whatsapp_manager/overview/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-domu-primary text-xs py-2 px-3.5 shrink-0 flex items-center gap-1.5 self-start sm:self-center"
+                >
+                  <span>Gerenciador de Pagamentos Meta</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
 
             {/* Credentials form */}
             <form

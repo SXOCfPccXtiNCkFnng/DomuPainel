@@ -20,6 +20,7 @@ import {
   ExternalLink,
   AlertCircle,
   Sparkles,
+  CreditCard,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
 import { BILLING_PAY_PATH, redirectIfDispatchBlocked } from '@/lib/billingGuard';
@@ -770,6 +771,30 @@ export default function CampaignWizardModal({
                         className={inputClass}
                       />
                     </div>
+
+                    {/* Aviso proativo de forma de pagamento na Meta para modelos de Marketing */}
+                    {selectedTemplate?.category === 'MARKETING' && (
+                      <div className="p-3.5 bg-blue-50/80 border border-blue-200 text-xs text-slate-700 flex items-start gap-2.5 leading-relaxed rounded-md">
+                        <CreditCard className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-bold text-slate-900 text-[11.5px]">
+                            Requisito da Meta para entrega de Marketing:
+                          </p>
+                          <p className="text-[11px] text-slate-600 leading-relaxed">
+                            A Meta cobra centavos diretamente da sua conta por conversa de marketing entregue. Para que as mensagens sejam entregues nos celulares dos contatos, certifique-se de que a sua conta do WhatsApp possui um <strong>cartão de crédito cadastrado</strong> no Gerenciador da Meta.
+                          </p>
+                          <a
+                            href="https://business.facebook.com/latest/whatsapp_manager/overview/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-domu-blue underline hover:text-blue-700 pt-0.5"
+                          >
+                            Abrir Configurações de Pagamento na Meta
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </>
