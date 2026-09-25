@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/requireAuth';
 import { resolveMetaCredentials } from '@/lib/metaClient';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,6 +89,23 @@ export async function GET(req: NextRequest) {
       else formattedQuality = qualityRating;
     }
 
+    // Contabiliza disparos das últimas 24 horas corridas (rolling 24h)
+    let sentLast24h = 0;
+    try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count } = await supabaseAdmin
+        .from('campaign_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .gte('created_at', twentyFourHoursAgo)
+        .neq('status', 'FAILED');
+      sentLast24h = count || 0;
+    } catch (countErr) {
+      console.warn('[WhatsApp Stats] erro ao contar disparos 24h:', countErr);
+    }
+
+    const remaining24h = numericLimit !== null ? Math.max(0, numericLimit - sentLast24h) : null;
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -100,6 +118,8 @@ export async function GET(req: NextRequest) {
         verifiedName,
         phoneStatus,
         isConnected,
+        sentLast24h,
+        remaining24h,
       },
     });
   } catch (error: any) {

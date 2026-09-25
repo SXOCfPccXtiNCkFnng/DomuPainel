@@ -223,11 +223,11 @@ export default function OverviewStats({
           </div>
           <div>
             <h3
-              className={`text-xl font-black tracking-tight leading-none mt-0.5 ${
-                metaConnected ? 'text-emerald-600' : 'text-amber-600'
+              className={`text-sm font-extrabold tracking-wide uppercase mt-1 leading-tight ${
+                metaConnected ? 'text-emerald-700' : 'text-amber-700'
               }`}
             >
-              {metaConnected ? 'CONECTADA' : 'PENDENTE'}
+              {metaConnected ? 'Conectada' : 'Pendente'}
             </h3>
             <div className="flex items-center gap-1 mt-1 text-[10.5px]">
               {metaConnected ? (

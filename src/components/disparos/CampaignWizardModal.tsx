@@ -110,7 +110,14 @@ export default function CampaignWizardModal({
   const [scheduledTime, setScheduledTime] = useState<string>('09:00');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const metaTierLimit = 1000;
+  const [metaStats, setMetaStats] = useState<{
+    numericLimit: number | null;
+    formattedTierLabel: string | null;
+    sentLast24h: number;
+    remaining24h: number | null;
+    qualityRating: string | null;
+  } | null>(null);
+  const [forceExceedQuota, setForceExceedQuota] = useState(false);
 
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
@@ -142,12 +149,32 @@ export default function CampaignWizardModal({
     setFilterBudget('');
     setPropertyId(initialPropertyId || '');
     setDispatchTiming('IMMEDIATE');
+    setForceExceedQuota(false);
     setIsSubmitting(false);
     setErrorMessage('');
     fetchLeads();
     fetchTemplates();
     fetchProperties();
+    fetchMetaStats();
   }, [isOpen, initialPropertyId, initialPropertyTitle]);
+
+  const fetchMetaStats = async () => {
+    try {
+      const res = await fetch('/api/whatsapp/stats');
+      const json = await res.json();
+      if (json.success && json.stats) {
+        setMetaStats({
+          numericLimit: json.stats.numericLimit ?? null,
+          formattedTierLabel: json.stats.formattedTierLabel ?? null,
+          sentLast24h: json.stats.sentLast24h ?? 0,
+          remaining24h: json.stats.remaining24h ?? null,
+          qualityRating: json.stats.qualityRating ?? null,
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao buscar stats da Meta:', err);
+    }
+  };
 
   const fetchLeads = async () => {
     setIsLoadingContacts(true);
@@ -265,8 +292,9 @@ export default function CampaignWizardModal({
   if (!isOpen || !mounted) return null;
 
   const rawTargetCount = selectedCount;
-  const isMetaLimitReached = rawTargetCount > metaTierLimit;
-  const targetCount = Math.min(rawTargetCount, metaTierLimit);
+  const dailyTierLimit = metaStats?.numericLimit ?? 1000;
+  const isMetaLimitReached = rawTargetCount > dailyTierLimit;
+  const targetCount = rawTargetCount;
 
   const hasImageHeader =
     selectedTemplate?.header_type === 'IMAGE' ||
@@ -286,7 +314,7 @@ export default function CampaignWizardModal({
     setIsSubmitting(true);
     const finalScheduledAt =
       dispatchTiming === 'SCHEDULED' ? `${scheduledDate}T${scheduledTime}:00` : null;
-    const leadIds = Array.from(selectedIds).slice(0, metaTierLimit);
+    const leadIds = Array.from(selectedIds);
 
     try {
       setErrorMessage('');
@@ -343,7 +371,33 @@ export default function CampaignWizardModal({
     }
   };
 
-  const canContinue = selectedCount > 0;
+  const isScheduled = dispatchTiming === 'SCHEDULED';
+  const isImmediate = dispatchTiming === 'IMMEDIATE';
+
+  const isOverQuota =
+    isImmediate &&
+    metaStats?.remaining24h !== null &&
+    metaStats?.remaining24h !== undefined &&
+    selectedCount > metaStats.remaining24h;
+
+  const isQuotaZero =
+    isImmediate &&
+    metaStats?.remaining24h !== null &&
+    metaStats?.remaining24h !== undefined &&
+    metaStats.remaining24h <= 0;
+
+  const handleTrimToSafeQuota = () => {
+    if (!metaStats?.remaining24h || metaStats.remaining24h <= 0) return;
+    const safeLimit = metaStats.remaining24h;
+    const allSelected = Array.from(selectedIds);
+    const safeSelected = new Set(allSelected.slice(0, safeLimit));
+    setSelectedIds(safeSelected);
+    setForceExceedQuota(false);
+  };
+
+  const canContinue =
+    selectedCount > 0 &&
+    (isScheduled || (!isQuotaZero && (!isOverQuota || forceExceedQuota)));
 
   const steps = ['Destinatários', 'Template'];
 
@@ -527,6 +581,81 @@ export default function CampaignWizardModal({
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                   </div>
+
+                  {/* Cota Oficial Meta (24h) com cálculo em tempo real */}
+                  {metaStats?.numericLimit !== null && metaStats?.numericLimit !== undefined && (
+                    <div className="mb-3 p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between text-xs flex-wrap gap-1">
+                        <span className="font-semibold text-slate-700">
+                          Cota Oficial Meta (24h):
+                        </span>
+                        <span className="font-bold text-slate-900">
+                          {metaStats.sentLast24h} / {metaStats.numericLimit} usadas{' '}
+                          <span className={(metaStats.remaining24h ?? 0) > 0 ? 'text-emerald-700' : 'text-rose-700'}>
+                            (Restam {metaStats.remaining24h ?? 0} disponíveis)
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Barra de progresso da cota */}
+                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            (metaStats.remaining24h ?? 0) <= 0
+                              ? 'bg-rose-500'
+                              : (metaStats.sentLast24h / metaStats.numericLimit) > 0.8
+                                ? 'bg-amber-500'
+                                : 'bg-domu-blue'
+                          }`}
+                          style={{
+                            width: `${Math.min(100, Math.round((metaStats.sentLast24h / metaStats.numericLimit) * 100))}%`,
+                          }}
+                        />
+                      </div>
+
+                      {/* Alerta quando a cota está zerada para envio imediato */}
+                      {isQuotaZero && (
+                        <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 space-y-1">
+                          <p className="font-bold">Limite diário de 24h atingido na Meta API</p>
+                          <p className="text-[11px] text-rose-700 leading-snug">
+                            Você já utilizou os {metaStats.numericLimit} envios das últimas 24 horas. Para não ter mensagens rejeitadas pela Meta, selecione a opção <strong>&ldquo;Agendar envio&rdquo;</strong> acima para programar para as próximas horas ou amanhã.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Alerta inteligente quando selecionou mais contatos do que a cota restante */}
+                      {isOverQuota && !isQuotaZero && (
+                        <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-2">
+                          <div>
+                            <span className="font-bold">Atenção ao limite da Meta: </span>
+                            <span className="text-[11px] text-amber-800">
+                              Você selecionou <strong>{selectedCount} contatos</strong>, mas seu saldo disponível para hoje é de <strong>{metaStats.remaining24h} mensagens</strong>.
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleTrimToSafeQuota}
+                              className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center"
+                            >
+                              ✓ Enviar apenas para os {metaStats.remaining24h} primeiros contatos seguros
+                            </button>
+                          </div>
+
+                          <label className="flex items-center gap-2 pt-1 text-[11px] text-amber-800 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={forceExceedQuota}
+                              onChange={(e) => setForceExceedQuota(e.target.checked)}
+                              className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            <span>Desejo tentar enviar para todos os {selectedCount} contatos mesmo ciente do risco de corte pela Meta.</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     <select

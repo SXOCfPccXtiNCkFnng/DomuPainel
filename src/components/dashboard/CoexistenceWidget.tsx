@@ -135,6 +135,35 @@ export default function CoexistenceWidget({
           <strong>Consulta oficial da Meta:</strong> Sua conta está no <strong>{dailyLimitTier}</strong> (limite oficial de até {(numericLimit ?? 0).toLocaleString('pt-BR')} disparos/24h). O limite é controlado automaticamente na hora dos envios.
         </span>
       </div>
+
+      {/* Explicação da Classificação de Qualidade da Meta (Direto da Documentação Oficial, sem ícones) */}
+      <div className="p-3.5 bg-white border border-slate-200/90 rounded-sm text-xs text-slate-700 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-slate-900">
+            Classificação de Qualidade da Meta (Quality Rating)
+          </span>
+          <span className="text-[11px] text-slate-400">
+            Baseado nos últimos 7 dias de envios
+          </span>
+        </div>
+        <p className="text-slate-600 leading-relaxed text-[11.5px]">
+          A Meta avalia a qualidade do seu número oficial conforme o retorno dos destinatários (mensagens lidas, respostas, bloqueios e denúncias de spam):
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-0.5 text-[11.5px]">
+          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+            <span className="font-bold text-emerald-700 block mb-0.5">Verde (Alta qualidade)</span>
+            <span className="text-slate-600 leading-snug">Seu número cumpre as diretrizes da Meta e os clientes recebem bem as mensagens.</span>
+          </div>
+          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+            <span className="font-bold text-amber-700 block mb-0.5">Amarelo (Média qualidade)</span>
+            <span className="text-slate-600 leading-snug">Houve denúncias ou bloqueios recentes. Recomenda-se pausar envios frios e revisar o texto.</span>
+          </div>
+          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+            <span className="font-bold text-rose-700 block mb-0.5">Vermelho (Baixa qualidade)</span>
+            <span className="text-slate-600 leading-snug">Alto índice de denúncias. Risco iminente de redução do limite diário ou bloqueio do número.</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
