@@ -72,9 +72,13 @@ function TrendBadge({
 
 interface OverviewStatsProps {
   metaConnectedProp?: boolean | null;
+  qualityRatingProp?: string | null;
 }
 
-export default function OverviewStats({ metaConnectedProp }: OverviewStatsProps = {}) {
+export default function OverviewStats({
+  metaConnectedProp,
+  qualityRatingProp,
+}: OverviewStatsProps = {}) {
   const [period, setPeriod] = useState<Period>('30d');
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalDispatches: 0,
@@ -228,7 +232,7 @@ export default function OverviewStats({ metaConnectedProp }: OverviewStatsProps 
             <div className="flex items-center gap-1 mt-1 text-[10.5px]">
               {metaConnected ? (
                 <span className="font-bold px-1.5 py-0.2 rounded border text-emerald-700 bg-emerald-50 border-emerald-200">
-                  Canal ativo
+                  {qualityRatingProp ? `Qualidade ${qualityRatingProp}` : 'Canal ativo'}
                 </span>
               ) : (
                 <Link

@@ -34,6 +34,9 @@ export default function DashboardPage() {
   const [whatsappPhone, setWhatsappPhone] = useState('(11) 99999-9999');
   const [segment, setSegment] = useState<TenantSegment>('geral');
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null);
+  const [metaQuality, setMetaQuality] = useState<string | null>(null);
+  const [metaTierLabel, setMetaTierLabel] = useState<string | null>(null);
+  const [metaVerifiedName, setMetaVerifiedName] = useState<string | null>(null);
   const [roiMetrics, setRoiMetrics] = useState([
     { label: 'Contatos atingidos', value: '0', hint: 'Entregas no período' },
     { label: 'Taxa de resposta', value: '0%', hint: 'Quem engajou' },
@@ -53,13 +56,22 @@ export default function DashboardPage() {
     fetchMetaStatus();
   }, []);
 
-  // Consulta ao vivo na Graph API da Meta — mesma fonte do header e do
-  // widget de coexistência, evita mostrar "Conectado" fixo no JSX.
+  // Consulta ao vivo na Graph API da Meta — puxa qualidade, tier e número oficial
   const fetchMetaStatus = async () => {
     try {
       const res = await fetch('/api/whatsapp/stats');
       const json = await res.json();
-      if (json.success) setMetaConnected(Boolean(json.stats?.isConnected));
+      if (json.success && json.stats) {
+        setMetaConnected(Boolean(json.stats.isConnected));
+        setMetaQuality(json.stats.qualityRating || null);
+        setMetaTierLabel(json.stats.formattedTierLabel || null);
+        if (json.stats.displayPhoneNumber) {
+          setWhatsappPhone(json.stats.displayPhoneNumber);
+        }
+        if (json.stats.verifiedName) {
+          setMetaVerifiedName(json.stats.verifiedName);
+        }
+      }
     } catch (err) {
       console.error('Erro ao buscar status do WhatsApp na Meta:', err);
     }
@@ -188,7 +200,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <OverviewStats metaConnectedProp={metaConnected} />
+      <OverviewStats metaConnectedProp={metaConnected} qualityRatingProp={metaQuality} />
 
       {activeCampaignId && (
         <CampaignProgress
@@ -282,21 +294,66 @@ export default function DashboardPage() {
           </div>
 
           <p className="text-sm text-slate-600 leading-relaxed">
-            Número <strong className="text-slate-900">{whatsappPhone}</strong> · empresa{' '}
-            <strong>{companyName}</strong>. Limite Starter: 1.500/mês e 200/dia (DOMU), sujeito à Meta.
+            Número <strong className="text-slate-900">{whatsappPhone}</strong>
+            {metaVerifiedName ? (
+              <span> · conta oficial <strong className="text-slate-900">{metaVerifiedName}</strong></span>
+            ) : (
+              <span> · empresa <strong className="text-slate-900">{companyName}</strong></span>
+            )}
+            .{' '}
+            {metaConnected && metaTierLabel ? (
+              <span className="text-slate-700">
+                Limite oficial Meta API: <strong className="text-slate-900">{metaTierLabel}</strong>.
+              </span>
+            ) : metaConnected ? (
+              <span className="text-slate-600">
+                Limite oficial obtido em tempo real da Meta API.
+              </span>
+            ) : (
+              <span className="text-slate-500">
+                Conecte o número para sincronizar os limites e a qualidade oficial da Meta API.
+              </span>
+            )}
           </p>
 
-          <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
-            <span>
-              Sessão:{' '}
-              {metaConnected === null ? (
-                <strong className="text-slate-400">…</strong>
-              ) : metaConnected ? (
-                <strong className="text-emerald-600">Ativa</strong>
-              ) : (
-                <strong className="text-amber-600">Pendente</strong>
-              )}
-            </span>
+          <div className="pt-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 border-t border-slate-100">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span>
+                Sessão:{' '}
+                {metaConnected === null ? (
+                  <strong className="text-slate-400">…</strong>
+                ) : metaConnected ? (
+                  <strong className="text-emerald-600 font-bold">Ativa</strong>
+                ) : (
+                  <strong className="text-amber-600 font-bold">Pendente</strong>
+                )}
+              </span>
+
+              <span className="flex items-center gap-1.5">
+                Qualidade Meta:{' '}
+                {!metaConnected ? (
+                  <span className="text-slate-400 font-medium">Aguardando conexão</span>
+                ) : metaQuality === 'GREEN' ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                    Alta (GREEN)
+                  </span>
+                ) : metaQuality === 'YELLOW' ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>
+                    Média (YELLOW)
+                  </span>
+                ) : metaQuality === 'RED' ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[11px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+                    Baixa (RED - Risco)
+                  </span>
+                ) : (
+                  <span className="text-slate-600 font-semibold">{metaQuality || 'Disponível na Meta'}</span>
+                )}
+              </span>
+            </div>
+
             <Link href="/configuracoes" className="text-domu-blue font-semibold hover:underline">
               Configurações
             </Link>

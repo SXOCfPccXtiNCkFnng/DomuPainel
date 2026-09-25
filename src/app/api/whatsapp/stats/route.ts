@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
     let messagingLimitTier: string | null = null;
     let qualityRating: string | null = null;
     let displayPhoneNumber = '';
+    let verifiedName = '';
+    let phoneStatus = '';
     let isConnected = false;
 
     try {
@@ -21,7 +23,7 @@ export async function GET(req: NextRequest) {
       const phoneNumberId = searchParams.get('phoneNumberId') || creds.phoneNumberId;
 
       const metaRes = await fetch(
-        `https://graph.facebook.com/v20.0/${phoneNumberId}?fields=messaging_limit_tier,quality_rating,display_phone_number,verified_name`,
+        `https://graph.facebook.com/v20.0/${phoneNumberId}?fields=messaging_limit_tier,quality_rating,display_phone_number,verified_name,status`,
         {
           headers: {
             Authorization: `Bearer ${creds.accessToken}`,
@@ -31,9 +33,11 @@ export async function GET(req: NextRequest) {
 
       if (metaRes.ok) {
         const metaData = await metaRes.json();
-        messagingLimitTier = metaData.messaging_limit_tier || 'TIER_1K';
-        qualityRating = metaData.quality_rating || 'UNKNOWN';
+        messagingLimitTier = metaData.messaging_limit_tier || null;
+        qualityRating = metaData.quality_rating || null;
         displayPhoneNumber = metaData.display_phone_number || '';
+        verifiedName = metaData.verified_name || '';
+        phoneStatus = metaData.status || '';
         isConnected = true;
       }
     } catch (metaErr) {
@@ -43,40 +47,45 @@ export async function GET(req: NextRequest) {
     let numericLimit: number | null = null;
     let formattedTierLabel: string | null = null;
 
-    if (isConnected) {
+    if (isConnected && messagingLimitTier) {
       switch (messagingLimitTier) {
+        case 'TIER_50':
+          numericLimit = 50;
+          formattedTierLabel = '50 msgs/24h';
+          break;
         case 'TIER_250':
           numericLimit = 250;
-          formattedTierLabel = 'Tier Inicial (250 msgs/24h)';
+          formattedTierLabel = '250 msgs/24h';
           break;
         case 'TIER_1K':
           numericLimit = 1000;
-          formattedTierLabel = 'Tier 1 (1.000 msgs/24h)';
+          formattedTierLabel = '1.000 msgs/24h';
           break;
         case 'TIER_10K':
           numericLimit = 10000;
-          formattedTierLabel = 'Tier 2 (10.000 msgs/24h)';
+          formattedTierLabel = '10.000 msgs/24h';
           break;
         case 'TIER_100K':
           numericLimit = 100000;
-          formattedTierLabel = 'Tier 3 (100.000 msgs/24h)';
+          formattedTierLabel = '100.000 msgs/24h';
           break;
+        case 'TIER_UNLIMITED':
         case 'UNLIMITED':
-          numericLimit = 9999999;
-          formattedTierLabel = 'Tier Ilimitado (Meta API)';
+          numericLimit = null;
+          formattedTierLabel = 'Ilimitado';
           break;
         default:
-          numericLimit = 1000;
-          formattedTierLabel = 'Tier 1 (1.000 msgs/24h)';
+          numericLimit = null;
+          formattedTierLabel = `${messagingLimitTier}`;
       }
     }
 
     let formattedQuality: string | null = null;
-    if (isConnected) {
-      formattedQuality = 'VERDE (Excelente)';
-      if (qualityRating === 'YELLOW') formattedQuality = 'AMARELO (Atenção)';
-      if (qualityRating === 'RED') formattedQuality = 'VERMELHO (Risco de Bloqueio)';
-      if (qualityRating === 'UNKNOWN') formattedQuality = 'Não disponível';
+    if (isConnected && qualityRating) {
+      if (qualityRating === 'GREEN') formattedQuality = 'Alta (GREEN)';
+      else if (qualityRating === 'YELLOW') formattedQuality = 'Média (YELLOW)';
+      else if (qualityRating === 'RED') formattedQuality = 'Baixa (RED)';
+      else formattedQuality = qualityRating;
     }
 
     return NextResponse.json({
@@ -88,6 +97,8 @@ export async function GET(req: NextRequest) {
         qualityRating,
         formattedQuality,
         displayPhoneNumber,
+        verifiedName,
+        phoneStatus,
         isConnected,
       },
     });
