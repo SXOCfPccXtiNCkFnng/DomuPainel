@@ -309,7 +309,10 @@ export default function ConfiguracoesPage() {
                       Como funciona a cobrança oficial do WhatsApp (Meta)?
                     </h4>
                     <p className="text-[11.5px] text-slate-600 leading-relaxed max-w-2xl">
-                      A Meta oferece até <strong>1.000 conversas de atendimento gratuitas por mês</strong> para cada conta. Para disparos de campanhas em massa (categoria <em>MARKETING</em>), a Meta exige que a sua conta do WhatsApp possua um <strong>cartão de crédito cadastrado</strong> nas Configurações de Pagamento para que as mensagens sejam entregues fisicamente nos aparelhos dos clientes.
+                      Para disparos de campanhas em massa (categoria <em>MARKETING</em>), a Meta cobra uma taxa por conversa iniciada (aprox. R$ 0,30 a R$ 0,35 por contato no Brasil) e exige um <strong>cartão de crédito cadastrado</strong> no WhatsApp Manager da sua conta para que as mensagens sejam entregues fisicamente nos aparelhos dos clientes.
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      <strong>Dica de economia:</strong> Quando o cliente responde à sua mensagem, abre-se uma <strong>janela de atendimento de 24 horas</strong> onde você pode trocar mensagens à vontade sem nenhuma cobrança adicional da Meta.
                     </p>
                   </div>
                 </div>
@@ -322,6 +325,41 @@ export default function ConfiguracoesPage() {
                   <span>Gerenciador de Pagamentos Meta</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
+              </div>
+            </div>
+
+            {/* Como subir o limite diário da Meta (Upgrade Automático de Tier) */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h4 className="text-xs font-bold text-slate-900">
+                  Como subir o Limite Diário oficial da Meta (De 250 para 1.000 e 10.000)?
+                </h4>
+                <span className="text-[10px] font-bold text-domu-blue bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                  Upgrade 100% Automático
+                </span>
+              </div>
+              <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                Você não precisa solicitar nem pagar nada à Meta para aumentar o limite. A promoção entre os tiers (250 ➔ 1.000 ➔ 10.000 ➔ 100.000) ocorre de forma automática pelo algoritmo da Meta ao cumprir 3 condições:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-[11.5px]">
+                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                  <span className="font-bold text-slate-800 block">1. Qualidade Verde</span>
+                  <p className="text-slate-600 leading-snug">
+                    Mantenha a nota do número alta (use variáveis como nome do cliente e envie apenas para quem demonstrou interesse).
+                  </p>
+                </div>
+                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                  <span className="font-bold text-slate-800 block">2. Utilizar a cota atual</span>
+                  <p className="text-slate-600 leading-snug">
+                    Dispare pelo menos 50% do limite atual em um intervalo de até 7 dias (ex: enviar mais de 125 mensagens quando estiver em 250).
+                  </p>
+                </div>
+                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                  <span className="font-bold text-slate-800 block">3. Liberação em até 48h</span>
+                  <p className="text-slate-600 leading-snug">
+                    Ao atingir esse volume com boa aceitação dos clientes, a Meta eleva seu limite diário automaticamente para o próximo patamar.
+                  </p>
+                </div>
               </div>
             </div>
 
