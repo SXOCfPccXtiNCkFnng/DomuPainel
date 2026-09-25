@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Template } from '@/types';
 import WhatsAppPreview, { renderTemplateVariables } from '@/components/shared/WhatsAppPreview';
 import { useModalA11y, useBackdropClose } from '@/hooks/useModalA11y';
@@ -148,6 +148,35 @@ export default function CriarTemplateModal({ isOpen, onClose, onAddTemplate }: C
                 onChange={(e) => setBodyText(e.target.value)}
                 className={`${inputClass} leading-relaxed`}
               />
+
+              {/{{\s*nome\s*}}/i.test(bodyText) ? (
+                <div className="mt-2 p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-lg flex items-start gap-2 text-emerald-900">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="text-[11px] leading-snug">
+                    <span className="font-bold text-emerald-800">Variável &#123;&#123;nome&#125;&#125; incluída:</span>
+                    <p className="text-emerald-700 mt-0.5">
+                      Ao disparar, o Domu substitui <strong>&#123;&#123;nome&#125;&#125;</strong> pelo nome real de cada cliente da lista. Isso eleva as respostas e previne bloqueios da Meta.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 p-2.5 bg-amber-50/90 border border-amber-200 rounded-lg flex items-start gap-2 text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-[11px] leading-snug">
+                    <span className="font-bold text-amber-800">Dica essencial sobre &#123;&#123;nome&#125;&#125;:</span>
+                    <p className="text-amber-700 mt-0.5">
+                      Recomendamos fortemente incluir <strong>&#123;&#123;nome&#125;&#125;</strong>. Mensagens genéricas idênticas aumentam o risco de marcação como spam e bloqueios pela Meta.{' '}
+                      <button
+                        type="button"
+                        onClick={() => handleInsertVariable('nome')}
+                        className="font-bold underline text-amber-900 hover:text-amber-950 inline cursor-pointer"
+                      >
+                        Inserir &#123;&#123;nome&#125;&#125;
+                      </button>
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

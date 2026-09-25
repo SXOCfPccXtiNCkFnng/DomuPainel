@@ -38,6 +38,33 @@ export default function TemplatesPage() {
   const [companyName, setCompanyName] = useState('Sua Empresa');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const handleInsertNome = () => {
+    const tag = '{{nome}}';
+    if (!textareaRef.current) {
+      if (!bodyText.includes(tag)) {
+        setBodyText((prev) => (prev ? `Olá ${tag}! ${prev}` : `Olá ${tag}! `));
+      } else {
+        setBodyText((prev) => `${prev} ${tag}`);
+      }
+      return;
+    }
+    const el = textareaRef.current;
+    const start = el.selectionStart ?? bodyText.length;
+    const end = el.selectionEnd ?? bodyText.length;
+    const before = bodyText.substring(0, start);
+    const after = bodyText.substring(end);
+    const spacerBefore = before.length > 0 && !before.endsWith(' ') ? ' ' : '';
+    const spacerAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('!') && !after.startsWith(',') ? ' ' : '';
+    const nextText = `${before}${spacerBefore}${tag}${spacerAfter}${after}`;
+    setBodyText(nextText);
+    setTimeout(() => {
+      el.focus();
+      const newPos = start + spacerBefore.length + tag.length;
+      el.setSelectionRange(newPos, newPos);
+    }, 50);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -368,17 +395,59 @@ export default function TemplatesPage() {
                 )}
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1.5">
-                    Texto da mensagem
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-semibold text-slate-700 block">
+                      Texto da mensagem
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleInsertNome}
+                      className="text-[11px] font-bold text-domu-blue hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-2.5 py-0.5 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Inserir variável do nome do contato"
+                    >
+                      <Sparkles className="w-3 h-3 text-domu-blue" />
+                      <span>+ Inserir &#123;&#123;nome&#125;&#125;</span>
+                    </button>
+                  </div>
                   <textarea
+                    ref={textareaRef}
                     rows={4}
                     required
-                    placeholder="Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva."
+                    placeholder="Olá {{nome}}! Gostaria de apresentar uma oferta exclusiva da nossa empresa. Podemos conversar?"
                     value={bodyText}
                     onChange={(e) => setBodyText(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 leading-relaxed"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 leading-relaxed font-sans"
                   />
+
+                  {/* Aviso explicativo e validação em tempo real da variável {{nome}} */}
+                  {/{{\s*nome\s*}}/i.test(bodyText) ? (
+                    <div className="mt-2 p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-lg flex items-start gap-2 text-emerald-900">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="text-[11px] leading-snug">
+                        <span className="font-bold text-emerald-800">Variável &#123;&#123;nome&#125;&#125; incluída:</span>
+                        <p className="text-emerald-700 mt-0.5">
+                          Excelente! Ao disparar, o Domu substitui <strong>&#123;&#123;nome&#125;&#125;</strong> pelo nome real de cada cliente da lista. Isso personaliza a conversa, aumenta as respostas e previne bloqueios da Meta.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-2.5 bg-amber-50/90 border border-amber-200 rounded-lg flex items-start gap-2 text-amber-900">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="text-[11px] leading-snug">
+                        <span className="font-bold text-amber-800">Dica essencial sobre &#123;&#123;nome&#125;&#125;:</span>
+                        <p className="text-amber-700 mt-0.5">
+                          Recomendamos sempre incluir <strong>&#123;&#123;nome&#125;&#125;</strong> (ex: <em>&ldquo;Olá &#123;&#123;nome&#125;&#125;!...&rdquo;</em>). Mensagens idênticas enviadas a vários números aumentam o risco de denúncias de spam e punições pelo algoritmo da Meta.{' '}
+                          <button
+                            type="button"
+                            onClick={handleInsertNome}
+                            className="font-bold underline text-amber-900 hover:text-amber-950 inline cursor-pointer"
+                          >
+                            Clique para inserir &#123;&#123;nome&#125;&#125;
+                          </button>
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>

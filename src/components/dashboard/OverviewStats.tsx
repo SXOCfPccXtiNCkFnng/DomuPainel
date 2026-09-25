@@ -70,7 +70,11 @@ function TrendBadge({
   );
 }
 
-export default function OverviewStats() {
+interface OverviewStatsProps {
+  metaConnectedProp?: boolean | null;
+}
+
+export default function OverviewStats({ metaConnectedProp }: OverviewStatsProps = {}) {
   const [period, setPeriod] = useState<Period>('30d');
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalDispatches: 0,
@@ -116,7 +120,11 @@ export default function OverviewStats() {
     { id: '90d', label: 'Últimos 90 Dias' },
   ];
 
-  const metaConnected = Boolean(metrics.metaConnected);
+  // Se a prop vinda do page (consulta viva na Meta) foi informada, tem precedência absoluta
+  const metaConnected =
+    metaConnectedProp !== undefined && metaConnectedProp !== null
+      ? Boolean(metaConnectedProp)
+      : Boolean(metrics.metaConnected);
 
   return (
     <div className="space-y-3 font-sans">

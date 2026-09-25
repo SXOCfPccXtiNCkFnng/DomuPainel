@@ -188,7 +188,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <OverviewStats />
+      <OverviewStats metaConnectedProp={metaConnected} />
 
       {activeCampaignId && (
         <CampaignProgress

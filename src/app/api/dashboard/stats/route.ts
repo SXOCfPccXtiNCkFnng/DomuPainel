@@ -60,15 +60,17 @@ export async function GET(req: NextRequest) {
       .select('*')
       .eq('tenant_id', tenantId);
 
-    // Conexão real com a Meta = existe credencial própria salva (ou fallback global via env).
-    // tenants.coexistence_status é só uma flag de UI do onboarding — não prova que há canal ativo.
+    // Conexão com a Meta: apenas se o tenant possui credencial própria vinculada, criptografada e ativa.
     const { data: metaCred } = await supabaseAdmin
       .from('tenant_credentials')
-      .select('tenant_id')
+      .select('tenant_id, phone_number_id, is_verified, encrypted_access_token')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    const metaConnected =
-      Boolean(metaCred) || Boolean(process.env.META_ACCESS_TOKEN && process.env.META_PHONE_NUMBER_ID);
+    const metaConnected = Boolean(
+      metaCred?.phone_number_id &&
+      metaCred?.encrypted_access_token &&
+      metaCred?.is_verified === true
+    );
 
     const now = new Date();
     const currentStart = new Date(now);
