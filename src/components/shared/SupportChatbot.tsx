@@ -27,6 +27,7 @@ interface Message {
   text: string;
   options?: string[];
   showWhatsAppLink?: boolean;
+  whatsAppCustomText?: string;
 }
 
 interface FAQItem {
@@ -338,31 +339,62 @@ export default function SupportChatbot() {
     setIsTyping(true);
 
     setTimeout(() => {
-      // Procura se clicou em uma opção pré-definida ou fez busca semântica
-      const foundByShortLabel = FAQ_KNOWLEDGE_BASE.find(
-        (f) => f.shortLabel.toLowerCase() === text.toLowerCase()
-      );
-      const match = foundByShortLabel || findBestAnswer(text);
+      const lowerText = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      // Verifica se o usuário pediu diretamente para falar com suporte/humano/atendente
+      const isAskingForHuman = [
+        'atendente',
+        'humano',
+        'contato',
+        'falar com alguem',
+        'falar com alguém',
+        'falar com suporte',
+        'pessoa',
+        'telefone',
+        'whatsapp',
+        'zap',
+        'ajuda humana',
+      ].some((term) => lowerText.includes(term));
 
       let botReply: Message;
-      if (match) {
+
+      if (isAskingForHuman) {
         botReply = {
           id: `bot-${Date.now()}`,
           sender: 'bot',
-          text: match.answer,
+          text: `Com certeza! Você pode falar diretamente com a nossa equipe de suporte pelo WhatsApp.\n\nClique no botão abaixo para iniciar seu atendimento:`,
           showWhatsAppLink: true,
-          options: FAQ_KNOWLEDGE_BASE.filter((f) => f.id !== match.id)
-            .slice(0, 3)
-            .map((f) => f.shortLabel),
+          whatsAppCustomText: `Olá suporte Domu Tech! Gostaria de falar com um atendente sobre a minha conta.`,
+          options: FAQ_KNOWLEDGE_BASE.slice(0, 3).map((f) => f.shortLabel),
         };
       } else {
-        botReply = {
-          id: `bot-${Date.now()}`,
-          sender: 'bot',
-          text: `Não encontrei uma resposta exata para a sua dúvida na base automática sobre esse termo.\n\nVocê pode escolher um dos tópicos oficiais abaixo ou falar diretamente com o nosso suporte humano no WhatsApp:`,
-          options: FAQ_KNOWLEDGE_BASE.slice(0, 4).map((f) => f.shortLabel),
-          showWhatsAppLink: true,
-        };
+        // Procura se clicou em uma opção pré-definida ou fez busca semântica
+        const foundByShortLabel = FAQ_KNOWLEDGE_BASE.find(
+          (f) => f.shortLabel.toLowerCase() === text.toLowerCase()
+        );
+        const match = foundByShortLabel || findBestAnswer(text);
+
+        if (match) {
+          botReply = {
+            id: `bot-${Date.now()}`,
+            sender: 'bot',
+            text: match.answer,
+            showWhatsAppLink: false,
+            options: FAQ_KNOWLEDGE_BASE.filter((f) => f.id !== match.id)
+              .slice(0, 3)
+              .map((f) => f.shortLabel),
+          };
+        } else {
+          // Quando NÃO souber responder: fala para entrar em contato com o suporte!
+          botReply = {
+            id: `bot-${Date.now()}`,
+            sender: 'bot',
+            text: `Ainda não tenho a resposta exata para essa dúvida por aqui.\n\nPor favor, **entre em contato com a nossa equipe de suporte** pelo WhatsApp para te ajudarmos com isso agora mesmo:`,
+            options: FAQ_KNOWLEDGE_BASE.slice(0, 4).map((f) => f.shortLabel),
+            showWhatsAppLink: true,
+            whatsAppCustomText: `Olá suporte Domu Tech! Estava no sistema com uma dúvida: "${text}" e gostaria da ajuda de um atendente.`,
+          };
+        }
       }
 
       setMessages((prev) => [...prev, botReply]);
@@ -497,18 +529,17 @@ export default function SupportChatbot() {
                     {/* Botão de Atendimento no WhatsApp (Sem expor o número visualmente) */}
                     {isBot && msg.showWhatsAppLink && (
                       <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
-                        <span className="text-[10px] text-slate-500 font-semibold">
-                          Precisa de atendimento humano?
-                        </span>
                         <a
                           href={CONTACT_WHATSAPP_URL(
-                            'Olá suporte Domu Tech! Gostaria de falar com um atendente sobre a minha conta.'
+                            msg.whatsAppCustomText ||
+                              'Olá suporte Domu Tech! Gostaria de falar com um atendente sobre a minha conta.'
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-domu-blue hover:bg-blue-700 text-white font-bold text-[11px] transition-colors shadow-xs"
+                          className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-domu-blue hover:bg-blue-700 text-white font-bold text-[11px] transition-colors shadow-xs cursor-pointer"
                         >
-                          <span>Falar com Atendente no WhatsApp</span>
+                          <Headset className="w-4 h-4" />
+                          <span>Entrar em contato no WhatsApp</span>
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </div>
