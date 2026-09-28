@@ -103,10 +103,47 @@ const FAQ_KNOWLEDGE_BASE: FAQItem[] = [
 • **Vermelho (Baixa qualidade):** Alto índice de bloqueios e denúncias. Risco de redução imediata do limite diário ou suspensão temporária pela Meta.`,
   },
   {
+    id: 'por_que_templates',
+    question: 'Por que preciso criar e aprovar templates para disparar mensagens?',
+    shortLabel: 'Por que templates são obrigatórios',
+    keywords: [
+      'por que template',
+      'por que templates',
+      'por que preciso',
+      'por que criar template',
+      'por que criar templates',
+      'preciso de template',
+      'preciso criar template',
+      'preciso criar templates',
+      'obrigatorio template',
+      'obrigatoriedade',
+      'motivo template',
+      'exigencia meta',
+      'politica da meta',
+    ],
+    answer: `O uso de templates aprovados é uma **exigência obrigatória e oficial da Meta** para qualquer empresa que queira iniciar conversas no WhatsApp pela API Oficial.
+
+**Por que a Meta exige templates?**
+
+1. **Proteção Anti-Spam dos Usuários:** A Meta pré-avalia o texto para garantir que os clientes não recebam mensagens abusivas, golpes ou conteúdo invasivo.
+2. **Início de Conversa Ativa (Outbound):** Sempre que sua empresa manda mensagem para alguém que ainda não conversou com você hoje, a Meta exige que esse primeiro contato utilize um modelo pré-aprovado.
+3. **Conversas Livres após a Resposta:** Assim que o cliente responde ao seu template, abre-se a janela de atendimento de 24 horas, onde você pode conversar livremente sem precisar de nenhum template!
+4. **Segurança do seu Número:** Templates aprovados garantem a reputação do seu chip e evitam banimentos pela Meta.`,
+  },
+  {
     id: 'criar_template',
     question: 'Como cadastrar e aprovar um novo modelo de mensagem (Template)?',
     shortLabel: 'Como aprovar novo template',
-    keywords: ['template', 'templates', 'modelo', 'modelos', 'aprovar template', 'criar template', 'cadastrar template', 'mensagem pronta', 'meta aprovar'],
+    keywords: [
+      'como cadastrar template',
+      'como criar template',
+      'como aprovar template',
+      'passo a passo template',
+      'cadastrar template',
+      'novo template',
+      'criar novo modelo',
+      'aprovar template',
+    ],
     answer: `Para cadastrar e aprovar um template para disparos:
 
 1. Acesse o menu **Templates** na barra lateral.
@@ -114,6 +151,29 @@ const FAQ_KNOWLEDGE_BASE: FAQItem[] = [
 3. Escolha a categoria (ex: **Marketing** para ofertas ou **Utilidade** para confirmações).
 4. Escreva a mensagem e use a variável **{{nome}}** para que cada cliente receba o texto personalizado.
 5. Clique em **"Enviar para Aprovação"**. O algoritmo da Meta analisa e geralmente aprova em **poucos minutos**!`,
+  },
+  {
+    id: 'template_rejeitado',
+    question: 'O que fazer se o meu template for rejeitado pela Meta?',
+    shortLabel: 'Template rejeitado pela Meta',
+    keywords: [
+      'template rejeitado',
+      'template recusado',
+      'template reprovado',
+      'reprovado pela meta',
+      'rejeitado pela meta',
+      'motivo rejeicao',
+      'rejeicao',
+      'rejeição',
+    ],
+    answer: `Se o seu template foi rejeitado pela Meta, geralmente é por um destes motivos:
+
+1. **Variáveis Consecutivas:** Nunca use \`{{1}} {{2}}\` coladas sem texto explicativo no meio.
+2. **Categoria Incorreta:** Se a mensagem oferece promoção, produto ou serviço, a categoria DEVE ser **Marketing**. Se cadastrar como Utilidade, a Meta reprova.
+3. **Links Encurtados:** A Meta proíbe encurtadores genéricos (como bit.ly). Use o link direto do seu domínio.
+4. **Erros de Português:** Textos com erros graves de digitação ou excesso de pontuação (ex: !!! ou ???) são reprovados.
+
+**O que fazer:** Ajuste o texto no menu **Templates** e reenvie para aprovação — a análise leva apenas poucos minutos!`,
   },
   {
     id: 'conectar_meta',
@@ -197,6 +257,12 @@ function getTopicIcon(labelOrId: string) {
   if (normalized.includes('conectar') || normalized.includes('conexao') || normalized.includes('vincular')) {
     return <Link2 className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
   }
+  if (normalized.includes('rejeitado') || normalized.includes('reprovado')) {
+    return <ShieldAlert className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
+  }
+  if (normalized.includes('por que template') || normalized.includes('obrigatorio') || normalized.includes('obrigatórios')) {
+    return <HelpCircle className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
+  }
   if (normalized.includes('aprovar') || normalized.includes('novo template')) {
     return <FileText className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
   }
@@ -209,7 +275,7 @@ function getTopicIcon(labelOrId: string) {
   if (normalized.includes('qualidade') || normalized.includes('verde')) {
     return <Activity className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
   }
-  if (normalized.includes('nome') || normalized.includes('template')) {
+  if (normalized.includes('nome')) {
     return <Tag className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
   }
   if (normalized.includes('excel') || normalized.includes('planilha') || normalized.includes('contatos')) {
