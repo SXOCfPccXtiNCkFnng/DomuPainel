@@ -716,7 +716,7 @@ export default function OnboardingPage() {
               </div>
 
               <a
-                href="https://wa.me/5511934430659?text=Olá!%20Gostaria%20de%20solicitar%20um%20segmento%20personalizado%20na%20Plataforma%20DOMU%20Tech"
+                href="https://wa.me/5511921474360?text=Olá!%20Gostaria%20de%20solicitar%20um%20segmento%20personalizado%20na%20Plataforma%20DOMU%20Tech"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-all shrink-0 flex items-center justify-center gap-2"

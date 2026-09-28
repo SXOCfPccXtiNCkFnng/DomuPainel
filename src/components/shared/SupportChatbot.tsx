@@ -4,14 +4,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Send,
-  Sparkles,
+  Headset,
   ExternalLink,
   RotateCcw,
-  Minus,
-  MessageSquare,
-  HelpCircle,
 } from 'lucide-react';
-import { CONTACT_WHATSAPP_URL, CONTACT_EMAIL } from '@/lib/contact';
+import { CONTACT_WHATSAPP_URL, CONTACT_WHATSAPP_DISPLAY } from '@/lib/contact';
 
 interface Message {
   id: string;
@@ -249,71 +246,51 @@ export default function SupportChatbot() {
 
   return (
     <>
-      {/* Botão Flutuante no Canto Inferior Direito: Ícone estilo WhatsApp + texto 'Suporte' embaixo */}
+      {/* Botão Flutuante no Canto Inferior Direito: Ícone azul de fone + bordas retas + texto 'SUPORTE' embaixo */}
       <div className="fixed bottom-5 right-5 z-[999] flex flex-col items-center gap-1 select-none">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative ${
+          className={`w-14 h-14 rounded-none flex items-center justify-center shadow-xl transition-all duration-200 hover:opacity-95 active:scale-95 cursor-pointer relative ${
             isOpen
-              ? 'bg-slate-800 text-white hover:bg-slate-900 border-2 border-slate-700'
-              : 'bg-[#25D366] hover:bg-[#20bd5a] text-white border-2 border-white'
+              ? 'bg-slate-900 text-white border border-slate-700'
+              : 'bg-domu-blue hover:bg-blue-700 text-white border border-white/20'
           }`}
-          title={isOpen ? 'Fechar Suporte' : 'Abrir Suporte e Dúvidas Domu Tech'}
+          title={isOpen ? 'Fechar Suporte' : 'Abrir Suporte e Atendimento Domu Tech'}
           aria-label={isOpen ? 'Fechar Suporte' : 'Abrir Suporte'}
         >
           {isOpen ? (
             <X className="w-6 h-6 transition-transform rotate-0" />
           ) : (
-            <>
-              {/* Ícone oficial do WhatsApp em SVG de alta definição */}
-              <svg
-                viewBox="0 0 24 24"
-                width="32"
-                height="32"
-                fill="currentColor"
-                className="drop-shadow-xs"
-              >
-                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2ZM12.05 20.16C10.56 20.16 9.1 19.76 7.83 19.01L7.53 18.83L4.41 19.65L5.24 16.61L5.05 16.3C4.22 14.99 3.79 13.47 3.79 11.91C3.79 7.37 7.5 3.66 12.05 3.66C14.25 3.66 16.32 4.52 17.88 6.08C19.44 7.64 20.3 9.71 20.3 11.92C20.29 16.46 16.59 20.16 12.05 20.16ZM16.58 14.41C16.33 14.29 15.11 13.69 14.88 13.6C14.65 13.52 14.49 13.48 14.32 13.72C14.16 13.97 13.69 14.52 13.55 14.68C13.41 14.85 13.26 14.87 13.01 14.75C12.77 14.62 11.98 14.37 11.05 13.54C10.33 12.89 9.84 12.09 9.7 11.85C9.56 11.6 9.68 11.47 9.81 11.35C9.92 11.23 10.06 11.05 10.18 10.91C10.31 10.77 10.35 10.67 10.43 10.5C10.51 10.34 10.47 10.2 10.41 10.07C10.35 9.95 9.87 8.77 9.67 8.29C9.48 7.82 9.28 7.88 9.14 7.88C9 7.87 8.84 7.87 8.68 7.87C8.51 7.87 8.24 7.93 8.01 8.18C7.79 8.42 7.15 9.02 7.15 10.24C7.15 11.46 8.04 12.64 8.16 12.8C8.28 12.97 9.91 15.47 12.39 16.54C12.98 16.8 13.44 16.95 13.8 17.06C14.4 17.25 14.94 17.22 15.38 17.16C15.86 17.09 16.86 16.55 17.07 15.96C17.28 15.38 17.28 14.89 17.22 14.79C17.15 14.69 17 14.63 16.58 14.41Z" />
-              </svg>
-
-              {/* Pulsing online badge */}
-              <span className="absolute top-0 right-0 flex h-3.5 w-3.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-400 border-2 border-white"></span>
-              </span>
-            </>
+            <Headset className="w-7 h-7 text-white" />
           )}
         </button>
 
-        {/* Texto "Suporte" abaixo do ícone conforme solicitado */}
-        <span className="text-[11px] font-extrabold text-slate-800 bg-white/95 px-2.5 py-0.5 rounded-full shadow-md border border-slate-200/90 tracking-wide uppercase">
+        {/* Texto "SUPORTE" abaixo do ícone com bordas retas */}
+        <span className="text-[11px] font-bold text-slate-800 bg-white px-2.5 py-0.5 rounded-none shadow-md border border-slate-300 tracking-wider uppercase">
           Suporte
         </span>
       </div>
 
-      {/* Janela de Chat Flutuante */}
+      {/* Janela de Chat Flutuante com Bordas Retas */}
       {isOpen && (
         <div
           role="dialog"
-          aria-label="Assistente de Suporte Domu Tech"
-          className="fixed bottom-24 right-4 sm:right-6 z-[999] w-[375px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-7.5rem)] rounded-2xl shadow-2xl border border-slate-200/90 bg-white flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 font-sans"
+          aria-label="Suporte Domu Tech"
+          className="fixed bottom-24 right-4 sm:right-6 z-[999] w-[375px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-7.5rem)] rounded-none shadow-2xl border border-slate-300 bg-white flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 font-sans"
         >
           {/* Header do Chat */}
-          <div className="bg-[#0B132B] text-white px-4 py-3.5 flex items-center justify-between shrink-0 border-b border-slate-800">
+          <div className="bg-[#0B132B] text-white px-4 py-3.5 flex items-center justify-between shrink-0 border-b border-slate-800 rounded-none">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+              <div className="w-8 h-8 rounded-none bg-domu-blue/25 border border-domu-blue/50 flex items-center justify-center text-blue-400 shrink-0">
+                <Headset className="w-4 h-4 text-blue-400" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-bold text-white tracking-tight">
-                    Assistente Domu Tech
-                  </h3>
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                </div>
+                <h3 className="text-xs font-bold text-white tracking-tight">
+                  Suporte Domu Tech
+                </h3>
                 <p className="text-[10px] text-slate-300">
-                  Respostas instantâneas sobre a Meta e o SaaS
+                  Respostas instantâneas sobre a Meta e a Plataforma
                 </p>
               </div>
             </div>
@@ -323,7 +300,7 @@ export default function SupportChatbot() {
                 type="button"
                 onClick={handleReset}
                 title="Reiniciar conversa"
-                className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 hover:text-white hover:bg-slate-800 rounded-none transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
@@ -331,7 +308,7 @@ export default function SupportChatbot() {
                 type="button"
                 onClick={() => setIsOpen(false)}
                 title="Fechar chat"
-                className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 hover:text-white hover:bg-slate-800 rounded-none transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -339,7 +316,7 @@ export default function SupportChatbot() {
           </div>
 
           {/* Área de Mensagens (Scrollable) */}
-          <div className="flex-1 p-3.5 overflow-y-auto space-y-3.5 bg-slate-50/60 text-xs">
+          <div className="flex-1 p-3.5 overflow-y-auto space-y-3 bg-slate-50/70 text-xs">
             {messages.map((msg) => {
               const isBot = msg.sender === 'bot';
               return (
@@ -348,10 +325,10 @@ export default function SupportChatbot() {
                   className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}
                 >
                   <div
-                    className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 shadow-xs leading-relaxed whitespace-pre-line ${
+                    className={`max-w-[88%] rounded-none px-3.5 py-2.5 shadow-xs leading-relaxed whitespace-pre-line border ${
                       isBot
-                        ? 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs'
-                        : 'bg-domu-blue text-white rounded-tr-xs font-medium'
+                        ? 'bg-white text-slate-800 border-slate-200'
+                        : 'bg-domu-blue text-white border-blue-700 font-medium'
                     }`}
                   >
                     {/* Render simples com negrito e tópicos */}
@@ -384,7 +361,7 @@ export default function SupportChatbot() {
                     {isBot && msg.showWhatsAppLink && (
                       <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
                         <span className="text-[10px] text-slate-500 font-semibold">
-                          Ainda com dúvida ou precisa de suporte técnico?
+                          Precisa de atendimento humano?
                         </span>
                         <a
                           href={CONTACT_WHATSAPP_URL(
@@ -392,9 +369,9 @@ export default function SupportChatbot() {
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors shadow-xs"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-none bg-domu-blue hover:bg-blue-700 text-white font-bold text-[11px] transition-colors shadow-xs"
                         >
-                          <span>Falar com Atendente no WhatsApp</span>
+                          <span>Falar com Atendente ({CONTACT_WHATSAPP_DISPLAY})</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
@@ -409,7 +386,7 @@ export default function SupportChatbot() {
                           key={opt}
                           type="button"
                           onClick={() => handleSend(opt)}
-                          className="px-2.5 py-1 bg-white hover:bg-blue-50 hover:border-domu-blue/60 border border-slate-200/90 text-slate-700 hover:text-domu-blue rounded-full text-[10.5px] font-semibold transition-all shadow-2xs text-left cursor-pointer"
+                          className="px-2.5 py-1 bg-white hover:bg-blue-50 hover:border-domu-blue border border-slate-300 text-slate-700 hover:text-domu-blue rounded-none text-[10.5px] font-semibold transition-all shadow-2xs text-left cursor-pointer"
                         >
                           {opt}
                         </button>
@@ -422,14 +399,14 @@ export default function SupportChatbot() {
 
             {/* Indicador de digitando */}
             {isTyping && (
-              <div className="flex items-center gap-1.5 text-slate-400 bg-white border border-slate-200/80 px-3 py-2 rounded-2xl rounded-tl-xs w-20">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"></span>
+              <div className="flex items-center gap-1.5 text-slate-400 bg-white border border-slate-200 px-3 py-2 rounded-none w-20">
+                <span className="w-1.5 h-1.5 rounded-none bg-slate-400 animate-bounce"></span>
                 <span
-                  className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
+                  className="w-1.5 h-1.5 rounded-none bg-slate-400 animate-bounce"
                   style={{ animationDelay: '150ms' }}
                 ></span>
                 <span
-                  className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
+                  className="w-1.5 h-1.5 rounded-none bg-slate-400 animate-bounce"
                   style={{ animationDelay: '300ms' }}
                 ></span>
               </div>
@@ -444,7 +421,7 @@ export default function SupportChatbot() {
               e.preventDefault();
               handleSend(inputValue);
             }}
-            className="p-2.5 bg-white border-t border-slate-200 flex items-center gap-2 shrink-0"
+            className="p-2.5 bg-white border-t border-slate-200 flex items-center gap-2 shrink-0 rounded-none"
           >
             <input
               ref={inputRef}
@@ -452,28 +429,28 @@ export default function SupportChatbot() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Digite sua dúvida (ex: limite, cobrança)..."
-              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-900 rounded-xl focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 placeholder:text-slate-400"
+              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 text-xs text-slate-900 rounded-none focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 placeholder:text-slate-400"
             />
             <button
               type="submit"
               disabled={!inputValue.trim() || isTyping}
-              className="w-9 h-9 flex items-center justify-center bg-domu-blue hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl transition-colors cursor-pointer shrink-0"
+              className="w-9 h-9 flex items-center justify-center bg-domu-blue hover:bg-blue-700 disabled:opacity-40 text-white rounded-none transition-colors cursor-pointer shrink-0"
               title="Enviar mensagem"
             >
               <Send className="w-4 h-4" />
             </button>
           </form>
 
-          {/* Rodapé sutil com transbordo direto */}
-          <div className="px-3 py-1.5 bg-slate-100/90 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500">
-            <span>Suporte Oficial Domu Tech</span>
+          {/* Rodapé sutil com contato oficial */}
+          <div className="px-3 py-1.5 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-600 rounded-none">
+            <span className="font-medium">Contato: {CONTACT_WHATSAPP_DISPLAY}</span>
             <a
               href={CONTACT_WHATSAPP_URL()}
               target="_blank"
               rel="noopener noreferrer"
               className="text-domu-blue hover:underline font-bold flex items-center gap-0.5"
             >
-              WhatsApp direto ↗
+              Falar no WhatsApp ↗
             </a>
           </div>
         </div>

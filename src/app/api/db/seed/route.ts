@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         slug: 'domu-imoveis-demo',
         name: 'DOMU Imóveis & Consultoria',
         segment: 'imobiliario',
-        whatsapp_number: '5511934430659',
+        whatsapp_number: '5511921474360',
         coexistence_status: 'CONNECTED',
         status: 'ACTIVE'
       }, { onConflict: 'slug' })
