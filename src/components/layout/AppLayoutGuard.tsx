@@ -8,6 +8,7 @@ import Header from '@/components/layout/Header';
 import { isRealEstateSegment, isDispatchOnlySegment, getSegmentFromStorage } from '@/lib/segmentConfig';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
+import SupportChatbot from '@/components/shared/SupportChatbot';
 
 export default function AppLayoutGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -201,6 +202,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
           {children}
         </main>
       </div>
+      <SupportChatbot />
     </div>
   );
 }

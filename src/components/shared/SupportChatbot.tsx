@@ -1,0 +1,483 @@
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  X,
+  Send,
+  Sparkles,
+  ExternalLink,
+  RotateCcw,
+  Minus,
+  MessageSquare,
+  HelpCircle,
+} from 'lucide-react';
+import { CONTACT_WHATSAPP_URL, CONTACT_EMAIL } from '@/lib/contact';
+
+interface Message {
+  id: string;
+  sender: 'bot' | 'user';
+  text: string;
+  options?: string[];
+  showWhatsAppLink?: boolean;
+}
+
+interface FAQItem {
+  id: string;
+  question: string;
+  shortLabel: string;
+  keywords: string[];
+  answer: string;
+}
+
+const FAQ_KNOWLEDGE_BASE: FAQItem[] = [
+  {
+    id: 'limite_diario',
+    question: 'Como aumentar o limite diário da Meta (de 250 para 1.000 ou 10.000)?',
+    shortLabel: '📈 Subir limite diário (250 ➔ 1.000)',
+    keywords: ['limite', '250', '1000', '1.000', '10000', '10.000', 'subir', 'aumentar', 'tier', 'cota', 'ampliar', 'escala'],
+    answer: `O aumento do limite diário de mensagens da Meta é **100% automático e gratuito**! Você não precisa abrir chamado nem pagar nada extra.
+
+**As 3 regras oficiais da Meta para o aumento:**
+1. **Qualidade Verde:** Mantenha a pontuação do chip alta (personalize mensagens com o nome do cliente e evite contatos frios).
+2. **Utilizar a cota atual:** Dispare pelo menos **50% do limite atual** em até 7 dias (exemplo: disparar mais de 125 mensagens quando estiver no limite de 250).
+3. **Liberação em 48h:** Cumprindo os envios com boa aceitação dos clientes, o algoritmo da Meta eleva o patamar automaticamente (250 ➔ 1.000 ➔ 10.000 ➔ 100.000/dia).`,
+  },
+  {
+    id: 'cobranca_meta',
+    question: 'Como funciona a cobrança oficial por conversa da Meta?',
+    shortLabel: '💳 Como funciona a cobrança da Meta',
+    keywords: ['cobranca', 'cobrança', 'custo', 'valor', 'preco', 'preço', 'pagamento', 'cartao', 'cartão', 'conversas', 'taxa', 'meta cobrar'],
+    answer: `A cobrança da Meta funciona da seguinte forma:
+
+• **Cobrança por Sessão de 24h:** A Meta não cobra por cada balão de mensagem, e sim por **sessão de conversa aberta de 24 horas**.
+• **Valor por Conversa de Marketing:** No Brasil, o envio de campanha custa em média **~US$ 0,06 (aprox. R$ 0,30 a R$ 0,35)** por lead atingido.
+• **Janela de Atendimento Gratuita:** Quando o lead responde à sua mensagem, abre-se uma janela de 24 horas onde você pode trocar **quantas mensagens quiser sem cobranças adicionais** da Meta!
+• **Cartão Obrigatório:** Para campanhas de Marketing, a Meta exige um cartão de crédito internacional cadastrado no seu WhatsApp Manager.`,
+  },
+  {
+    id: 'quality_rating',
+    question: 'O que significa a nota Verde, Amarela e Vermelha (Quality Rating)?',
+    shortLabel: '🚦 Qualidade Verde, Amarela e Vermelha',
+    keywords: ['qualidade', 'quality', 'rating', 'score', 'nota', 'verde', 'amarelo', 'vermelho', 'bloqueio', 'reputacao', 'reputação'],
+    answer: `O **Quality Rating** é a nota oficial que a Meta dá para o seu número com base nos últimos 7 dias de envios:
+
+🟢 **Verde (Alta qualidade):** Seu número cumpre as diretrizes e os clientes estão recebendo bem as mensagens (leituras e respostas altas).
+🟡 **Amarelo (Média qualidade):** Houve denúncias de spam ou bloqueios recentes por alguns contatos. Recomenda-se pausar envios frios e revisar o texto.
+🔴 **Vermelho (Baixa qualidade):** Alto índice de bloqueios e denúncias. Risco de redução imediata do limite diário ou suspensão temporária pela Meta.`,
+  },
+  {
+    id: 'variavel_nome',
+    question: 'Por que é importante colocar {{nome}} nos templates?',
+    shortLabel: '🏷️ Por que usar {{nome}} no template',
+    keywords: ['nome', 'variavel', 'variável', 'chave', 'template', 'modelo', 'personalizar', 'spam', 'personalizacao', 'personalização'],
+    answer: `A variável **{{nome}}** é indispensável por 3 grandes razões:
+
+1. **Proteção Anti-Spam da Meta:** Se você enviar centenas de mensagens com texto 100% idêntico, a Meta classifica como disparo massivo robótico. Com o {{nome}}, cada mensagem se torna única no algoritmo da Meta.
+2. **Triplica as Respostas:** Clientes respondem muito mais quando veem seu próprio nome no início da mensagem (*"Olá Carlos!"*).
+3. **Automação Domu:** No momento do disparo, nossa plataforma substitui automaticamente o {{nome}} pelo nome real do lead importado da sua planilha!`,
+  },
+  {
+    id: 'importar_planilha',
+    question: 'Como importar contatos de planilha Excel ou CSV?',
+    shortLabel: '📊 Como importar contatos do Excel',
+    keywords: ['planilha', 'excel', 'csv', 'contatos', 'importar', 'subir', 'base', 'leads', 'lista', 'arquivo'],
+    answer: `Importar sua lista de contatos para o Domu é simples e rápido:
+
+1. Acesse o menu **Contatos** na barra lateral.
+2. Clique no botão **"Importar contatos"** (ou arraste sua planilha .xlsx ou .csv).
+3. O sistema aceita planilhas com colunas como **Nome**, **Telefone / WhatsApp**, **E-mail** e **Tags/Interesse**.
+4. O Domu formata automaticamente o código do país (55) e o DDD para garantir que a Meta entregue as mensagens sem erros.`,
+  },
+  {
+    id: 'coexistencia',
+    question: 'O que é o modo Coexistência e como funciona no meu celular?',
+    shortLabel: '📱 Modo Coexistência no celular',
+    keywords: ['celular', 'coexistencia', 'coexistência', 'aparelho', 'sincronizar', '14 dias', 'smartphone', 'whatsapp celular', 'whatsapp business'],
+    answer: `O **Modo Coexistência** é um recurso oficial da Meta que permite que você:
+
+• Continue usando o aplicativo **WhatsApp Business no celular normalmente** para conversar 1 a 1 com clientes, mandar áudios e ver fotos.
+• Ao mesmo tempo, use a **plataforma Domu Tech no computador** para disparos em massa automáticos e gestão de campanhas pela API Oficial.
+• **Regra dos 14 dias:** Basta abrir o WhatsApp no seu celular pelo menos 1 vez a cada 14 dias para manter a sincronização ativa com a Meta.`,
+  },
+  {
+    id: 'evitar_bloqueios',
+    question: 'Quais são as melhores práticas para evitar bloqueios no WhatsApp?',
+    shortLabel: '🛡️ Como evitar bloqueios de chip',
+    keywords: ['evitar bloqueio', 'bloqueio', 'banir', 'banimento', 'proibido', 'seguranca', 'segurança', 'denuncia', 'denúncia', 'cuidados'],
+    answer: `Dicas de ouro para manter seu número 100% seguro:
+
+1. **Use apenas listas próprias:** Nunca compre listas de contatos frios que não conhecem sua empresa.
+2. **Sempre use {{nome}}:** Mensagens personalizadas evitam a detecção de envio massivo pela Meta.
+3. **Respeite a cota diária:** Nosso sistema já avisa seu saldo de 24h antes do envio para não ultrapassar o limite oficial.
+4. **Respeite horários comerciais:** Evite disparar tarde da noite ou em horários invasivos para não receber denúncias.
+5. **Dê opção de saída:** Permita que o lead diga se não deseja mais receber novidades.`,
+  },
+  {
+    id: 'janela_24h',
+    question: 'Como funciona a janela de atendimento de 24 horas?',
+    shortLabel: '⏱️ Janela de atendimento de 24 horas',
+    keywords: ['janela', '24 horas', '24h', 'sessao', 'sessão', 'resposta', 'gratis', 'grátis', 'tempo'],
+    answer: `A **Janela de 24 Horas** é o período oficial da Meta que começa no momento em que um contato responde a uma mensagem da sua empresa.
+
+Dentro dessa janela de 24 horas:
+• Você pode trocar quantas mensagens de texto e áudio desejar.
+• Não há cobrança de novas taxas de disparo de marketing pela Meta para essas mensagens de resposta.
+• É o momento ideal para o corretor conduzir a negociação diretamente no WhatsApp!`,
+  },
+];
+
+function findBestAnswer(query: string): FAQItem | null {
+  const clean = query
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  let bestMatch: FAQItem | null = null;
+  let maxScore = 0;
+
+  for (const item of FAQ_KNOWLEDGE_BASE) {
+    let score = 0;
+    for (const kw of item.keywords) {
+      const cleanKw = kw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      if (clean.includes(cleanKw)) {
+        score += cleanKw.length > 4 ? 3 : 1;
+      }
+    }
+    const cleanQuestion = item.question
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const words = clean.split(/\s+/).filter((w) => w.length > 2);
+    for (const word of words) {
+      if (cleanQuestion.includes(word)) score += 2;
+    }
+
+    if (score > maxScore) {
+      maxScore = score;
+      bestMatch = item;
+    }
+  }
+
+  return maxScore >= 2 ? bestMatch : null;
+}
+
+export default function SupportChatbot() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 'welcome-1',
+      sender: 'bot',
+      text: 'Olá! Sou o assistente de suporte da **Domu Tech** 👋\n\nEstou aqui para tirar dúvidas sobre o sistema, regras da Meta, limites diários, aprovação de templates e cobrança.\n\nEscolha um dos tópicos rápidos abaixo ou digite sua dúvida:',
+      options: FAQ_KNOWLEDGE_BASE.slice(0, 5).map((f) => f.shortLabel),
+    },
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+      setTimeout(() => inputRef.current?.focus(), 150);
+    }
+  }, [isOpen, messages]);
+
+  const handleSend = (userText: string) => {
+    const text = userText.trim();
+    if (!text) return;
+
+    const userMsgId = `user-${Date.now()}`;
+    const newMessages: Message[] = [
+      ...messages,
+      { id: userMsgId, sender: 'user', text },
+    ];
+    setMessages(newMessages);
+    setInputValue('');
+    setIsTyping(true);
+
+    setTimeout(() => {
+      // Procura se clicou em uma opção pré-definida ou fez busca semântica
+      const foundByShortLabel = FAQ_KNOWLEDGE_BASE.find(
+        (f) => f.shortLabel.toLowerCase() === text.toLowerCase()
+      );
+      const match = foundByShortLabel || findBestAnswer(text);
+
+      let botReply: Message;
+      if (match) {
+        botReply = {
+          id: `bot-${Date.now()}`,
+          sender: 'bot',
+          text: match.answer,
+          showWhatsAppLink: true,
+          options: FAQ_KNOWLEDGE_BASE.filter((f) => f.id !== match.id)
+            .slice(0, 3)
+            .map((f) => f.shortLabel),
+        };
+      } else {
+        botReply = {
+          id: `bot-${Date.now()}`,
+          sender: 'bot',
+          text: `Não encontrei uma resposta exata para a sua dúvida na base automática sobre esse termo.\n\nVocê pode escolher um dos tópicos oficiais abaixo ou falar diretamente com o nosso suporte humano no WhatsApp:`,
+          options: FAQ_KNOWLEDGE_BASE.slice(0, 4).map((f) => f.shortLabel),
+          showWhatsAppLink: true,
+        };
+      }
+
+      setMessages((prev) => [...prev, botReply]);
+      setIsTyping(false);
+    }, 450);
+  };
+
+  const handleReset = () => {
+    setMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        sender: 'bot',
+        text: 'Conversa reiniciada! Como posso te ajudar agora? Escolha um tema ou digite sua pergunta:',
+        options: FAQ_KNOWLEDGE_BASE.slice(0, 5).map((f) => f.shortLabel),
+      },
+    ]);
+  };
+
+  return (
+    <>
+      {/* Botão Flutuante no Canto Inferior Direito: Ícone estilo WhatsApp + texto 'Suporte' embaixo */}
+      <div className="fixed bottom-5 right-5 z-[999] flex flex-col items-center gap-1 select-none">
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative ${
+            isOpen
+              ? 'bg-slate-800 text-white hover:bg-slate-900 border-2 border-slate-700'
+              : 'bg-[#25D366] hover:bg-[#20bd5a] text-white border-2 border-white'
+          }`}
+          title={isOpen ? 'Fechar Suporte' : 'Abrir Suporte e Dúvidas Domu Tech'}
+          aria-label={isOpen ? 'Fechar Suporte' : 'Abrir Suporte'}
+        >
+          {isOpen ? (
+            <X className="w-6 h-6 transition-transform rotate-0" />
+          ) : (
+            <>
+              {/* Ícone oficial do WhatsApp em SVG de alta definição */}
+              <svg
+                viewBox="0 0 24 24"
+                width="32"
+                height="32"
+                fill="currentColor"
+                className="drop-shadow-xs"
+              >
+                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2ZM12.05 20.16C10.56 20.16 9.1 19.76 7.83 19.01L7.53 18.83L4.41 19.65L5.24 16.61L5.05 16.3C4.22 14.99 3.79 13.47 3.79 11.91C3.79 7.37 7.5 3.66 12.05 3.66C14.25 3.66 16.32 4.52 17.88 6.08C19.44 7.64 20.3 9.71 20.3 11.92C20.29 16.46 16.59 20.16 12.05 20.16ZM16.58 14.41C16.33 14.29 15.11 13.69 14.88 13.6C14.65 13.52 14.49 13.48 14.32 13.72C14.16 13.97 13.69 14.52 13.55 14.68C13.41 14.85 13.26 14.87 13.01 14.75C12.77 14.62 11.98 14.37 11.05 13.54C10.33 12.89 9.84 12.09 9.7 11.85C9.56 11.6 9.68 11.47 9.81 11.35C9.92 11.23 10.06 11.05 10.18 10.91C10.31 10.77 10.35 10.67 10.43 10.5C10.51 10.34 10.47 10.2 10.41 10.07C10.35 9.95 9.87 8.77 9.67 8.29C9.48 7.82 9.28 7.88 9.14 7.88C9 7.87 8.84 7.87 8.68 7.87C8.51 7.87 8.24 7.93 8.01 8.18C7.79 8.42 7.15 9.02 7.15 10.24C7.15 11.46 8.04 12.64 8.16 12.8C8.28 12.97 9.91 15.47 12.39 16.54C12.98 16.8 13.44 16.95 13.8 17.06C14.4 17.25 14.94 17.22 15.38 17.16C15.86 17.09 16.86 16.55 17.07 15.96C17.28 15.38 17.28 14.89 17.22 14.79C17.15 14.69 17 14.63 16.58 14.41Z" />
+              </svg>
+
+              {/* Pulsing online badge */}
+              <span className="absolute top-0 right-0 flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-400 border-2 border-white"></span>
+              </span>
+            </>
+          )}
+        </button>
+
+        {/* Texto "Suporte" abaixo do ícone conforme solicitado */}
+        <span className="text-[11px] font-extrabold text-slate-800 bg-white/95 px-2.5 py-0.5 rounded-full shadow-md border border-slate-200/90 tracking-wide uppercase">
+          Suporte
+        </span>
+      </div>
+
+      {/* Janela de Chat Flutuante */}
+      {isOpen && (
+        <div
+          role="dialog"
+          aria-label="Assistente de Suporte Domu Tech"
+          className="fixed bottom-24 right-4 sm:right-6 z-[999] w-[375px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-7.5rem)] rounded-2xl shadow-2xl border border-slate-200/90 bg-white flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 font-sans"
+        >
+          {/* Header do Chat */}
+          <div className="bg-[#0B132B] text-white px-4 py-3.5 flex items-center justify-between shrink-0 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold text-white tracking-tight">
+                    Assistente Domu Tech
+                  </h3>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                </div>
+                <p className="text-[10px] text-slate-300">
+                  Respostas instantâneas sobre a Meta e o SaaS
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 text-slate-300">
+              <button
+                type="button"
+                onClick={handleReset}
+                title="Reiniciar conversa"
+                className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                title="Fechar chat"
+                className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Área de Mensagens (Scrollable) */}
+          <div className="flex-1 p-3.5 overflow-y-auto space-y-3.5 bg-slate-50/60 text-xs">
+            {messages.map((msg) => {
+              const isBot = msg.sender === 'bot';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}
+                >
+                  <div
+                    className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 shadow-xs leading-relaxed whitespace-pre-line ${
+                      isBot
+                        ? 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs'
+                        : 'bg-domu-blue text-white rounded-tr-xs font-medium'
+                    }`}
+                  >
+                    {/* Render simples com negrito e tópicos */}
+                    <div className="space-y-1.5">
+                      {msg.text.split('\n').map((line, idx) => {
+                        if (!line.trim()) return <div key={idx} className="h-1.5" />;
+                        // Substitui markdown básico de negrito **texto**
+                        const parts = line.split(/(\*\*[^*]+\*\*)/g);
+                        return (
+                          <p key={idx} className={line.startsWith('•') ? 'pl-2' : ''}>
+                            {parts.map((p, pIdx) => {
+                              if (p.startsWith('**') && p.endsWith('**')) {
+                                return (
+                                  <strong
+                                    key={pIdx}
+                                    className={isBot ? 'font-bold text-slate-900' : 'font-bold text-white'}
+                                  >
+                                    {p.slice(2, -2)}
+                                  </strong>
+                                );
+                              }
+                              return <span key={pIdx}>{p}</span>;
+                            })}
+                          </p>
+                        );
+                      })}
+                    </div>
+
+                    {/* Botão de Transbordo Humano no WhatsApp Oficial se sugerido */}
+                    {isBot && msg.showWhatsAppLink && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-semibold">
+                          Ainda com dúvida ou precisa de suporte técnico?
+                        </span>
+                        <a
+                          href={CONTACT_WHATSAPP_URL(
+                            'Olá suporte Domu Tech! Gostaria de falar com um atendente sobre a minha conta.'
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors shadow-xs"
+                        >
+                          <span>Falar com Atendente no WhatsApp</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chips de Opções Rápidas (1 clique) */}
+                  {isBot && msg.options && msg.options.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 max-w-[95%]">
+                      {msg.options.map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => handleSend(opt)}
+                          className="px-2.5 py-1 bg-white hover:bg-blue-50 hover:border-domu-blue/60 border border-slate-200/90 text-slate-700 hover:text-domu-blue rounded-full text-[10.5px] font-semibold transition-all shadow-2xs text-left cursor-pointer"
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Indicador de digitando */}
+            {isTyping && (
+              <div className="flex items-center gap-1.5 text-slate-400 bg-white border border-slate-200/80 px-3 py-2 rounded-2xl rounded-tl-xs w-20">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"></span>
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
+                  style={{ animationDelay: '150ms' }}
+                ></span>
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
+                  style={{ animationDelay: '300ms' }}
+                ></span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Campo de Entrada de Texto */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend(inputValue);
+            }}
+            className="p-2.5 bg-white border-t border-slate-200 flex items-center gap-2 shrink-0"
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Digite sua dúvida (ex: limite, cobrança)..."
+              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-xs text-slate-900 rounded-xl focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 placeholder:text-slate-400"
+            />
+            <button
+              type="submit"
+              disabled={!inputValue.trim() || isTyping}
+              className="w-9 h-9 flex items-center justify-center bg-domu-blue hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl transition-colors cursor-pointer shrink-0"
+              title="Enviar mensagem"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+
+          {/* Rodapé sutil com transbordo direto */}
+          <div className="px-3 py-1.5 bg-slate-100/90 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500">
+            <span>Suporte Oficial Domu Tech</span>
+            <a
+              href={CONTACT_WHATSAPP_URL()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-domu-blue hover:underline font-bold flex items-center gap-0.5"
+            >
+              WhatsApp direto ↗
+            </a>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
