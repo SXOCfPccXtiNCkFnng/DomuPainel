@@ -16,6 +16,8 @@ import {
   ShieldAlert,
   Clock,
   HelpCircle,
+  Link2,
+  FileText,
 } from 'lucide-react';
 import { CONTACT_WHATSAPP_URL } from '@/lib/contact';
 
@@ -36,6 +38,34 @@ interface FAQItem {
 }
 
 const FAQ_KNOWLEDGE_BASE: FAQItem[] = [
+  {
+    id: 'como_disparar',
+    question: 'Como criar uma campanha e fazer um disparo de mensagens?',
+    shortLabel: 'Como fazer um disparo',
+    keywords: [
+      'disparo',
+      'disparar',
+      'disparos',
+      'enviar',
+      'envio',
+      'campanha',
+      'campanhas',
+      'fazer disparo',
+      'faco disparo',
+      'mandar mensagem',
+      'disparo em massa',
+      'criar campanha',
+      'nova campanha',
+    ],
+    answer: `Para criar uma campanha e realizar um disparo de mensagens:
+
+1. Acesse o menu **Disparos** na barra lateral.
+2. Clique no botão azul **"Nova Campanha"**.
+3. **Escolha o Template:** Selecione o modelo de mensagem aprovado pela Meta.
+4. **Selecione os Contatos:** Escolha a lista de leads importada ou adicione novos contatos.
+5. **Segurança de Limite:** A plataforma calcula automaticamente seu limite diário da Meta (ex: 250, 1.000) para você não ter risco de bloqueio.
+6. Clique em **"Iniciar Disparo"** para que o envio seja realizado automaticamente pela API Oficial!`,
+  },
   {
     id: 'limite_diario',
     question: 'Como aumentar o limite diário da Meta (de 250 para 1.000 ou 10.000)?',
@@ -70,6 +100,32 @@ const FAQ_KNOWLEDGE_BASE: FAQItem[] = [
 • **Verde (Alta qualidade):** Seu número cumpre as diretrizes e os clientes estão recebendo bem as mensagens (leituras e respostas altas).
 • **Amarelo (Média qualidade):** Houve denúncias de spam ou bloqueios recentes por alguns contatos. Recomenda-se pausar envios frios e revisar o texto.
 • **Vermelho (Baixa qualidade):** Alto índice de bloqueios e denúncias. Risco de redução imediata do limite diário ou suspensão temporária pela Meta.`,
+  },
+  {
+    id: 'criar_template',
+    question: 'Como cadastrar e aprovar um novo modelo de mensagem (Template)?',
+    shortLabel: 'Como aprovar novo template',
+    keywords: ['template', 'templates', 'modelo', 'modelos', 'aprovar template', 'criar template', 'cadastrar template', 'mensagem pronta', 'meta aprovar'],
+    answer: `Para cadastrar e aprovar um template para disparos:
+
+1. Acesse o menu **Templates** na barra lateral.
+2. Clique em **"Novo Template"**.
+3. Escolha a categoria (ex: **Marketing** para ofertas ou **Utilidade** para confirmações).
+4. Escreva a mensagem e use a variável **{{nome}}** para que cada cliente receba o texto personalizado.
+5. Clique em **"Enviar para Aprovação"**. O algoritmo da Meta analisa e geralmente aprova em **poucos minutos**!`,
+  },
+  {
+    id: 'conectar_meta',
+    question: 'Como conectar a conta da Meta / WhatsApp Oficial?',
+    shortLabel: 'Como conectar conta da Meta',
+    keywords: ['conectar', 'conexao', 'conexão', 'vincular', 'meta', 'whatsapp', 'waba', 'configurar whatsapp', 'qrcode', 'conta meta', 'conectar meta'],
+    answer: `Para conectar seu número de WhatsApp Oficial da Meta:
+
+1. Acesse o menu **Configurações** na barra lateral.
+2. Localize a seção **Conexão Meta (WhatsApp Cloud API)**.
+3. Clique em **"Conectar com a Meta"** (fluxo oficial via Embedded Signup do Facebook).
+4. Faça login na sua conta empresarial da Meta e selecione o número da sua empresa.
+5. Autorize as permissões. Ao finalizar, o status mudará para **Conectada** e seu número estará liberado para disparos!`,
   },
   {
     id: 'variavel_nome',
@@ -134,6 +190,15 @@ Dentro dessa janela de 24 horas:
 
 function getTopicIcon(labelOrId: string) {
   const normalized = labelOrId.toLowerCase();
+  if (normalized.includes('disparo') || normalized.includes('campanha') || normalized.includes('enviar')) {
+    return <Send className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
+  }
+  if (normalized.includes('conectar') || normalized.includes('conexao') || normalized.includes('vincular')) {
+    return <Link2 className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
+  }
+  if (normalized.includes('aprovar') || normalized.includes('novo template')) {
+    return <FileText className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
+  }
   if (normalized.includes('limite') || normalized.includes('subir')) {
     return <TrendingUp className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
   }
@@ -161,6 +226,16 @@ function getTopicIcon(labelOrId: string) {
   return <HelpCircle className="w-3.5 h-3.5 text-domu-blue shrink-0" />;
 }
 
+const STOP_WORDS = new Set([
+  'como', 'fazer', 'faco', 'faço', 'quero', 'saber', 'para', 'onde', 'qual', 'quais', 'quem',
+  'com', 'por', 'que', 'uma', 'uns', 'umas', 'meu', 'minha', 'meus', 'minhas', 'ele',
+  'ela', 'eles', 'elas', 'isso', 'esse', 'essa', 'esses', 'essas', 'aqui', 'sobre',
+  'tenho', 'tem', 'ter', 'pode', 'posso', 'consigo', 'dar', 'deu', 'vai', 'vou', 'voce',
+  'você', 'eu', 'um', 'de', 'do', 'da', 'dos', 'das', 'no', 'na', 'nos', 'nas', 'em', 'e', 'ou',
+  'se', 'ja', 'já', 'so', 'só', 'tudo', 'todos', 'toda', 'todas', 'ola', 'olá', 'bom', 'dia',
+  'tarde', 'noite', 'ajuda', 'ajudar'
+]);
+
 function findBestAnswer(query: string): FAQItem | null {
   const clean = query
     .toLowerCase()
@@ -170,24 +245,48 @@ function findBestAnswer(query: string): FAQItem | null {
   let bestMatch: FAQItem | null = null;
   let maxScore = 0;
 
+  // Palavras significativas da busca ignorando stop words
+  const searchWords = clean
+    .split(/[\s,?.!;:]+/)
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+
   for (const item of FAQ_KNOWLEDGE_BASE) {
     let score = 0;
+
+    // 1. Match em palavras-chave específicas do item (peso alto)
     for (const kw of item.keywords) {
       const cleanKw = kw
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
+
+      // Frase/termo exato contido na mensagem digitada
       if (clean.includes(cleanKw)) {
-        score += cleanKw.length > 4 ? 3 : 1;
+        score += cleanKw.length > 5 ? 10 : 6;
+      }
+
+      // Palavras individuais da busca batendo com keyword
+      for (const word of searchWords) {
+        if (cleanKw === word) {
+          score += 5;
+        } else if (cleanKw.includes(word) && word.length >= 4) {
+          score += 2;
+        }
       }
     }
-    const cleanQuestion = item.question
+
+    // 2. Match nas palavras significativas da pergunta (excluindo stop words)
+    const cleanQuestionWords = item.question
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    const words = clean.split(/\s+/).filter((w) => w.length > 2);
-    for (const word of words) {
-      if (cleanQuestion.includes(word)) score += 2;
+      .replace(/[\u0300-\u036f]/g, '')
+      .split(/[\s,?.!;:]+/)
+      .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+
+    for (const word of searchWords) {
+      if (cleanQuestionWords.includes(word)) {
+        score += 3;
+      }
     }
 
     if (score > maxScore) {
@@ -196,7 +295,7 @@ function findBestAnswer(query: string): FAQItem | null {
     }
   }
 
-  return maxScore >= 2 ? bestMatch : null;
+  return maxScore >= 4 ? bestMatch : null;
 }
 
 export default function SupportChatbot() {
