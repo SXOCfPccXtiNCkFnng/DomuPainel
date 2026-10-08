@@ -276,6 +276,21 @@ export function MetaConnectButton({
     );
   };
 
+  const waitForEmbeddedSignupSession = () =>
+    new Promise<EmbeddedSignupData>((resolve) => {
+      const started = Date.now();
+      const tick = () => {
+        const session = embeddedSignupDataRef.current;
+        const waited = Date.now() - started;
+        if (session.wabaId || waited >= 1500) {
+          resolve(session);
+          return;
+        }
+        window.setTimeout(tick, 100);
+      };
+      tick();
+    });
+
   const handleFbLoginResponse = async (response: FbLoginResponse) => {
     clearStuckTimeout();
     connectingRef.current = false;
@@ -288,13 +303,9 @@ export function MetaConnectButton({
       return;
     }
 
-    const { wabaId: signupWabaId, phoneNumberId: signupPhoneNumberId } =
-      embeddedSignupDataRef.current;
-    if (!signupWabaId || !signupPhoneNumberId) {
-      setError('Não recebemos o WABA/número da Meta. Tente conectar novamente.');
-      setIsConnecting(false);
-      return;
-    }
+    const session = await waitForEmbeddedSignupSession();
+    const signupWabaId = session.wabaId;
+    const signupPhoneNumberId = session.phoneNumberId;
 
     try {
       const res = await fetch('/api/onboarding/embedded-signup', {
@@ -320,8 +331,8 @@ export function MetaConnectButton({
 
       setModalOpen(false);
       onConnected({
-        wabaId: signupWabaId,
-        phoneNumberId: signupPhoneNumberId,
+        wabaId: data.wabaId,
+        phoneNumberId: data.phoneNumberId,
         whatsappPhone: data.whatsappPhone,
         verifyToken: data.verifyToken,
         warnings: data.warnings,

@@ -7,6 +7,7 @@ import { generateSecureToken } from '@/lib/email';
 import { isValidBrazilianPhone } from '@/lib/validators';
 import { getMetaAppSecret } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
+import { pickOnboardedPhone, type ListedWhatsappPhone } from '@/lib/metaSignupPhone';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,115 @@ async function registerPhoneNumber(
   }
 }
 
+type MetaPhoneRow = { id?: string; display_phone_number?: string };
+
+/** Lista os números da WABA. Coexistência muitas vezes não devolve phone_number_id no popup. */
+async function listWabaPhoneNumbers(
+  wabaId: string,
+  accessToken: string
+): Promise<ListedWhatsappPhone[]> {
+  const url = new URL(`https://graph.facebook.com/${META_API_VERSION}/${wabaId}/phone_numbers`);
+  url.searchParams.set('fields', 'id,display_phone_number');
+  url.searchParams.set('limit', '50');
+
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message || 'Não foi possível listar os números da conta WhatsApp.');
+  }
+
+  const rows: MetaPhoneRow[] = Array.isArray(data?.data) ? data.data : [];
+  return rows
+    .filter((row) => row?.id)
+    .map((row) => ({
+      id: String(row.id),
+      wabaId,
+      displayPhoneNumber: row.display_phone_number || null,
+    }));
+}
+
+/** WABAs concedidas ao token, quando o popup não manda waba_id. */
+async function listWabaIdsFromToken(accessToken: string): Promise<string[]> {
+  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+  const appSecret = getMetaAppSecret();
+  if (!appId || !appSecret) {
+    throw new Error('NEXT_PUBLIC_META_APP_ID / META_APP_SECRET não configurados no servidor.');
+  }
+
+  const url = new URL(`https://graph.facebook.com/${META_API_VERSION}/debug_token`);
+  url.searchParams.set('input_token', accessToken);
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${appId}|${appSecret}` },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message || 'Não foi possível ler a conta autorizada na Meta.');
+  }
+
+  const scopes = Array.isArray(data?.data?.granular_scopes) ? data.data.granular_scopes : [];
+  const ids = new Set<string>();
+  for (const scope of scopes) {
+    if (scope?.scope !== 'whatsapp_business_management') continue;
+    const targets = Array.isArray(scope.target_ids) ? scope.target_ids : [];
+    for (const id of targets) {
+      if (id) ids.add(String(id));
+    }
+  }
+  return [...ids];
+}
+
+/**
+ * Garante waba_id e phone_number_id antes de marcar a conta como conectada.
+ * Se o popup da coexistência omitir o número, busca em GET /{waba}/phone_numbers.
+ */
+async function resolveSignupIds(input: {
+  accessToken: string;
+  wabaId?: string;
+  phoneNumberId?: string;
+  whatsappPhone?: string;
+}): Promise<{ wabaId: string; phoneNumberId: string; lookedUpPhone: boolean }> {
+  const givenWaba = input.wabaId?.trim() || '';
+  const givenPhone = input.phoneNumberId?.trim() || '';
+
+  if (givenWaba && givenPhone) {
+    return { wabaId: givenWaba, phoneNumberId: givenPhone, lookedUpPhone: false };
+  }
+
+  const wabaIds = givenWaba ? [givenWaba] : await listWabaIdsFromToken(input.accessToken);
+  const listed: ListedWhatsappPhone[] = [];
+  for (const wabaId of wabaIds) {
+    const phones = await listWabaPhoneNumbers(wabaId, input.accessToken);
+    listed.push(...phones);
+  }
+
+  if (givenPhone) {
+    const match = listed.find((phone) => phone.id === givenPhone);
+    const wabaId = match?.wabaId || (wabaIds.length === 1 ? wabaIds[0] : '');
+    if (!wabaId) {
+      throw new Error(
+        'A Meta confirmou o número, mas não informou a conta do WhatsApp. Tente conectar de novo.'
+      );
+    }
+    return { wabaId, phoneNumberId: givenPhone, lookedUpPhone: false };
+  }
+
+  const picked = pickOnboardedPhone(listed, input.whatsappPhone);
+  if (picked === 'none') {
+    throw new Error(
+      'A Meta confirmou a conta, mas não encontramos o número do WhatsApp Business. Confira se o aplicativo verde está aberto nesse número e tente de novo.'
+    );
+  }
+  if (picked === 'ambiguous') {
+    throw new Error(
+      'A Meta confirmou a conta, mas há mais de um número e nenhum bate com o WhatsApp informado no cadastro. Volte e confira se digitou o número do aplicativo verde.'
+    );
+  }
+
+  return { wabaId: picked.wabaId, phoneNumberId: picked.id, lookedUpPhone: true };
+}
+
 /** Busca o número de telefone real na Meta (mais confiável que confiar no que o cliente digitou). */
 async function fetchDisplayPhoneNumber(
   phoneNumberId: string,
@@ -128,11 +238,11 @@ export async function POST(req: NextRequest) {
       cityState,
     } = body;
 
-    if (!code || !wabaId || !phoneNumberId) {
+    if (!code) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Faltou code, wabaId ou phoneNumberId do Embedded Signup da Meta.',
+          error: 'Faltou o código de autorização do Embedded Signup da Meta.',
         },
         { status: 400 }
       );
@@ -166,9 +276,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let resolvedWabaId: string;
+    let resolvedPhoneNumberId: string;
+    try {
+      const resolved = await resolveSignupIds({
+        accessToken,
+        wabaId: wabaId ? String(wabaId) : undefined,
+        phoneNumberId: phoneNumberId ? String(phoneNumberId) : undefined,
+        whatsappPhone: whatsappPhone ? String(whatsappPhone) : undefined,
+      });
+      resolvedWabaId = resolved.wabaId;
+      resolvedPhoneNumberId = resolved.phoneNumberId;
+      if (resolved.lookedUpPhone) {
+        logger.info('onboarding.embedded_signup_phone_resolved', {
+          tenantId,
+          wabaId: resolvedWabaId,
+          phoneNumberId: resolvedPhoneNumberId,
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Não foi possível identificar o número na Meta.';
+      const customerCanRetry = message.startsWith('A Meta confirmou');
+      logger.warn('onboarding.embedded_signup_resolve_failed', { tenantId, message });
+      return NextResponse.json(
+        { success: false, error: message },
+        { status: customerCanRetry ? 400 : 502 }
+      );
+    }
+
     const warnings: string[] = [];
 
-    const registerResult = await registerPhoneNumber(String(phoneNumberId), accessToken);
+    const registerResult = await registerPhoneNumber(resolvedPhoneNumberId, accessToken);
     if (!registerResult.ok) {
       warnings.push(`Registro do número: ${registerResult.error}`);
       logger.warn('onboarding.embedded_signup_register_warning', {
@@ -177,7 +315,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const subscribeResult = await subscribeAppToWaba(String(wabaId), accessToken);
+    const subscribeResult = await subscribeAppToWaba(resolvedWabaId, accessToken);
     if (!subscribeResult.ok) {
       warnings.push(`Assinatura de webhooks: ${subscribeResult.error}`);
       logger.warn('onboarding.embedded_signup_subscribe_warning', {
@@ -198,8 +336,8 @@ export async function POST(req: NextRequest) {
     const { error: credError } = await supabaseAdmin.from('tenant_credentials').upsert(
       {
         tenant_id: tenantId,
-        waba_id: String(wabaId),
-        phone_number_id: String(phoneNumberId),
+        waba_id: resolvedWabaId,
+        phone_number_id: resolvedPhoneNumberId,
         encrypted_access_token: encryptedText,
         token_encryption_iv: iv,
         verify_token: verifyToken,
@@ -222,7 +360,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const realPhoneNumber = await fetchDisplayPhoneNumber(String(phoneNumberId), accessToken);
+    const realPhoneNumber = await fetchDisplayPhoneNumber(resolvedPhoneNumberId, accessToken);
     const resolvedPhone = realPhoneNumber || whatsappPhone || undefined;
 
     await supabaseAdmin
@@ -244,13 +382,18 @@ export async function POST(req: NextRequest) {
         .eq('role', 'ADMIN');
     }
 
-    logger.info('onboarding.embedded_signup_connected', { tenantId, wabaId, phoneNumberId, warnings });
+    logger.info('onboarding.embedded_signup_connected', {
+      tenantId,
+      wabaId: resolvedWabaId,
+      phoneNumberId: resolvedPhoneNumberId,
+      warnings,
+    });
 
     return NextResponse.json({
       success: true,
       message: 'WhatsApp conectado via Meta Embedded Signup.',
-      wabaId,
-      phoneNumberId,
+      wabaId: resolvedWabaId,
+      phoneNumberId: resolvedPhoneNumberId,
       whatsappPhone: resolvedPhone || null,
       verifyToken,
       cityState: cityState || null,
