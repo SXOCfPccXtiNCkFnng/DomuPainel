@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth } from '@/lib/requireAuth';
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     .limit(30);
 
   if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.notifications', error);
   }
 
   const notifications = (data || []).map((n) => ({
@@ -53,7 +54,7 @@ export async function PATCH(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .eq('user_id', userId)
       .eq('is_read', false);
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    if (error) return internalErrorResponse('api.notifications', error);
     return NextResponse.json({ success: true });
   }
 
@@ -69,6 +70,6 @@ export async function PATCH(req: NextRequest) {
     .eq('tenant_id', tenantId)
     .eq('user_id', userId);
 
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (error) return internalErrorResponse('api.notifications', error);
   return NextResponse.json({ success: true });
 }

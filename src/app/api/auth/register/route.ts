@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Register API Error]', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Erro interno ao processar cadastro.' },
+      { success: false, error: 'Erro interno ao processar cadastro.' },
       { status: 500 }
     );
   }

@@ -218,6 +218,140 @@ Mensagem enviada só pelo app, antes de conectar a API, não abre essa janela da
 
 **Imóveis** e **Leads e Respostas** aparecem no segmento imobiliário marcados como **Em breve**. O segmento “Somente Disparos” não usa esses dois.`,
   },
+  {
+    id: 'status_envio',
+    question: 'O que significa cada status de envio (Na fila, Enviando, Enviado, Entregue, Lido, Falhou)?',
+    shortLabel: 'Status de envio da campanha',
+    keywords: ['status', 'na fila', 'enviando', 'enviado', 'entregue', 'lido', 'falhou', 'progresso', 'acompanhar'],
+    answer: `Status de cada contato numa campanha (tela de progresso em **Disparo de Campanha**):
+
+• **Na fila:** aguardando a vez de sair.
+• **Enviando:** a Domu já mandou para a Meta e aguarda a confirmação.
+• **Enviado:** a Meta aceitou a mensagem.
+• **Entregue:** chegou no celular do contato.
+• **Lido:** o contato abriu (só aparece se ele não desativou a confirmação de leitura).
+• **Falhou:** não saiu — o motivo aparece em **Exibir detalhes**.
+
+Campanhas grandes saem em lotes: a barra avança aos poucos, e o envio continua mesmo com a tela fechada.`,
+  },
+  {
+    id: 'enviado_nao_entregue',
+    question: 'Minhas mensagens aparecem como enviadas, mas não são entregues. Por quê?',
+    shortLabel: 'Enviado mas não entregue',
+    keywords: ['nao entregue', 'não entregue', 'nao chegou', 'não chegou', 'nao recebeu', 'não recebeu', 'so enviado', 'só enviado', 'entrega'],
+    answer: `Quando fica em **Enviado** e não passa para **Entregue**, as causas mais comuns são:
+
+1. **Sem cartão na Meta:** para templates de **Marketing**, a Meta exige um meio de pagamento cadastrado no **WhatsApp Manager** da sua empresa. Sem isso ela aceita, mas não entrega.
+2. O contato não tem WhatsApp naquele número, ou o celular está desligado/sem internet (a Meta tenta por até alguns dias).
+3. O contato bloqueou seu número.
+
+Comece conferindo o cartão em **WhatsApp Manager → Configurações de pagamento**.`,
+  },
+  {
+    id: 'erros_meta',
+    question: 'O que significam os erros da Meta numa campanha que falhou?',
+    shortLabel: 'Campanha falhou: e agora?',
+    keywords: ['erro', 'falha', 'falhou', 'deu erro', '131058', '132001', '131030', '131047', '131026', '130429', 'expirou', 'token'],
+    answer: `Erros mais comuns (o texto aparece em **Exibir detalhes** na campanha):
+
+• **Template não encontrado ou não aprovado (132001):** o modelo não está aprovado nesse número. Confira em **Templates**.
+• **Modelos de exemplo da Meta (131058):** "hello_world" e similares só funcionam no número de teste. Crie seu próprio template.
+• **Número fora da lista de teste (131030):** a conta da Meta ainda está em modo de desenvolvimento.
+• **Número inválido / sem WhatsApp (131026).**
+• **Limite temporário da Meta (130429):** aguarde alguns minutos.
+• **Credenciais expiradas:** reconecte o WhatsApp em **Configurações → Integração WhatsApp**.
+• **Opt-out:** o contato pediu para não receber; a Domu pula automaticamente.`,
+  },
+  {
+    id: 'agendar_campanha',
+    question: 'Como agendar uma campanha para outro dia ou horário?',
+    shortLabel: 'Agendar campanha',
+    keywords: ['agendar', 'agendamento', 'agendada', 'horario', 'horário', 'programar', 'depois', 'mais tarde'],
+    answer: `1. Em **Disparo de Campanha**, clique em **Nova Campanha**.
+2. Escolha o template e os contatos normalmente.
+3. Na etapa de envio, escolha **Agendar** e defina data e hora.
+
+A campanha fica como **Agendada** e sai sozinha no horário, mesmo com o painel fechado. Se o horário já passou, aparece o botão **Disparar agora** na tela de progresso. Lembre: no plano Starter existe a trava de 200 disparos por dia.`,
+  },
+  {
+    id: 'limite_plano',
+    question: 'Qual a diferença entre o limite do meu plano Domu e o limite da Meta?',
+    shortLabel: 'Limite do plano x limite da Meta',
+    keywords: ['limite do plano', 'limite mensal', 'limite diario', 'limite diário', 'excedido', 'estourou', 'disparos por mes', 'disparos por mês'],
+    answer: `São dois limites independentes:
+
+• **Limite do plano Domu** (por mês): **Starter** até 1.500 disparos/mês e 200/dia; **Pro** até 6.000/mês; **Enterprise** sem limite na plataforma.
+• **Limite da Meta** (por 24 horas, por número): 250, 1.000, 10.000… conversas iniciadas. Sobe sozinho com boa qualidade.
+
+O disparo é bloqueado se qualquer um dos dois for passar. Para ampliar o da Domu, troque de plano em **Assinatura e Planos**.`,
+  },
+  {
+    id: 'planos_assinatura',
+    question: 'Como funcionam os planos, o pagamento e a troca ou cancelamento da assinatura?',
+    shortLabel: 'Planos e assinatura',
+    keywords: ['plano', 'planos', 'assinatura', 'pix', 'cartao de credito', 'cartão de crédito', 'mensalidade', 'trocar plano', 'mudar plano', 'upgrade', 'cancelar assinatura', 'renovar', 'vencimento'],
+    answer: `Tudo fica em **Assinatura e Planos** (só Administradores):
+
+• Planos **Starter**, **Pro** e **Enterprise** — o valor atualizado aparece na própria tela.
+• Pagamento mensal por **PIX** (5% de desconto, o QR Code é gerado na hora) ou **cartão de crédito**.
+• **Trocar de plano:** escolha o novo plano e conclua o pagamento; ele vale quando o pagamento é confirmado.
+• **Cancelar:** pelo botão de cancelamento na mesma tela; as cobranças futuras são encerradas.
+• Com a assinatura vencida, o painel continua acessível, mas os disparos ficam bloqueados até regularizar.
+
+A cobrança das conversas é da **Meta**, separada da mensalidade Domu.`,
+  },
+  {
+    id: 'equipe',
+    question: 'Como convidar pessoas da equipe e quais são as permissões de cada função?',
+    shortLabel: 'Convidar equipe e permissões',
+    keywords: ['equipe', 'convidar', 'convite', 'usuario', 'usuário', 'usuarios', 'colaborador', 'permissao', 'permissão', 'atendente', 'corretor', 'administrador', 'acesso'],
+    answer: `Em **Configurações → Equipe e permissões** (só Administradores):
+
+1. Informe nome, e-mail e a função.
+2. A pessoa recebe um e-mail para criar a senha (o convite vale 7 dias).
+
+Funções:
+• **Administrador:** tudo, inclusive equipe, assinatura e conexão do WhatsApp.
+• **Corretor:** cria templates e dispara campanhas.
+• **Atendente:** consulta e atende, mas não dispara nem apaga contatos.
+
+Limite de usuários: Starter 3, Pro 10, Enterprise 50. Removeu alguém? O acesso cai na hora.`,
+  },
+  {
+    id: 'opt_out',
+    question: 'Como funciona o opt-out (contato que pede para não receber mais)?',
+    shortLabel: 'Contato pediu para sair',
+    keywords: ['opt-out', 'optout', 'opt out', 'descadastrar', 'nao quero receber', 'não quero receber', 'sair da lista', 'parar de receber', 'remover numero', 'remover número'],
+    answer: `Quando o contato responde algo como **"sair"**, **"parar"**, **"stop"**, **"cancelar"**, **"não quero receber"** ou **"remover meu número"**, a Domu marca o opt-out automaticamente.
+
+• Ele deixa de receber campanhas (fica de fora até de envios já na fila).
+• Continua na sua lista de **Contatos**, marcado como opt-out.
+• Respeitar o opt-out é regra da Meta e protege a qualidade do seu número.
+
+Dica: termine o template com algo como "Responda SAIR para não receber mais".`,
+  },
+  {
+    id: 'senha',
+    question: 'Esqueci minha senha ou quero trocar a senha. Como faço?',
+    shortLabel: 'Trocar ou recuperar senha',
+    keywords: ['senha', 'esqueci', 'recuperar', 'redefinir', 'trocar senha', 'alterar senha', 'login', 'nao consigo entrar', 'não consigo entrar'],
+    answer: `• **Esqueceu:** na tela de login clique em **Esqueceu a senha?**, informe o e-mail e use o link que chega (vale 1 hora; confira o spam).
+• **Quer trocar:** em **Configurações → Meu Perfil**, informe a senha atual e a nova.
+
+Ao trocar a senha, os outros aparelhos conectados saem da conta por segurança.`,
+  },
+  {
+    id: 'segmento',
+    question: 'Qual a diferença entre o segmento Imobiliário e o Somente Disparos? Posso trocar?',
+    shortLabel: 'Segmento da conta',
+    keywords: ['segmento', 'somente disparos', 'imobiliario', 'imobiliário', 'trocar segmento', 'mudar segmento', 'modo', 'completo'],
+    answer: `O segmento muda o foco do painel, não o limite do plano:
+
+• **Somente Disparos:** painel enxuto, só campanhas, templates, contatos e métricas de envio.
+• **Imobiliário:** os mesmos disparos e, em breve, **Imóveis** e **Leads e Respostas**.
+
+O segmento é escolhido no cadastro inicial. Para trocar depois, fale com o suporte.`,
+  },
 ];
 
 const HUMAN_PHRASES = [

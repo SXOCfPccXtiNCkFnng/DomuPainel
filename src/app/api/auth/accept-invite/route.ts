@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { hashPassword, isPasswordStrong } from '@/lib/authHelpers';
 import { applySessionCookie } from '@/lib/requireAuth';
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.accept-invite', error);
   }
 }
 
@@ -77,6 +78,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Reserva o convite atomicamente: o mesmo link não cria duas contas.
+    const { data: claimed } = await supabaseAdmin
+      .from('user_invites')
+      .update({ accepted_at: new Date().toISOString() })
+      .eq('id', invite.id)
+      .is('accepted_at', null)
+      .select('id');
+    if (!claimed || claimed.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Convite inválido ou expirado.' },
+        { status: 400 }
+      );
+    }
+    const releaseInvite = () =>
+      supabaseAdmin.from('user_invites').update({ accepted_at: null }).eq('id', invite.id);
+
     const passwordHash = await hashPassword(password);
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
@@ -97,13 +114,10 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+      // Falha inesperada: devolve o convite para a pessoa poder tentar de novo.
+      await releaseInvite();
       throw userError;
     }
-
-    await supabaseAdmin
-      .from('user_invites')
-      .update({ accepted_at: new Date().toISOString() })
-      .eq('id', invite.id);
 
     await notifyTenantAdmins(invite.tenant_id, {
       title: 'Novo membro na equipe',
@@ -141,6 +155,6 @@ export async function POST(req: NextRequest) {
     return res;
   } catch (error: any) {
     logger.error('team.accept_error', { message: error?.message });
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.accept-invite', error);
   }
 }

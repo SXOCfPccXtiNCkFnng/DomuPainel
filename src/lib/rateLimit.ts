@@ -1,6 +1,17 @@
 type Bucket = { count: number; resetAt: number };
 
 const buckets = new Map<string, Bucket>();
+let lastSweep = 0;
+const SWEEP_INTERVAL_MS = 60 * 1000;
+
+/** Remove janelas vencidas — sem isso o Map cresce para sempre (uma chave por IP/e-mail). */
+function sweepExpired(now: number) {
+  if (now - lastSweep < SWEEP_INTERVAL_MS) return;
+  lastSweep = now;
+  for (const [key, bucket] of buckets) {
+    if (bucket.resetAt <= now) buckets.delete(key);
+  }
+}
 
 /**
  * Rate limit em memória (por processo). Adequado para single-instance / MVP.
@@ -12,6 +23,7 @@ export function checkRateLimit(
   windowMs: number
 ): { ok: boolean; retryAfterSec?: number; remaining: number } {
   const now = Date.now();
+  sweepExpired(now);
   let bucket = buckets.get(key);
 
   if (!bucket || bucket.resetAt <= now) {

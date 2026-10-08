@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, leads: result });
   } catch (error: any) {
     console.error('[Leads API GET Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.leads', error);
   }
 }
 
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Leads API POST Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.leads', error);
   }
 }
 
@@ -231,13 +232,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true, updated: data?.length || 0, leads: data });
   } catch (error: any) {
     console.error('[Leads API PATCH Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.leads', error);
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = await requireAuth(req);
+    // Apagar contatos (inclusive em massa) é destrutivo: Atendente não pode.
+    const auth = await requireDispatcher(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -264,6 +266,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, deleted: count ?? ids.length });
   } catch (error: any) {
     console.error('[Leads API DELETE Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.leads', error);
   }
 }

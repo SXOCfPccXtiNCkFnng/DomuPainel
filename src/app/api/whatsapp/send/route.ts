@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[API Send Route Error]', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Erro interno ao processar disparo.' },
+      { success: false, error: 'Erro interno ao processar disparo.' },
       { status: 500 }
     );
   }

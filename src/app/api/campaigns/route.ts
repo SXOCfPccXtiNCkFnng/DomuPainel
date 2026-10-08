@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, campaigns });
   } catch (error: any) {
     console.error('[Campaigns GET]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.campaigns', error);
   }
 }
 

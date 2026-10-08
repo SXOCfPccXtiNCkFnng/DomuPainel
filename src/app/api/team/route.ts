@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAdmin, isValidTeamRole, TEAM_ROLES } from '@/lib/requireAuth';
 import { getPlanUserLimit, normalizePlanTier } from '@/lib/planLimits';
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     logger.error('team.list_error', { message: error?.message });
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.team', error);
   }
 }
 
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     logger.error('team.invite_error', { message: error?.message });
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.team', error);
   }
 }
 
@@ -213,7 +214,7 @@ export async function PATCH(req: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.team', error);
   }
 }
 
@@ -255,6 +256,6 @@ export async function DELETE(req: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.team', error);
   }
 }

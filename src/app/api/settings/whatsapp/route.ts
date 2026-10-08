@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { encryptData } from '@/lib/crypto';
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
@@ -11,6 +12,7 @@ export async function GET(req: NextRequest) {
     const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
+    const isAdmin = auth.session.role === 'ADMIN' || auth.session.role === 'SUPER_ADMIN';
 
     const { data: tenant } = await supabaseAdmin
       .from('tenants')
@@ -32,7 +34,8 @@ export async function GET(req: NextRequest) {
         coexistenceStatus: tenant?.coexistence_status || 'DISCONNECTED',
         wabaId: creds?.waba_id || '',
         phoneNumberId: creds?.phone_number_id || '',
-        verifyToken: creds?.verify_token || '',
+        // Segredo do webhook: só quem pode reconfigurar a integração vê.
+        verifyToken: isAdmin ? creds?.verify_token || '' : '',
         appId: creds?.app_id || '',
         hasToken: Boolean(creds?.waba_id),
         isVerified: creds?.is_verified || false,
@@ -41,7 +44,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Settings GET]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.settings.whatsapp', error);
   }
 }
 
@@ -129,6 +132,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Settings POST]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.settings.whatsapp', error);
   }
 }

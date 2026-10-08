@@ -1,3 +1,18 @@
+import { NextResponse } from 'next/server';
+
+/**
+ * Resposta 500 para o cliente sem vazar detalhe interno (nome de tabela,
+ * constraint, SQL). O motivo real vai só para o log.
+ */
+export function internalErrorResponse(
+  scope: string,
+  error: unknown,
+  message = 'Erro interno. Tente novamente em instantes.'
+) {
+  console.error(`[${scope}]`, describeError(error));
+  return NextResponse.json({ success: false, error: message }, { status: 500 });
+}
+
 /**
  * Erros do Postgrest/Supabase não são instanceof Error — só têm .message,
  * .code, .details, .hint. Sem isso, os catches genéricos jogavam fora o

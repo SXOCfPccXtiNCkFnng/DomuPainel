@@ -134,19 +134,34 @@ export async function POST(req: NextRequest) {
 
     // Pagamento — validar status real na API Asaas antes de ativar
     if (payment?.id) {
-      const externalRef = payment.externalReference || payment.subscription;
-      let tenantId: string | null =
-        typeof payment.externalReference === 'string'
-          ? payment.externalReference
-          : null;
+      // Busca o pagamento direto no Asaas ANTES de decidir de qual tenant ele é:
+      // status, externalReference e subscription vêm da fonte, não do payload.
+      let source = payment as typeof payment & {
+        externalReference?: string;
+        subscription?: string;
+        status?: string;
+      };
+      if (!isBillingMockEnabled()) {
+        try {
+          source = { ...payment, ...(await asaasGetPayment(payment.id)) };
+        } catch (err) {
+          console.error('[Asaas Webhook] Falha ao validar payment no Asaas:', err);
+          return NextResponse.json(
+            { success: false, error: 'Não foi possível validar o pagamento.' },
+            { status: 502 }
+          );
+        }
+      }
 
-      if (!tenantId && payment.subscription) {
+      const externalRef = source.externalReference || source.subscription;
+      let tenantId: string | null =
+        typeof source.externalReference === 'string' ? source.externalReference : null;
+
+      if (!tenantId && source.subscription) {
         const { data: sub } = await supabaseAdmin
           .from('subscriptions')
-          .select(
-            'tenant_id, plan_tier, monthly_price_brl, payment_method, coupon_code, asaas_customer_id'
-          )
-          .eq('asaas_subscription_id', payment.subscription)
+          .select('tenant_id')
+          .eq('asaas_subscription_id', source.subscription)
           .maybeSingle();
         if (sub) tenantId = sub.tenant_id;
       }
@@ -161,21 +176,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (tenantId) {
-        let verifiedStatus = String(payment.status || '');
-
-        // Confirma status no Asaas (exceto mock local)
-        if (!isBillingMockEnabled()) {
-          try {
-            const verified = await asaasGetPayment(payment.id);
-            verifiedStatus = verified.status || verifiedStatus;
-          } catch (err) {
-            console.error('[Asaas Webhook] Falha ao validar payment no Asaas:', err);
-            return NextResponse.json(
-              { success: false, error: 'Não foi possível validar o pagamento.' },
-              { status: 502 }
-            );
-          }
-        }
+        const verifiedStatus = String(source.status || '');
 
         const mapped = mapAsaasPaymentStatusToSubscription(verifiedStatus);
         const { data: current } = await supabaseAdmin
@@ -201,10 +202,10 @@ export async function POST(req: NextRequest) {
             planTier: current?.plan_tier || 'STARTER',
             monthlyPrice: Number(current?.monthly_price_brl) || 0,
             paymentMethod:
-              current?.payment_method || payment.billingType || 'PIX',
+              current?.payment_method || source.billingType || 'PIX',
             asaasCustomerId: current?.asaas_customer_id,
             asaasSubscriptionId:
-              current?.asaas_subscription_id || payment.subscription,
+              current?.asaas_subscription_id || source.subscription,
             couponCode:
               current?.status === 'ACTIVE' ? null : current?.coupon_code || null,
             status: 'ACTIVE',
@@ -215,10 +216,10 @@ export async function POST(req: NextRequest) {
             .update({ status: mapped, updated_at: new Date().toISOString() })
             .eq('tenant_id', tenantId);
         } else if (
-          payment.billingType === 'PIX' &&
+          source.billingType === 'PIX' &&
           current?.status === 'ACTIVE' &&
           current?.asaas_subscription_id &&
-          payment.subscription === current.asaas_subscription_id
+          source.subscription === current.asaas_subscription_id
         ) {
           // Assinatura já ativa + cobrança nova pendente no mesmo asaas_subscription_id
           // = o Asaas gerou o próximo ciclo automaticamente. Avisa o cliente com o Pix.

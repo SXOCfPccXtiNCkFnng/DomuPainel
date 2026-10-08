@@ -19,12 +19,27 @@ import {
   Link2,
   FileText,
 } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { CONTACT_WHATSAPP_URL } from '@/lib/contact';
 import {
   FAQ_KNOWLEDGE_BASE,
   findBestAnswer,
   wantsHumanSupport,
 } from '@/lib/supportKnowledge';
+
+/** Atalhos da tela inicial: as dúvidas que mais aparecem no dia a dia. */
+const WELCOME_TOPIC_IDS = [
+  'como_disparar',
+  'erros_meta',
+  'enviado_nao_entregue',
+  'criar_template',
+  'conectar_meta',
+  'planos_assinatura',
+];
+
+const WELCOME_OPTIONS = WELCOME_TOPIC_IDS.map(
+  (id) => FAQ_KNOWLEDGE_BASE.find((item) => item.id === id)?.shortLabel
+).filter((label): label is string => Boolean(label));
 
 interface Message {
   id: string;
@@ -81,14 +96,15 @@ function getTopicIcon(labelOrId: string) {
 
 
 export default function SupportChatbot() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome-1',
       sender: 'bot',
-      text: 'Olá! Sou o assistente de suporte da **Domu Tech**.\n\nEstou aqui para tirar dúvidas sobre o sistema, regras da Meta, limites diários, aprovação de templates e cobrança.\n\nEscolha um dos tópicos rápidos abaixo ou digite sua dúvida:',
-      options: FAQ_KNOWLEDGE_BASE.slice(0, 5).map((f) => f.shortLabel),
+      text: 'Olá! Sou o assistente de suporte da **Domu Tech**.\n\nConsigo ver os dados da sua conta (campanhas, templates, plano e conexão do WhatsApp), então pode perguntar coisas como **"por que minha última campanha falhou?"** ou **"quanto ainda posso disparar este mês?"**.\n\nEscolha um tópico ou digite sua dúvida:',
+      options: WELCOME_OPTIONS,
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
@@ -106,10 +122,15 @@ export default function SupportChatbot() {
     }
   }, [isOpen, messages]);
 
-  const followUps = (exceptId?: string) =>
-    FAQ_KNOWLEDGE_BASE.filter((item) => item.id !== exceptId)
+  // Sugere tópicos que ainda não apareceram nesta conversa, em vez de sempre os mesmos 3.
+  const followUps = (exceptId?: string) => {
+    const seen = new Set(messages.map((m) => m.text.toLowerCase()));
+    return FAQ_KNOWLEDGE_BASE.filter(
+      (item) => item.id !== exceptId && !seen.has(item.shortLabel.toLowerCase())
+    )
       .slice(0, 3)
       .map((item) => item.shortLabel);
+  };
 
   const pushBot = (reply: Omit<Message, 'id' | 'sender'>) => {
     setMessages((prev) => [...prev, { id: `bot-${Date.now()}`, sender: 'bot', ...reply }]);
@@ -152,18 +173,30 @@ export default function SupportChatbot() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: text,
-            history: history.slice(-8).map((item) => ({ role: item.sender, text: item.text })),
+            pathname,
+            // Sem a mensagem atual (vai em `message`) e sem a saudação inicial.
+            history: messages
+              .filter((item) => !item.id.startsWith('welcome'))
+              .slice(-10)
+              .map((item) => ({ role: item.sender, text: item.text })),
           }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.answer) {
+          const suggestions: string[] = Array.isArray(data.suggestions) ? data.suggestions : [];
           pushBot({
             text: data.answer,
             showWhatsAppLink: Boolean(data.offerHuman),
             whatsAppCustomText: data.offerHuman
               ? `Olá suporte Domu Tech! Estava no sistema com uma dúvida: "${text}" e gostaria da ajuda de um atendente.`
               : undefined,
-            options: followUps(),
+            options: suggestions.length > 0 ? suggestions : followUps(),
+          });
+          return;
+        }
+        if (res.status === 429) {
+          pushBot({
+            text: data.error || 'Muitas perguntas seguidas. Aguarde alguns segundos e tente de novo.',
           });
           return;
         }
@@ -191,7 +224,7 @@ export default function SupportChatbot() {
         id: `welcome-${Date.now()}`,
         sender: 'bot',
         text: 'Conversa reiniciada! Como posso te ajudar agora? Escolha um tema ou digite sua pergunta:',
-        options: FAQ_KNOWLEDGE_BASE.slice(0, 5).map((f) => f.shortLabel),
+        options: WELCOME_OPTIONS,
       },
     ]);
   };

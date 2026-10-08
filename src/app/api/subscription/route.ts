@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getPlanMonthlyLimit, PLAN_DISPATCH_LIMITS, PlanTier } from '@/lib/planLimits';
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
@@ -95,7 +96,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Subscription API GET Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.subscription', error);
   }
 }
 
@@ -194,6 +195,6 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Subscription DELETE Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.subscription', error);
   }
 }

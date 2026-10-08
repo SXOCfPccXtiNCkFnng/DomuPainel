@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Login API Error]', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Erro interno ao processar login.' },
+      { success: false, error: 'Erro interno ao processar login.' },
       { status: 500 }
     );
   }

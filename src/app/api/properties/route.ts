@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,13 +22,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, properties: data || [] });
   } catch (error: any) {
     console.error('[Properties GET]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.properties', error);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAuth(req);
+    const auth = await requireDispatcher(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -69,6 +70,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, property: data });
   } catch (error: any) {
     console.error('[Properties POST]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.properties', error);
   }
 }

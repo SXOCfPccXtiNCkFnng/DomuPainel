@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth } from '@/lib/requireAuth';
 import { recountCampaignLogs } from '@/lib/campaignDispatch';
@@ -104,6 +105,6 @@ export async function GET(
     });
   } catch (error: any) {
     console.error('[Campaign progress]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.campaigns.progress', error);
   }
 }

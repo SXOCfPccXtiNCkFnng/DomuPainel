@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: 'Erro ao carregar os dados. Tente novamente em instantes.',
       },
       { status: 500 }
     );

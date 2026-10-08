@@ -28,6 +28,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, count: count || 0 });
   } catch (error: any) {
     console.error('[Replies API]', error);
-    return NextResponse.json({ success: false, error: error.message, count: 0 }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Erro ao carregar respostas.', count: 0 }, { status: 500 });
   }
 }

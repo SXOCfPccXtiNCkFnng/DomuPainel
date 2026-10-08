@@ -48,6 +48,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Consome o token ANTES de trocar a senha, de forma atômica: duas requisições
+    // simultâneas com o mesmo link não conseguem as duas redefinir a senha.
+    const { data: claimed } = await supabaseAdmin
+      .from('password_reset_tokens')
+      .update({ used_at: new Date().toISOString() })
+      .eq('id', row.id)
+      .is('used_at', null)
+      .select('id');
+    if (!claimed || claimed.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Link inválido ou expirado. Solicite um novo.' },
+        { status: 400 }
+      );
+    }
+
     const passwordHash = await hashPassword(password);
     const { error: userError } = await supabaseAdmin
       .from('users')
@@ -55,11 +70,6 @@ export async function POST(req: NextRequest) {
       .eq('id', row.user_id);
 
     if (userError) throw userError;
-
-    await supabaseAdmin
-      .from('password_reset_tokens')
-      .update({ used_at: new Date().toISOString() })
-      .eq('id', row.id);
 
     await supabaseAdmin
       .from('password_reset_tokens')

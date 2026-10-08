@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getMetaAppSecret, getMetaVerifyToken, isProduction } from '@/lib/envSecrets';
 import { isOptOutMessage } from '@/lib/metaClient';
 import { logger } from '@/lib/logger';
+import { recountCampaignLogs } from '@/lib/campaignDispatch';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,20 +31,38 @@ function verifyMetaSignature(rawBody: string, signatureHeader: string | null, ap
   }
 }
 
+/**
+ * Incremento atômico (RPC da migration 20261008_campaign_counter_rpc). Ler e
+ * gravar +1 aqui perdia contagem com vários webhooks chegando juntos. Se a
+ * migration ainda não rodou, recalcula tudo a partir dos logs (sempre correto,
+ * só mais caro).
+ */
 async function bumpCampaignCounter(
   campaignId: string,
   field: 'delivered_count' | 'read_count' | 'failed_count' | 'sent_count'
 ) {
+  const { error } = await supabaseAdmin.rpc('increment_campaign_counter', {
+    p_campaign_id: campaignId,
+    p_field: field,
+  });
+  if (!error) return;
+
+  logger.info('webhook.counter_rpc_fallback', { campaignId, message: error.message });
   const { data: camp } = await supabaseAdmin
     .from('campaigns')
-    .select(field)
+    .select('tenant_id')
     .eq('id', campaignId)
     .maybeSingle();
   if (!camp) return;
-  const current = Number((camp as any)[field] || 0);
+  const counts = await recountCampaignLogs(campaignId, camp.tenant_id);
   await supabaseAdmin
     .from('campaigns')
-    .update({ [field]: current + 1, updated_at: new Date().toISOString() })
+    .update({
+      sent_count: counts.sent + counts.delivered + counts.read,
+      delivered_count: counts.delivered + counts.read,
+      read_count: counts.read,
+      failed_count: counts.failed,
+    })
     .eq('id', campaignId);
 }
 
@@ -81,7 +100,15 @@ async function handleStatusUpdate(status: any) {
   const rank: Record<string, number> = { PENDING: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 9 };
   if ((rank[mapped] || 0) < (rank[prev] || 0) && mapped !== 'FAILED') return;
 
-  await supabaseAdmin.from('campaign_logs').update(patch).eq('id', log.id);
+  // Compare-and-set no status anterior: se a Meta reentregar o mesmo evento
+  // em paralelo, só um processa e os contadores não contam em dobro.
+  const { data: changed } = await supabaseAdmin
+    .from('campaign_logs')
+    .update(patch)
+    .eq('id', log.id)
+    .eq('status', prev)
+    .select('id');
+  if (!changed || changed.length === 0) return;
 
   if (mapped === 'DELIVERED' && prev !== 'DELIVERED' && prev !== 'READ') {
     await bumpCampaignCounter(log.campaign_id, 'delivered_count');
@@ -156,6 +183,17 @@ async function handleInboundMessage(message: any, tenantId: string | null, metad
   if (!lead) {
     logger.info('webhook.lead_not_found', { from, tenantId });
     return;
+  }
+
+  // A Meta reentrega o webhook quando não recebe 200 a tempo: sem isso a
+  // mesma mensagem aparecia duplicada no atendimento.
+  if (message.id) {
+    const { data: existing } = await supabaseAdmin
+      .from('chat_messages')
+      .select('id')
+      .eq('wamid', message.id)
+      .limit(1);
+    if (existing && existing.length > 0) return;
   }
 
   await supabaseAdmin.from('chat_messages').insert({
