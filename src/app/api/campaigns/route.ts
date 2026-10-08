@@ -13,6 +13,8 @@ import { ensureTemplateIdForTenant } from '@/lib/globalTemplates';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 
 export const dynamic = 'force-dynamic';
+/** O disparo imediato roda o primeiro lote (~40s) dentro do POST. */
+export const maxDuration = 60;
 
 function startOfUtcDayIso(): string {
   const d = new Date();
@@ -39,7 +41,7 @@ async function countSentInPeriod(tenantId: string, sinceIso: string): Promise<nu
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 

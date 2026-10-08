@@ -16,7 +16,7 @@ import { getPlanMonthlyLimit, normalizePlanTier } from '@/lib/planLimits';
 import { isProduction } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
 import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
-import { brandedEmailHtml } from '@/lib/emailTemplates';
+import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,12 +67,12 @@ async function sendPixRenewalEmail(input: {
     const html = brandedEmailHtml({
       heading: 'Pix da sua renovação está pronto',
       bodyHtml: `<p style="margin:0 0 12px;">Olá!</p>
-        <p style="margin:0 0 12px;">Sua assinatura do plano <strong>${input.planTier}</strong> (${priceLabel}/mês) da empresa <strong>${
+        <p style="margin:0 0 12px;">Sua assinatura do plano <strong>${escapeHtml(input.planTier)}</strong> (${priceLabel}/mês) da empresa <strong>${escapeHtml(
           tenant?.name || ''
-        }</strong> renovou e já tem um Pix aguardando pagamento.</p>
+        )}</strong> renovou e já tem um Pix aguardando pagamento.</p>
         ${qrImage ? `<div style="text-align:center;margin:20px 0;"><img src="${qrImage}" alt="QR Code Pix" width="220" style="display:inline-block;border:1px solid #E2E8F0;border-radius:12px;padding:8px;" /></div>` : ''}
         <p style="margin:0 0 8px;font-weight:700;color:#0B132B;">Pix copia e cola:</p>
-        <p style="margin:0;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;font-family:monospace;font-size:12px;word-break:break-all;color:#334155;">${pix.payload}</p>`,
+        <p style="margin:0;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;font-family:monospace;font-size:12px;word-break:break-all;color:#334155;">${escapeHtml(pix.payload)}</p>`,
       ctaLabel: 'Pagar no painel',
       ctaUrl: billingUrl,
     });

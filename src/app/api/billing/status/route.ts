@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 /** Consulta status do pagamento pendente (polling no onboarding). */
 export async function GET(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
     const userId = auth.session.userId;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { requireAuth } from '@/lib/requireAuth';
+import { applySessionCookie, requireAuth } from '@/lib/requireAuth';
 import {
   hashPassword,
   isPasswordStrong,
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 /** GET — retorna dados do perfil do usuário logado */
 export async function GET(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return auth.error;
 
   const { userId, tenantId } = auth.session;
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
 /** PATCH — atualiza nome, phone e/ou senha */
 export async function PATCH(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return auth.error;
 
   const { userId } = auth.session;
@@ -146,8 +146,25 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     success: true,
     message: 'Perfil atualizado com sucesso.',
   });
+
+  // Senha nova invalida todas as sessões (outros aparelhos saem);
+  // reemite o cookie só para este navegador continuar logado.
+  if (updates.password_hash) {
+    applySessionCookie(
+      res,
+      {
+        userId,
+        tenantId: auth.session.tenantId,
+        role: auth.session.role,
+        passwordHash: updates.password_hash,
+      },
+      auth.session.rememberMe ?? true
+    );
+  }
+
+  return res;
 }

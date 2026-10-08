@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
 
     applySessionCookie(
       res,
-      { userId: user.id, tenantId: user.tenant_id, role: user.role },
+      { userId: user.id, tenantId: user.tenant_id, role: user.role, passwordHash },
       true
     );
 

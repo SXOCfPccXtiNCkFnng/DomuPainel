@@ -2,6 +2,20 @@ import { appBaseUrl } from '@/lib/email';
 import { CONTACT_EMAIL, CONTACT_WHATSAPP_URL } from '@/lib/contact';
 
 /**
+ * Escapa texto para interpolar em HTML de e-mail. Use em TODO dado vindo de
+ * usuário/banco (nome, empresa, plano...) — senão alguém se cadastra com nome
+ * `<a href="...">` e manda phishing com a marca e o domínio da Domu.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Casca visual padrão dos e-mails transacionais: logo, cartão branco com o
  * conteúdo e rodapé com contato. Table-based + estilos inline de propósito —
  * é o que sobrevive à sanitização de HTML de clientes de e-mail (Gmail,
@@ -14,6 +28,7 @@ export function brandedEmailHtml({
   ctaUrl,
 }: {
   heading: string;
+  /** HTML cru — escape os dados dinâmicos com escapeHtml antes de montar. */
   bodyHtml: string;
   ctaLabel?: string;
   ctaUrl?: string;
@@ -25,7 +40,7 @@ export function brandedEmailHtml({
     ctaUrl && ctaLabel
       ? `<tr>
           <td style="padding-top:28px;">
-            <a href="${ctaUrl}" style="display:inline-block;background:#1E5AF6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 30px;border-radius:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">${ctaLabel}</a>
+            <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:#1E5AF6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 30px;border-radius:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">${escapeHtml(ctaLabel)}</a>
           </td>
         </tr>`
       : '';
@@ -45,7 +60,7 @@ export function brandedEmailHtml({
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <h1 style="margin:0 0 16px;font-size:20px;line-height:1.35;color:#0B132B;font-weight:800;">${heading}</h1>
+                  <h1 style="margin:0 0 16px;font-size:20px;line-height:1.35;color:#0B132B;font-weight:800;">${escapeHtml(heading)}</h1>
                   <div style="font-size:14px;line-height:1.75;color:#475569;">
                     ${bodyHtml}
                   </div>

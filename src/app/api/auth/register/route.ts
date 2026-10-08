@@ -11,7 +11,7 @@ import {
 } from '@/lib/validators';
 import { LEGAL_DOCS_VERSION } from '@/lib/legal';
 import { appBaseUrl, sendEmail } from '@/lib/email';
-import { brandedEmailHtml } from '@/lib/emailTemplates';
+import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
 import { seedGenericTemplatesForTenant } from '@/lib/globalTemplates';
 
@@ -141,8 +141,8 @@ export async function POST(req: NextRequest) {
       text: `Olá ${newUser.name},\n\nSua conta na Domu Tech foi criada com sucesso. Faça login para continuar a configuração da sua plataforma de automação no WhatsApp:\n${appBaseUrl(req.nextUrl.origin)}/login\n\nEquipe Domu Tech`,
       html: brandedEmailHtml({
         heading: 'Bem-vindo à Domu Tech!',
-        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${newUser.name}</strong>!</p>
-          <p style="margin:0 0 12px;">Sua conta da <strong>${newTenant.name}</strong> foi criada com sucesso. Falta pouco: faça login pra continuar a configuração da sua plataforma de automação no WhatsApp.</p>`,
+        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${escapeHtml(newUser.name)}</strong>!</p>
+          <p style="margin:0 0 12px;">Sua conta da <strong>${escapeHtml(newTenant.name)}</strong> foi criada com sucesso. Falta pouco: faça login pra continuar a configuração da sua plataforma de automação no WhatsApp.</p>`,
         ctaLabel: 'Entrar na plataforma',
         ctaUrl: `${appBaseUrl(req.nextUrl.origin)}/login`,
       }),

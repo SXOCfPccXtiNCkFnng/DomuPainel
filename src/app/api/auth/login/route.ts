@@ -67,8 +67,10 @@ export async function POST(req: NextRequest) {
     const patch: Record<string, unknown> = {
       last_login_at: new Date().toISOString(),
     };
+    let currentPasswordHash: string = user.password_hash;
     if (verify.needsRehash) {
-      patch.password_hash = await hashPassword(password);
+      currentPasswordHash = await hashPassword(password);
+      patch.password_hash = currentPasswordHash;
     }
 
     await supabaseAdmin.from('users').update(patch).eq('id', user.id);
@@ -103,6 +105,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         tenantId: user.tenant_id,
         role: user.role || 'ADMIN',
+        passwordHash: currentPasswordHash,
       },
       Boolean(rememberMe)
     );

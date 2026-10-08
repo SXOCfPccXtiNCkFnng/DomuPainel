@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 /** Notificações do usuário logado (não do tenant inteiro — cada linha já nasce com user_id). */
 export async function GET(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return auth.error;
   const { userId, tenantId } = auth.session;
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
 /** Marca uma notificação (body: {id}) ou todas (body: {markAllRead:true}) como lida. */
 export async function PATCH(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return auth.error;
   const { userId, tenantId } = auth.session;
 

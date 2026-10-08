@@ -58,7 +58,7 @@ function badgeClass(status: string): string {
   if (s === 'READ' || s === 'DELIVERED') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
   if (s === 'SENT') return 'text-domu-blue bg-blue-50 border-blue-200';
   if (s === 'FAILED') return 'text-red-700 bg-red-50 border-red-200';
-  if (s === 'PENDING') return 'text-amber-800 bg-amber-50 border-amber-200';
+  if (s === 'PENDING' || s === 'SENDING') return 'text-amber-800 bg-amber-50 border-amber-200';
   return 'text-slate-600 bg-slate-50 border-slate-200';
 }
 
@@ -117,24 +117,32 @@ export default function CampaignProgress({ campaignId, onClose }: CampaignProgre
 
   useEffect(() => {
     let cancelled = false;
+    // Um lote de envio pode levar ~40s; sem isso o intervalo de 4s empilha chamadas.
+    let inFlight = false;
 
     const tick = async () => {
-      const camp = await load();
-      if (cancelled || !camp) return;
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const camp = await load();
+        if (cancelled || !camp) return;
 
-      const status = String(camp.status || '').toUpperCase();
-      const due =
-        status === 'SCHEDULED' &&
-        camp.scheduledAt &&
-        new Date(camp.scheduledAt).getTime() <= Date.now();
+        const status = String(camp.status || '').toUpperCase();
+        const due =
+          status === 'SCHEDULED' &&
+          camp.scheduledAt &&
+          new Date(camp.scheduledAt).getTime() <= Date.now();
 
-      if (due || (status === 'RUNNING' && camp.counts.pending > 0)) {
-        await fetch('/api/campaigns/run-due', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaignId }),
-        });
-        if (!cancelled) await load();
+        if (due || (status === 'RUNNING' && camp.counts.pending > 0)) {
+          await fetch('/api/campaigns/run-due', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignId }),
+          });
+          if (!cancelled) await load();
+        }
+      } finally {
+        inFlight = false;
       }
     };
 

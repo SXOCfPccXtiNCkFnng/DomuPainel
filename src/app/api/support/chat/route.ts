@@ -144,7 +144,7 @@ function parseModelJson(raw: string): { answer: string; offerHuman: boolean } | 
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return auth.error;
 
   const body = await req.json().catch(() => null);

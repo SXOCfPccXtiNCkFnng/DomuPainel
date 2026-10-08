@@ -9,7 +9,7 @@ import {
   hashToken,
   sendEmail,
 } from '@/lib/email';
-import { brandedEmailHtml } from '@/lib/emailTemplates';
+import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
 
@@ -156,8 +156,8 @@ export async function POST(req: NextRequest) {
       text: `Olá ${name},\n\nVocê foi convidado como ${roleLabel} na Plataforma Domu Tech.\nAceite o convite (válido por 7 dias):\n${inviteUrl}${contactFooterText()}`,
       html: brandedEmailHtml({
         heading: 'Você foi convidado!',
-        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${name}</strong>!</p>
-          <p style="margin:0 0 12px;">Você foi convidado para acessar a Plataforma Domu Tech como <strong>${roleLabel}</strong>. Clique no botão abaixo pra criar sua senha e começar — o convite vale por <strong>7 dias</strong>.</p>`,
+        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${escapeHtml(name)}</strong>!</p>
+          <p style="margin:0 0 12px;">Você foi convidado para acessar a Plataforma Domu Tech como <strong>${escapeHtml(roleLabel)}</strong>. Clique no botão abaixo pra criar sua senha e começar — o convite vale por <strong>7 dias</strong>.</p>`,
         ctaLabel: 'Aceitar convite',
         ctaUrl: inviteUrl,
       }),

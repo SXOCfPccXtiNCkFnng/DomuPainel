@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 function statusLabel(status: string): string {
   const s = status.toUpperCase();
   if (s === 'PENDING') return 'Na fila';
+  if (s === 'SENDING') return 'Enviando';
   if (s === 'SENT') return 'Enviado';
   if (s === 'DELIVERED') return 'Entregue';
   if (s === 'READ') return 'Lido';
@@ -20,7 +21,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
     const { id: campaignId } = await params;

@@ -11,12 +11,15 @@ export type SessionPayload = {
   role: string;
   exp: number;
   rem?: boolean;
+  /** Impressão do password_hash: troca/reset de senha derruba sessões antigas. */
+  pv?: string;
 };
 
 export type AuthSession = {
   userId: string;
   tenantId: string;
   role: string;
+  rememberMe?: boolean;
 };
 
 function b64urlEncode(input: string | Buffer): string {
@@ -38,6 +41,11 @@ function sign(data: string): string {
   return b64urlEncode(crypto.createHmac('sha256', getSessionSecret()).update(data).digest());
 }
 
+/** HMAC curto do hash da senha — não revela nada do hash, só muda quando a senha muda. */
+export function passwordFingerprint(passwordHash: string): string {
+  return sign(`pv:${passwordHash}`).slice(0, 16);
+}
+
 export function createSessionToken(
   payload: Omit<SessionPayload, 'exp'> & { exp?: number },
   maxAgeSeconds: number
@@ -47,6 +55,7 @@ export function createSessionToken(
     tid: payload.tid,
     role: payload.role,
     rem: payload.rem,
+    pv: payload.pv,
     exp: payload.exp ?? Math.floor(Date.now() / 1000) + maxAgeSeconds,
   };
   const encoded = b64urlEncode(JSON.stringify(body));
@@ -74,6 +83,10 @@ export function verifySessionToken(token: string | undefined | null): SessionPay
   }
 }
 
+/**
+ * Só valida a assinatura/expiração do cookie — NÃO sabe se o usuário foi
+ * removido ou trocou a senha. Para autorizar, use requireAuth.
+ */
 export function getSessionFromRequest(req: NextRequest): AuthSession | null {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const payload = verifySessionToken(token);
@@ -82,68 +95,62 @@ export function getSessionFromRequest(req: NextRequest): AuthSession | null {
     userId: payload.uid,
     tenantId: payload.tid,
     role: payload.role || 'ADMIN',
+    rememberMe: payload.rem,
   };
 }
 
-/** Use no topo de rotas protegidas. Nunca confie em tenantId do client. */
-export function requireAuth(
-  req: NextRequest
-): { session: AuthSession } | { error: NextResponse } {
-  const session = getSessionFromRequest(req);
-  if (!session) {
-    return {
-      error: NextResponse.json(
-        { success: false, error: 'Não autenticado. Faça login novamente.' },
-        { status: 401 }
-      ),
-    };
-  }
-  return { session };
+function unauthorized(message = 'Sessão inválida. Faça login novamente.') {
+  return {
+    error: NextResponse.json({ success: false, error: message }, { status: 401 }),
+  };
 }
 
-async function resolveRoleFromDb(
-  session: AuthSession
-): Promise<{ ok: true; role: string } | { ok: false; error: NextResponse }> {
+/**
+ * Use no topo de rotas protegidas. Nunca confie em tenantId do client.
+ * Revalida no banco a cada chamada: usuário removido, senha trocada/resetada
+ * ou tenant diferente derrubam a sessão; a role vem do banco, não do cookie.
+ */
+export async function requireAuth(
+  req: NextRequest
+): Promise<{ session: AuthSession } | { error: NextResponse }> {
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  const payload = verifySessionToken(token);
+  if (!payload) return unauthorized('Não autenticado. Faça login novamente.');
+
   const { data: user, error } = await supabaseAdmin
     .from('users')
-    .select('role, tenant_id')
-    .eq('id', session.userId)
+    .select('role, tenant_id, password_hash')
+    .eq('id', payload.uid)
     .maybeSingle();
 
-  if (error || !user) {
-    return {
-      ok: false,
-      error: NextResponse.json(
-        { success: false, error: 'Sessão inválida. Faça login novamente.' },
-        { status: 401 }
-      ),
-    };
+  if (error) throw error;
+  if (!user || user.tenant_id !== payload.tid) return unauthorized();
+
+  const expectedPv = passwordFingerprint(String(user.password_hash || ''));
+  const gotPv = Buffer.from(String(payload.pv || ''));
+  const wantPv = Buffer.from(expectedPv);
+  if (gotPv.length !== wantPv.length || !crypto.timingSafeEqual(gotPv, wantPv)) {
+    return unauthorized();
   }
 
-  if (user.tenant_id !== session.tenantId) {
-    return {
-      ok: false,
-      error: NextResponse.json(
-        { success: false, error: 'Sessão inválida para esta conta.' },
-        { status: 401 }
-      ),
-    };
-  }
-
-  return { ok: true, role: String(user.role || 'ATTENDANT').toUpperCase() };
+  return {
+    session: {
+      userId: payload.uid,
+      tenantId: payload.tid,
+      role: String(user.role || 'ATTENDANT').toUpperCase(),
+      rememberMe: payload.rem,
+    },
+  };
 }
 
 /** Admin com role revalidada no banco (não só no cookie). */
 export async function requireAdmin(
   req: NextRequest
 ): Promise<{ session: AuthSession } | { error: NextResponse }> {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return auth;
 
-  const resolved = await resolveRoleFromDb(auth.session);
-  if (!resolved.ok) return { error: resolved.error };
-
-  if (resolved.role !== 'ADMIN' && resolved.role !== 'SUPER_ADMIN') {
+  if (auth.session.role !== 'ADMIN' && auth.session.role !== 'SUPER_ADMIN') {
     return {
       error: NextResponse.json(
         { success: false, error: 'Acesso restrito a administradores.' },
@@ -152,9 +159,7 @@ export async function requireAdmin(
     };
   }
 
-  return {
-    session: { ...auth.session, role: resolved.role },
-  };
+  return auth;
 }
 
 /** Role revalidada no banco. */
@@ -162,14 +167,11 @@ export async function requireRole(
   req: NextRequest,
   roles: string[]
 ): Promise<{ session: AuthSession } | { error: NextResponse }> {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return auth;
 
-  const resolved = await resolveRoleFromDb(auth.session);
-  if (!resolved.ok) return { error: resolved.error };
-
   const allowed = roles.map((r) => r.toUpperCase());
-  if (!allowed.includes(resolved.role)) {
+  if (!allowed.includes(auth.session.role)) {
     return {
       error: NextResponse.json(
         { success: false, error: 'Você não tem permissão para esta ação.' },
@@ -178,9 +180,7 @@ export async function requireRole(
     };
   }
 
-  return {
-    session: { ...auth.session, role: resolved.role },
-  };
+  return auth;
 }
 
 /** Admin ou corretor — operações de campanha/template. */
@@ -203,7 +203,7 @@ export function sessionMaxAgeSeconds(rememberMe: boolean): number {
 
 export function applySessionCookie(
   res: NextResponse,
-  session: { userId: string; tenantId: string; role: string },
+  session: { userId: string; tenantId: string; role: string; passwordHash: string },
   rememberMe: boolean
 ): void {
   const maxAge = sessionMaxAgeSeconds(rememberMe);
@@ -213,6 +213,7 @@ export function applySessionCookie(
       tid: session.tenantId,
       role: session.role,
       rem: rememberMe,
+      pv: passwordFingerprint(session.passwordHash),
     },
     maxAge
   );

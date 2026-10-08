@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isCronRequest } from '@/lib/cronAuth';
 import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
-import { brandedEmailHtml } from '@/lib/emailTemplates';
+import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { logger } from '@/lib/logger';
 import { describeError, withTransientRetry } from '@/lib/errors';
@@ -77,9 +77,9 @@ export async function GET(req: NextRequest) {
       const html = brandedEmailHtml({
         heading: 'Sua assinatura vence em breve',
         bodyHtml: `<p style="margin:0 0 12px;">Olá!</p>
-          <p style="margin:0 0 12px;">A assinatura do plano <strong>${sub.plan_tier}</strong> (${priceLabel}/mês) da empresa <strong>${
+          <p style="margin:0 0 12px;">A assinatura do plano <strong>${escapeHtml(sub.plan_tier)}</strong> (${priceLabel}/mês) da empresa <strong>${escapeHtml(
             tenant?.name || ''
-          }</strong> vence em <strong>${expiresAt}</strong>.</p>
+          )}</strong> vence em <strong>${expiresAt}</strong>.</p>
           <p style="margin:0;">Para continuar disparando campanhas sem interrupção, renove antes dessa data.</p>`,
         ctaLabel: 'Renovar assinatura',
         ctaUrl: renewUrl,

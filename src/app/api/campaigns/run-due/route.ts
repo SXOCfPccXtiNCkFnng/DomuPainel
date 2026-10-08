@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireDispatcher } from '@/lib/requireAuth';
 import {
   dispatchCampaignPending,
   processDueScheduledCampaigns,
@@ -18,7 +18,7 @@ async function handleRunDue(req: NextRequest, body: { campaignId?: string }) {
   let tenantId: string | undefined;
 
   if (!isCron) {
-    const auth = requireAuth(req);
+    const auth = await requireDispatcher(req);
     if ('error' in auth) return auth.error;
     tenantId = auth.session.tenantId;
   }

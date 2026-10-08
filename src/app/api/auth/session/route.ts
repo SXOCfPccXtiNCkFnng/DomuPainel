@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isTenantOnboarded } from '@/lib/sessionHelpers';
-import { getSessionFromRequest, requireAuth } from '@/lib/requireAuth';
+import { requireAuth } from '@/lib/requireAuth';
 import { isPlatformAdminEmail } from '@/lib/platformAdmin';
 import { TenantSegment } from '@/types';
 
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 /** Sessão autenticada — tenant vem do cookie, nunca do query string. */
 export async function GET(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
 
     const { tenantId, userId } = auth.session;
@@ -60,8 +60,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** Health check leve: cookie válido? (sem vazar dados) */
+/** Health check leve: sessão válida? (sem vazar dados) */
 export async function HEAD(req: NextRequest) {
-  const session = getSessionFromRequest(req);
-  return new NextResponse(null, { status: session ? 204 : 401 });
+  const auth = await requireAuth(req);
+  return new NextResponse(null, { status: 'error' in auth ? 401 : 204 });
 }

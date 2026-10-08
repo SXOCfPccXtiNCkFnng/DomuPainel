@@ -15,7 +15,7 @@ function formatWhatsAppPhone(rawPhone: string): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
@@ -237,7 +237,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 

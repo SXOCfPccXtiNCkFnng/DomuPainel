@@ -18,7 +18,11 @@ export type DispatchGate =
 export async function assertMetaDispatchAllowed(
   tenantId: string,
   batchSize: number,
-  options?: { scheduled?: boolean }
+  options?: {
+    scheduled?: boolean;
+    /** Campanha já criada sendo disparada: os logs ainda na fila dela não contam como "já usados". */
+    excludeCampaignId?: string;
+  }
 ): Promise<DispatchGate> {
   if (batchSize <= 0) {
     return { ok: false, error: 'Nenhum contato elegível para este disparo.' };
@@ -60,7 +64,19 @@ export async function assertMetaDispatchAllowed(
       .eq('tenant_id', tenantId)
       .gte('created_at', since)
       .neq('status', 'FAILED');
-    const used = count || 0;
+    let ownQueued = 0;
+    if (options?.excludeCampaignId) {
+      // Os logs ainda não enviados desta campanha já estão em `count` e são o próprio batchSize.
+      const { count: queued } = await supabaseAdmin
+        .from('campaign_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('campaign_id', options.excludeCampaignId)
+        .gte('created_at', since)
+        .in('status', ['PENDING', 'SENDING']);
+      ownQueued = queued || 0;
+    }
+    const used = Math.max(0, (count || 0) - ownQueued);
     const remaining = Math.max(0, tierLimit - used);
     if (batchSize > remaining) {
       return {

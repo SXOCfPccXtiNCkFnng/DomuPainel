@@ -1,13 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMetaTemplate, sendMetaText } from '@/lib/metaClient';
-import { requireAuth } from '@/lib/requireAuth';
+import { requireDispatcher } from '@/lib/requireAuth';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
+import { checkRateLimit } from '@/lib/rateLimit';
 
+/**
+ * Envio avulso para um contato do próprio tenant.
+ * Travas: papel de disparo, assinatura ativa, só para leads cadastrados
+ * (nunca número arbitrário), opt-out e rate limit por tenant.
+ */
 export async function POST(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireDispatcher(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
+
+    const limit = checkRateLimit(`whatsapp-send:${tenantId}`, 30, 60 * 1000);
+    if (!limit.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Muitos envios em sequência. Aguarde um minuto.' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfterSec || 60) } }
+      );
+    }
+
+    const { data: subscription } = await supabaseAdmin
+      .from('subscriptions')
+      .select('status')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!isSubscriptionAllowedToDispatch(subscription?.status)) {
+      return NextResponse.json(
+        { success: false, error: 'Assinatura inativa ou vencida. Regularize em Assinatura para enviar mensagens.' },
+        { status: 402 }
+      );
+    }
 
     const body = await req.json();
     const {
@@ -31,14 +58,23 @@ export async function POST(req: NextRequest) {
     if (phoneDigits.startsWith('55') && phoneDigits.length > 11) phones.push(phoneDigits.slice(2));
     else if (phoneDigits.length <= 11) phones.push(`55${phoneDigits}`);
 
-    const { data: lead } = await supabaseAdmin
+    // Sem .maybeSingle(): com 2 cadastros do mesmo número ele dá erro, `lead`
+    // vira null e o opt-out era ignorado. Qualquer cadastro com opt-out bloqueia.
+    const { data: leads, error: leadError } = await supabaseAdmin
       .from('leads')
       .select('id, opt_in')
       .eq('tenant_id', tenantId)
-      .in('phone', phones)
-      .maybeSingle();
+      .in('phone', phones);
+    if (leadError) throw leadError;
 
-    if (lead && lead.opt_in === false) {
+    if (!leads || leads.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Este número não está nos seus contatos. Cadastre o contato antes de enviar.' },
+        { status: 404 }
+      );
+    }
+
+    if (leads.some((lead) => lead.opt_in === false)) {
       return NextResponse.json(
         { success: false, error: 'Este contato pediu para não receber mensagens (opt-out).' },
         { status: 403 }

@@ -16,6 +16,16 @@ export type DispatchResult = {
   campaignStatus: string;
 };
 
+/** Máximo de logs buscados por chamada; o resto fica para a próxima (cron/tela de progresso). */
+const BATCH_LIMIT = 200;
+/** Tempo máximo enviando numa chamada — tem que caber no maxDuration da rota (60s). */
+const DEFAULT_TIME_BUDGET_MS = 40_000;
+/**
+ * Log em SENDING numa campanha sem atividade há esse tempo = o processo morreu
+ * no meio do envio. Não reenviamos (a Meta pode ter aceitado), marcamos falha.
+ */
+const STALE_SENDING_MS = 5 * 60 * 1000;
+
 function formatMetaError(err: unknown): string {
   if (!err) return 'Falha no envio via Meta Cloud API.';
   let raw = '';
@@ -58,14 +68,20 @@ function formatMetaError(err: unknown): string {
 /**
  * Envia logs PENDING de uma campanha via Meta e atualiza contadores.
  * Usa credenciais do tenant (fallback env). Respeita opt_in = false.
+ *
+ * Seguro para rodar em paralelo (cron + tela de progresso + criação): cada log
+ * é reivindicado (PENDING → SENDING) antes do envio, então nunca sai duplicado.
+ * Processa em lotes até `deadline`; o que sobrar continua PENDING e a campanha
+ * fica RUNNING para a próxima chamada.
  */
 export async function dispatchCampaignPending(
   campaignId: string,
-  options?: { tenantId?: string; force?: boolean }
+  options?: { tenantId?: string; force?: boolean; deadline?: number }
 ): Promise<DispatchResult> {
+  const deadline = options?.deadline ?? Date.now() + DEFAULT_TIME_BUDGET_MS;
   let query = supabaseAdmin
     .from('campaigns')
-    .select('id, tenant_id, status, scheduled_at, template_id, name, hsm_templates(name, language, variables)')
+    .select('id, tenant_id, status, scheduled_at, updated_at, template_id, name, hsm_templates(name, language, variables)')
     .eq('id', campaignId);
 
   if (options?.tenantId) {
@@ -99,6 +115,13 @@ export async function dispatchCampaignPending(
     };
   }
 
+  if (status === 'RUNNING') {
+    const lastActivity = campaign.updated_at ? new Date(campaign.updated_at).getTime() : 0;
+    if (Date.now() - lastActivity > STALE_SENDING_MS) {
+      await failOrphanedSendingLogs(campaignId, campaign.tenant_id);
+    }
+  }
+
   if (status === 'SCHEDULED' && !options?.force) {
     const when = campaign.scheduled_at ? new Date(campaign.scheduled_at).getTime() : 0;
     if (when > Date.now()) {
@@ -121,6 +144,14 @@ export async function dispatchCampaignPending(
     .maybeSingle();
 
   if (!isSubscriptionAllowedToDispatch(subscription?.status)) {
+    if (status === 'RUNNING') {
+      // Vai para o fim da fila do cron, sem ocupar a vez das outras campanhas.
+      await supabaseAdmin
+        .from('campaigns')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', campaignId)
+        .eq('tenant_id', campaign.tenant_id);
+    }
     return {
       processed: 0,
       sent: 0,
@@ -244,18 +275,37 @@ export async function dispatchCampaignPending(
       .eq('status', 'RUNNING');
   }
 
+  const { count: pendingTotal } = await supabaseAdmin
+    .from('campaign_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('campaign_id', campaignId)
+    .eq('tenant_id', campaign.tenant_id)
+    .in('status', ['PENDING', 'SENDING']);
+
   const { data: pendingLogs } = await supabaseAdmin
     .from('campaign_logs')
     .select('id, lead_id, leads(phone, name, opt_in)')
     .eq('campaign_id', campaignId)
     .eq('tenant_id', campaign.tenant_id)
     .eq('status', 'PENDING')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(BATCH_LIMIT);
 
   const logs = pendingLogs || [];
   if (logs.length > 0) {
-    const gate = await assertMetaDispatchAllowed(campaign.tenant_id, logs.length);
+    const gate = await assertMetaDispatchAllowed(
+      campaign.tenant_id,
+      pendingTotal || logs.length,
+      { excludeCampaignId: campaignId }
+    );
     if (!gate.ok) {
+      // Fecha os logs também — senão ficam "Na fila" para sempre numa campanha FAILED.
+      await supabaseAdmin
+        .from('campaign_logs')
+        .update({ status: 'FAILED', error_message: gate.error })
+        .eq('campaign_id', campaignId)
+        .eq('tenant_id', campaign.tenant_id)
+        .eq('status', 'PENDING');
       await supabaseAdmin
         .from('campaigns')
         .update({
@@ -278,8 +328,24 @@ export async function dispatchCampaignPending(
   let sent = 0;
   let failed = 0;
   let skippedOptOut = 0;
+  let processed = 0;
 
   for (const log of logs) {
+    if (Date.now() > deadline) break;
+
+    // Claim atômico do log: se outro worker já pegou, pula (evita mensagem duplicada).
+    const { data: claimedLog, error: claimLogError } = await supabaseAdmin
+      .from('campaign_logs')
+      .update({ status: 'SENDING' })
+      .eq('id', log.id)
+      .eq('tenant_id', campaign.tenant_id)
+      .eq('status', 'PENDING')
+      .select('id')
+      .maybeSingle();
+    if (claimLogError) throw claimLogError;
+    if (!claimedLog) continue;
+    processed += 1;
+
     const lead = (log as any).leads;
     const phone = lead?.phone as string | undefined;
     const optIn = lead?.opt_in;
@@ -365,7 +431,10 @@ export async function dispatchCampaignPending(
         ? 'FAILED'
         : 'COMPLETED';
 
-  await supabaseAdmin
+  const isTerminal = finalStatus === 'COMPLETED' || finalStatus === 'FAILED';
+  // Condicional a RUNNING: só um worker fecha a campanha (sem notificação
+  // duplicada) e ninguém "ressuscita" uma campanha que outro marcou FAILED.
+  const { data: finalized } = await supabaseAdmin
     .from('campaigns')
     .update({
       status: finalStatus,
@@ -373,33 +442,37 @@ export async function dispatchCampaignPending(
       delivered_count: counts.delivered + counts.read,
       read_count: counts.read,
       failed_count: counts.failed,
-      completed_at: stillPending > 0 ? null : new Date().toISOString(),
+      completed_at: isTerminal ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', campaignId)
-    .eq('tenant_id', campaign.tenant_id);
+    .eq('tenant_id', campaign.tenant_id)
+    .eq('status', 'RUNNING')
+    .select('id');
+  const closedNow = isTerminal && (finalized?.length ?? 0) > 0;
 
-  if (finalStatus === 'FAILED') {
+  const sentTotal = counts.sent + counts.delivered + counts.read;
+  if (closedNow && finalStatus === 'FAILED') {
     await logOpsAlert({
       source: 'campanha',
-      message: `Campanha falhou (${campaign.name || campaignId}): ${failed} envios com erro.`,
+      message: `Campanha falhou (${campaign.name || campaignId}): ${counts.failed} envios com erro.`,
       tenantId: campaign.tenant_id,
     });
   }
 
-  if (finalStatus === 'COMPLETED' || finalStatus === 'FAILED') {
+  if (closedNow) {
     await notifyTenantAdmins(campaign.tenant_id, {
       title: finalStatus === 'COMPLETED' ? 'Campanha concluída' : 'Campanha falhou',
       message:
         finalStatus === 'COMPLETED'
-          ? `"${campaign.name || 'Campanha'}" terminou: ${sent} enviada(s), ${failed} falha(s).`
-          : `"${campaign.name || 'Campanha'}" falhou: ${failed} envio(s) com erro.`,
+          ? `"${campaign.name || 'Campanha'}" terminou: ${sentTotal} enviada(s), ${counts.failed} falha(s).`
+          : `"${campaign.name || 'Campanha'}" falhou: ${counts.failed} envio(s) com erro.`,
       type: finalStatus === 'COMPLETED' ? 'SUCCESS' : 'ERROR',
     });
   }
 
   return {
-    processed: logs.length,
+    processed,
     sent,
     failed,
     skippedOptOut,
@@ -445,22 +518,42 @@ async function resolveTemplateDetails(
 }
 
 export async function recountCampaignLogs(campaignId: string, tenantId: string) {
-  const { data: rows } = await supabaseAdmin
-    .from('campaign_logs')
-    .select('status')
-    .eq('campaign_id', campaignId)
-    .eq('tenant_id', tenantId);
+  // Contagem no banco (head + count): um select das linhas para em 1000 no
+  // Supabase e fecharia campanhas grandes antes da hora.
+  const countByStatus = async (statuses: string[]) => {
+    const { count, error } = await supabaseAdmin
+      .from('campaign_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('campaign_id', campaignId)
+      .eq('tenant_id', tenantId)
+      .in('status', statuses);
+    if (error) throw error;
+    return count || 0;
+  };
 
-  const counts = { pending: 0, sent: 0, delivered: 0, read: 0, failed: 0 };
-  for (const row of rows || []) {
-    const s = String(row.status || '').toUpperCase();
-    if (s === 'PENDING') counts.pending += 1;
-    else if (s === 'SENT') counts.sent += 1;
-    else if (s === 'DELIVERED') counts.delivered += 1;
-    else if (s === 'READ') counts.read += 1;
-    else if (s === 'FAILED') counts.failed += 1;
-  }
-  return counts;
+  // SENDING = reivindicado por um worker e ainda sem resposta da Meta: não terminou.
+  const [pending, sent, delivered, read, failed] = await Promise.all([
+    countByStatus(['PENDING', 'SENDING']),
+    countByStatus(['SENT']),
+    countByStatus(['DELIVERED']),
+    countByStatus(['READ']),
+    countByStatus(['FAILED']),
+  ]);
+  return { pending, sent, delivered, read, failed };
+}
+
+/** Logs presos em SENDING (processo morreu no meio): falha, nunca reenvio. */
+async function failOrphanedSendingLogs(campaignId: string, tenantId: string) {
+  await supabaseAdmin
+    .from('campaign_logs')
+    .update({
+      status: 'FAILED',
+      error_message:
+        'Envio interrompido antes da confirmação da Meta. A mensagem pode ter sido entregue; não reenviamos para evitar duplicidade.',
+    })
+    .eq('campaign_id', campaignId)
+    .eq('tenant_id', tenantId)
+    .eq('status', 'SENDING');
 }
 
 /**
@@ -490,11 +583,19 @@ export async function claimDueScheduledCampaign(
   return Boolean(data?.id);
 }
 
-/** Processa campanhas SCHEDULED cujo horário já passou. */
+/** RUNNING sem atividade há esse tempo = ninguém está enviando (timeout, tela fechada). */
+const STALLED_RUNNING_MS = 2 * 60 * 1000;
+
+/**
+ * Processa campanhas SCHEDULED cujo horário já passou e retoma campanhas
+ * RUNNING paradas (lote anterior estourou o tempo). Todas dividem um único
+ * prazo, para caber no maxDuration da rota.
+ */
 export async function processDueScheduledCampaigns(options?: {
   tenantId?: string;
   limit?: number;
 }): Promise<{ campaigns: number; results: DispatchResult[] }> {
+  const deadline = Date.now() + DEFAULT_TIME_BUDGET_MS;
   const nowIso = new Date().toISOString();
   let query = supabaseAdmin
     .from('campaigns')
@@ -513,6 +614,8 @@ export async function processDueScheduledCampaigns(options?: {
 
   const results: DispatchResult[] = [];
   for (const camp of due || []) {
+    // Sem tempo: não reivindica — continua SCHEDULED para a próxima rodada.
+    if (Date.now() > deadline) break;
     const claimed = await claimDueScheduledCampaign(camp.id, camp.tenant_id);
     if (!claimed) {
       results.push({
@@ -531,9 +634,32 @@ export async function processDueScheduledCampaigns(options?: {
     const result = await dispatchCampaignPending(camp.id, {
       tenantId: camp.tenant_id,
       force: true,
+      deadline,
     });
     results.push(result);
   }
 
-  return { campaigns: (due || []).length, results };
+  let stalledQuery = supabaseAdmin
+    .from('campaigns')
+    .select('id, tenant_id')
+    .eq('status', 'RUNNING')
+    .lt('updated_at', new Date(Date.now() - STALLED_RUNNING_MS).toISOString())
+    .order('updated_at', { ascending: true })
+    .limit(options?.limit ?? 20);
+  if (options?.tenantId) {
+    stalledQuery = stalledQuery.eq('tenant_id', options.tenantId);
+  }
+  const { data: stalled, error: stalledError } = await stalledQuery;
+  if (stalledError) throw stalledError;
+
+  for (const camp of stalled || []) {
+    if (Date.now() > deadline) break;
+    const result = await dispatchCampaignPending(camp.id, {
+      tenantId: camp.tenant_id,
+      deadline,
+    });
+    results.push(result);
+  }
+
+  return { campaigns: (due || []).length + (stalled || []).length, results };
 }

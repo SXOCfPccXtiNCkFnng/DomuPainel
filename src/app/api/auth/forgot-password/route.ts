@@ -8,7 +8,7 @@ import {
   hashToken,
   sendEmail,
 } from '@/lib/email';
-import { brandedEmailHtml } from '@/lib/emailTemplates';
+import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       text: `Olá ${user.name},\n\nUse o link abaixo para redefinir sua senha (válido por 1 hora):\n${resetUrl}\n\nSe você não pediu isso, ignore este e-mail.${contactFooterText()}`,
       html: brandedEmailHtml({
         heading: 'Redefinir sua senha',
-        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${user.name}</strong>!</p>
+        bodyHtml: `<p style="margin:0 0 12px;">Olá, <strong>${escapeHtml(user.name)}</strong>!</p>
           <p style="margin:0 0 12px;">Recebemos um pedido para redefinir a senha da sua conta na Domu Tech. Clique no botão abaixo para escolher uma nova senha — o link vale por <strong>1 hora</strong>.</p>
           <p style="margin:0;color:#94A3B8;font-size:13px;">Se você não pediu isso, pode ignorar este e-mail — sua senha continua a mesma.</p>`,
         ctaLabel: 'Redefinir senha',

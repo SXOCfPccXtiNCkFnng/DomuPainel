@@ -39,7 +39,7 @@ export async function requirePlatformAdmin(
   const allowed = getPlatformAdminEmails();
   if (allowed.length === 0) return { error: notFound() };
 
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if ('error' in auth) return { error: notFound() };
 
   const limit = checkRateLimit(`interno:${auth.session.userId}`, 40, 60 * 1000);

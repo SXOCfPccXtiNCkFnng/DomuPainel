@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 /** Contagem de respostas reais (chat inbound) no período */
 export async function GET(req: NextRequest) {
   try {
-    const auth = requireAuth(req);
+    const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
