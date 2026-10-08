@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { resolveMetaCredentials, sendMetaTemplate } from '@/lib/metaClient';
+import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 import { logOpsAlert } from '@/lib/opsAlert';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { notifyTenantAdmins } from '@/lib/notify';
@@ -252,6 +253,28 @@ export async function dispatchCampaignPending(
     .order('created_at', { ascending: true });
 
   const logs = pendingLogs || [];
+  if (logs.length > 0) {
+    const gate = await assertMetaDispatchAllowed(campaign.tenant_id, logs.length);
+    if (!gate.ok) {
+      await supabaseAdmin
+        .from('campaigns')
+        .update({
+          status: 'FAILED',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', campaignId);
+      return {
+        processed: 0,
+        sent: 0,
+        failed: 0,
+        skippedOptOut: 0,
+        skipped: true,
+        reason: gate.error,
+        campaignStatus: 'FAILED',
+      };
+    }
+  }
   let sent = 0;
   let failed = 0;
   let skippedOptOut = 0;

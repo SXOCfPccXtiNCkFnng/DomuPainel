@@ -1049,12 +1049,12 @@ export default function OnboardingPage() {
               </span>
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
                 {connectionType === 'COEXISTENCE'
-                  ? 'Conecte seu WhatsApp Business'
+                  ? 'Conecte o WhatsApp que você já usa'
                   : 'Configure a Meta Cloud API'}
               </h1>
               <p className="text-base text-slate-500 leading-relaxed max-w-xl mx-auto">
                 {connectionType === 'COEXISTENCE'
-                  ? 'Fluxo oficial de coexistência da Meta: você autoriza o número atual e continua usando o app no celular.'
+                  ? 'O celular precisa estar com o WhatsApp Business aberto, o aplicativo verde. O WhatsApp comum, azul, não serve para esta conexão.'
                   : 'Informe as credenciais do Meta Business Manager para vincular o número dedicado de API.'}
               </p>
             </div>
@@ -1075,19 +1075,20 @@ export default function OnboardingPage() {
                           <Smartphone className="w-5 h-5" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-bold text-slate-900">Coexistência oficial</h3>
-                          <p className="text-sm text-slate-500">Mesmo número no celular e na plataforma</p>
+                          <h3 className="text-lg font-bold text-slate-900">Mesmo número no celular e na Domu</h3>
+                          <p className="text-sm text-slate-500">Siga estes passos com o WhatsApp Business aberto</p>
                         </div>
                       </div>
 
                       <ol className="space-y-3">
                         {[
-                          'Clique em "Conectar com Meta" e faça login com a conta do Facebook do seu negócio.',
-                          'Escolha (ou crie) seu Business Manager, a conta do WhatsApp Business e o número atual.',
-                          'Autorize o acesso — a Meta mantém o app do celular funcionando junto com a plataforma.',
-                          'Pronto: seu número já sai ativo, sem perder histórico nem precisar reinstalar nada.',
+                          <>Clique em <strong className="text-slate-900">Conectar com Meta</strong> e entre com o Facebook da empresa.</>,
+                          <>Quando a Meta pedir o número, use o mesmo que está no WhatsApp Business.</>,
+                          <>No celular, abra a mensagem da Meta e toque em <strong className="text-slate-900">Conectar à plataforma</strong>.</>,
+                          <>Digite o código que aparecer no popup, ou escaneie o QR dentro do aplicativo. O QR não aparece no computador.</>,
+                          <>Não desinstale o WhatsApp Business enquanto isso. O aplicativo continua no celular e a Domu passa a disparar por esse mesmo número.</>,
                         ].map((step, idx) => (
-                          <li key={step} className="flex gap-3 text-sm text-slate-600">
+                          <li key={idx} className="flex gap-3 text-sm text-slate-600">
                             <span className="w-6 h-6 shrink-0 bg-[#0B132B] text-white text-xs font-bold flex items-center justify-center">
                               {idx + 1}
                             </span>
@@ -1101,7 +1102,7 @@ export default function OnboardingPage() {
                         <p>
                           Número informado no passo anterior:{' '}
                           <strong className="text-slate-900">{whatsappPhone || '—'}</strong>
-                          . A tela de autorização é da própria Meta — escolha o número certo lá dentro.
+                          . Se a Meta mostrar &quot;criar um número novo&quot; ou disser que o número já está no WhatsApp, volte e confira se digitou o número do Business.
                         </p>
                       </div>
 
@@ -1117,13 +1118,13 @@ export default function OnboardingPage() {
                     </div>
 
                     <div className="lg:col-span-2 p-6 sm:p-8 bg-[#0B132B] text-white flex flex-col items-center justify-center gap-4">
-                      <div className="w-40 h-40 bg-white p-3 flex items-center justify-center">
-                        <QrCode className="w-full h-full text-slate-900" />
+                      <div className="w-16 h-16 bg-white/10 border border-white/15 flex items-center justify-center">
+                        <Smartphone className="w-8 h-8 text-white" />
                       </div>
                       <div className="text-center space-y-1">
-                        <p className="text-sm font-semibold">Login oficial da Meta</p>
+                        <p className="text-sm font-semibold">A confirmação é no celular</p>
                         <p className="text-xs text-slate-400 leading-relaxed">
-                          Uma janela da Meta abre pra você fazer login e autorizar o acesso ao seu WhatsApp Business.
+                          A Meta manda a mensagem no WhatsApp Business. O código fica no popup. O QR, se aparecer, é dentro do aplicativo.
                         </p>
                       </div>
                     </div>

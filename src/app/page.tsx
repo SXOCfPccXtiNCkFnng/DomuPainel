@@ -20,11 +20,11 @@ import { TenantSegment } from '@/types';
 import {
   getSegmentFromStorage,
   SEGMENT_WELCOME,
-  isRealEstateSegment,
   isDispatchOnlySegment,
 } from '@/lib/segmentConfig';
 import { getAuthItem } from '@/lib/authStorage';
 import FirstStepsChecklist from '@/components/dashboard/FirstStepsChecklist';
+import PlanUpgradeModal from '@/components/shared/PlanUpgradeModal';
 
 export default function DashboardPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [contactCount, setContactCount] = useState(0);
   const [templateCount, setTemplateCount] = useState(0);
   const [campaignCount, setCampaignCount] = useState(0);
+  const [upgradeTitle, setUpgradeTitle] = useState<string | null>(null);
   const [roiMetrics, setRoiMetrics] = useState([
     { label: 'Contatos atingidos', value: '0', hint: 'Entregas no período' },
     { label: 'Taxa de resposta', value: '0%', hint: 'Quem engajou' },
@@ -85,8 +86,6 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     try {
       const storedTenantId = getAuthItem('domu_tenant_id') || '';
-      const currentSegment = getSegmentFromStorage();
-      const dispatchOnly = isDispatchOnlySegment(currentSegment);
       const res = await fetch(`/api/dashboard/stats?tenantId=${storedTenantId}&period=30d`);
       const json = await res.json();
 
@@ -102,53 +101,28 @@ export default function DashboardPage() {
         setCampaignCount(Number(json.metrics.campaignsCount) || 0);
         if (json.metrics.metaConnected) setMetaConnected(true);
 
-        if (dispatchOnly) {
-          setRoiMetrics([
-            {
-              label: 'Total de disparos',
-              value: String(json.metrics.totalDispatches ?? 0),
-              hint: 'Envios no período',
-            },
-            {
-              label: 'Taxa de entrega',
-              value: String(json.metrics.deliveryRate ?? '0.0%'),
-              hint: 'Confirmadas pela Meta',
-            },
-            {
-              label: 'Contatos atingidos',
-              value: String(json.metrics.atingidos ?? 0),
-              hint: 'Mensagens entregues',
-            },
-            {
-              label: 'Taxa de resposta',
-              value: `${json.metrics.taxaResposta ?? 0}%`,
-              hint: 'Quem respondeu',
-            },
-          ]);
-        } else {
-          setRoiMetrics([
-            {
-              label: 'Contatos atingidos',
-              value: String(json.metrics.atingidos ?? 0),
-              hint: 'Entregas no período',
-            },
-            {
-              label: 'Taxa de resposta',
-              value: `${json.metrics.taxaResposta ?? 0}%`,
-              hint: 'Quem engajou',
-            },
-            {
-              label: 'Leads qualificados',
-              value: String(json.metrics.leadsQualificados ?? 0),
-              hint: 'No funil ativo',
-            },
-            {
-              label: 'Visitas agendadas',
-              value: String(json.metrics.visitasAgendadas ?? 0),
-              hint: 'ROI do corretor',
-            },
-          ]);
-        }
+        setRoiMetrics([
+          {
+            label: 'Total de disparos',
+            value: String(json.metrics.totalDispatches ?? 0),
+            hint: 'Envios no período',
+          },
+          {
+            label: 'Taxa de entrega',
+            value: String(json.metrics.deliveryRate ?? '0.0%'),
+            hint: 'Confirmadas pela Meta',
+          },
+          {
+            label: 'Contatos atingidos',
+            value: String(json.metrics.atingidos ?? 0),
+            hint: 'Mensagens entregues',
+          },
+          {
+            label: 'Taxa de resposta',
+            value: `${json.metrics.taxaResposta ?? 0}%`,
+            hint: 'Quem respondeu',
+          },
+        ]);
       }
     } catch (err) {
       console.error('Erro ao buscar dados do dashboard:', err);
@@ -162,7 +136,6 @@ export default function DashboardPage() {
   };
 
   const welcomeMessage = SEGMENT_WELCOME[segment] || SEGMENT_WELCOME.geral;
-  const isRealEstate = isRealEstateSegment(segment);
   const dispatchOnly = isDispatchOnlySegment(segment);
 
   return (
@@ -196,16 +169,14 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-              {dispatchOnly ? 'Indicadores de Campanha' : 'Indicadores de ROI'}
+              Indicadores de campanha
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              {dispatchOnly
-                ? 'Acompanhe envios, entregas e engajamento das suas campanhas'
-                : 'Retorno das campanhas: quem foi atingido, respondeu e avançou no funil'}
+              O que esta conta já consegue medir: envio, entrega e resposta
             </p>
           </div>
           <Link href="/metricas" className="text-[11px] font-semibold text-domu-blue hover:underline">
-            {dispatchOnly ? 'Ver métricas →' : 'Ver painel de ROI →'}
+            Ver métricas →
           </Link>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -257,28 +228,32 @@ export default function DashboardPage() {
               <FileText className="w-4 h-4" />
               Templates
             </Link>
-            {!dispatchOnly && (
-              <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
-                <span className="inline-flex items-center gap-2">
-                  <MessageSquareReply className="w-4 h-4" />
-                  Ver quem respondeu
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">
-                  Em breve
-                </span>
-              </div>
-            )}
-            {isRealEstate && (
-              <div className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-400 flex items-center justify-between gap-2 cursor-not-allowed opacity-70">
-                <span className="inline-flex items-center gap-2">
-                  <PlusCircle className="w-4 h-4" />
-                  Cadastrar imóvel
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">
-                  Em breve
-                </span>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setUpgradeTitle('Leads e Respostas')}
+              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center justify-between gap-2 text-left"
+            >
+              <span className="inline-flex items-center gap-2">
+                <MessageSquareReply className="w-4 h-4" />
+                Ver quem respondeu
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wide text-domu-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5">
+                Pro
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setUpgradeTitle('Imóveis')}
+              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center justify-between gap-2 text-left"
+            >
+              <span className="inline-flex items-center gap-2">
+                <PlusCircle className="w-4 h-4" />
+                Cadastrar imóvel
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wide text-domu-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5">
+                Pro
+              </span>
+            </button>
             {dispatchOnly && (
               <Link
                 href="/disparos"
@@ -384,6 +359,12 @@ export default function DashboardPage() {
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
         onStartCampaign={handleStartCampaign}
+      />
+      <PlanUpgradeModal
+        open={Boolean(upgradeTitle)}
+        title={upgradeTitle || ''}
+        detail="Esse recurso faz parte do plano Pro. No plano atual você já dispara campanhas, importa contatos e vê entrega e resposta. No Pro entram imóveis, quem respondeu e o atendimento da equipe."
+        onClose={() => setUpgradeTitle(null)}
       />
     </div>
   );

@@ -10,6 +10,7 @@ import {
 } from '@/lib/planLimits';
 import { dispatchCampaignPending } from '@/lib/campaignDispatch';
 import { ensureTemplateIdForTenant } from '@/lib/globalTemplates';
+import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 
 export const dynamic = 'force-dynamic';
 
@@ -169,6 +170,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const { data: selectedLeads } = await supabaseAdmin
+      .from('leads')
+      .select('id, opt_in')
+      .eq('tenant_id', tenantId)
+      .in('id', leadIds);
+    const eligibleCount = (selectedLeads || []).filter((lead) => lead.opt_in !== false).length;
+    if (eligibleCount === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Nenhum contato desta lista pode receber campanha. Quem pediu para parar (opt-out) fica de fora, como a Meta exige.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const metaGate = await assertMetaDispatchAllowed(tenantId, eligibleCount, {
+      scheduled: Boolean(scheduledAt),
+    });
+    if (!metaGate.ok) {
+      return NextResponse.json({ success: false, error: metaGate.error }, { status: 403 });
+    }
+
     const isScheduled = Boolean(scheduledAt);
     const nowIso = new Date().toISOString();
 
@@ -183,6 +208,23 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: 'Por favor, selecione um modelo de mensagem aprovado para iniciar o disparo.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: templateRow } = await supabaseAdmin
+      .from('hsm_templates')
+      .select('status')
+      .eq('id', resolvedTemplateId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (templateRow?.status !== 'APPROVED') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'A Meta só deixa a empresa iniciar conversa com um template aprovado. Aguarde a aprovação em Templates antes de disparar.',
         },
         { status: 400 }
       );

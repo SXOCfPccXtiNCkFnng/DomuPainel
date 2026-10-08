@@ -82,17 +82,15 @@ export const PLATFORM_NAV: NavItemConfig[] = [
     id: 'imoveis',
     name: 'Imóveis',
     href: '/imoveis',
-    badge: 'Em Breve',
+    badge: 'Pro',
     isComingSoon: true,
-    segments: ['imobiliario'],
   },
   {
     id: 'atendimento',
     name: 'Leads e Respostas',
     href: '/atendimento',
-    badge: 'Em Breve',
+    badge: 'Pro',
     isComingSoon: true,
-    segments: ['imobiliario'],
   },
 ];
 
@@ -107,7 +105,6 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
 
   return PLATFORM_NAV.filter((item) => {
     if (item.segments && !item.segments.includes(segment)) return false;
-    if (dispatchOnly && (item.id === 'imoveis' || item.id === 'atendimento')) return false;
     return true;
   }).map((item) => {
     if (dispatchOnly && item.id === 'metricas') {

@@ -59,6 +59,7 @@ interface LeadContact {
   region?: string | null;
   interest_property_type?: string | null;
   budget_max?: number | null;
+  opt_in?: boolean | null;
 }
 
 const inputClass =
@@ -116,8 +117,8 @@ export default function CampaignWizardModal({
     sentLast24h: number;
     remaining24h: number | null;
     qualityRating: string | null;
+    isConnected: boolean;
   } | null>(null);
-  const [forceExceedQuota, setForceExceedQuota] = useState(false);
 
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
@@ -149,7 +150,6 @@ export default function CampaignWizardModal({
     setFilterBudget('');
     setPropertyId(initialPropertyId || '');
     setDispatchTiming('IMMEDIATE');
-    setForceExceedQuota(false);
     setIsSubmitting(false);
     setErrorMessage('');
     fetchLeads();
@@ -169,6 +169,7 @@ export default function CampaignWizardModal({
           sentLast24h: json.stats.sentLast24h ?? 0,
           remaining24h: json.stats.remaining24h ?? null,
           qualityRating: json.stats.qualityRating ?? null,
+          isConnected: Boolean(json.stats.isConnected),
         });
       }
     } catch (err) {
@@ -189,8 +190,9 @@ export default function CampaignWizardModal({
       const json = await res.json();
       if (json.success && json.leads) {
         const list: LeadContact[] = json.leads;
+        const eligible = list.filter((contact) => contact.opt_in !== false);
         setContacts(list);
-        setSelectedIds(new Set(list.map((c) => c.id)));
+        setSelectedIds(new Set(eligible.map((contact) => contact.id)));
       }
     } catch (err) {
       console.error('Erro ao carregar contatos:', err);
@@ -284,7 +286,8 @@ export default function CampaignWizardModal({
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(contacts.map((c) => c.id)));
+  const selectAll = () =>
+    setSelectedIds(new Set(contacts.filter((contact) => contact.opt_in !== false).map((contact) => contact.id)));
   const clearSelection = () => setSelectedIds(new Set());
   const dialogRef = useModalA11y<HTMLDivElement>(isOpen, onClose);
   const backdropProps = useBackdropClose(onClose);
@@ -392,12 +395,15 @@ export default function CampaignWizardModal({
     const allSelected = Array.from(selectedIds);
     const safeSelected = new Set(allSelected.slice(0, safeLimit));
     setSelectedIds(safeSelected);
-    setForceExceedQuota(false);
   };
 
+  const qualityBlocked = metaStats?.qualityRating === 'RED';
+  const notConnected = metaStats?.isConnected === false;
   const canContinue =
     selectedCount > 0 &&
-    (isScheduled || (!isQuotaZero && (!isOverQuota || forceExceedQuota)));
+    !qualityBlocked &&
+    !notConnected &&
+    (isScheduled || (!isQuotaZero && !isOverQuota));
 
   const steps = ['Destinatários', 'Template'];
 
@@ -582,6 +588,36 @@ export default function CampaignWizardModal({
                     </Link>
                   </div>
 
+                  {metaStats?.qualityRating === 'RED' && (
+                    <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800">
+                      <p className="font-bold">Qualidade vermelha na Meta</p>
+                      <p className="text-[11px] mt-1 leading-snug">
+                        A Meta marcou este número com qualidade baixa. O disparo fica pausado até a nota subir, para o número não ser restringido.
+                      </p>
+                    </div>
+                  )}
+                  {metaStats?.qualityRating === 'YELLOW' && (
+                    <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                      <p className="font-bold">Qualidade amarela na Meta</p>
+                      <p className="text-[11px] mt-1 leading-snug">
+                        Dá para disparar, mas novas denúncias podem reduzir o limite. Prefira contatos que já conhecem a empresa.
+                      </p>
+                    </div>
+                  )}
+                  {metaStats?.isConnected === false && (
+                    <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800">
+                      <p className="font-bold">WhatsApp ainda não conectado</p>
+                      <p className="text-[11px] mt-1 leading-snug">
+                        Conecte o número em Configurações. Sem a API oficial a Meta não envia a campanha.
+                      </p>
+                    </div>
+                  )}
+                  {contacts.some((contact) => contact.opt_in === false) && (
+                    <p className="mb-3 text-[11px] text-slate-500">
+                      Contatos que pediram para não receber ficam de fora desta lista. A Meta exige respeitar o opt-out.
+                    </p>
+                  )}
+
                   {/* Cota Oficial Meta (24h) com cálculo em tempo real */}
                   {metaStats?.numericLimit !== null && metaStats?.numericLimit !== undefined && (
                     <div className="mb-3 p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-2">
@@ -639,19 +675,9 @@ export default function CampaignWizardModal({
                               onClick={handleTrimToSafeQuota}
                               className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center"
                             >
-                              ✓ Enviar apenas para os {metaStats.remaining24h} primeiros contatos seguros
+                              Enviar apenas para os {metaStats.remaining24h} primeiros contatos
                             </button>
                           </div>
-
-                          <label className="flex items-center gap-2 pt-1 text-[11px] text-amber-800 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={forceExceedQuota}
-                              onChange={(e) => setForceExceedQuota(e.target.checked)}
-                              className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                            />
-                            <span>Desejo tentar enviar para todos os {selectedCount} contatos mesmo ciente do risco de corte pela Meta.</span>
-                          </label>
                         </div>
                       )}
                     </div>
@@ -1001,7 +1027,14 @@ export default function CampaignWizardModal({
             <button
               type="button"
               onClick={handleFinishAndStart}
-              disabled={targetCount === 0 || !selectedTemplate || isSubmitting}
+              disabled={
+                targetCount === 0 ||
+                !selectedTemplate ||
+                isSubmitting ||
+                qualityBlocked ||
+                notConnected ||
+                (isImmediate && (isQuotaZero || isOverQuota))
+              }
               className="btn-domu-primary text-xs py-2 px-5 flex items-center gap-1.5 disabled:opacity-40"
             >
               <Send className="w-3.5 h-3.5" />
