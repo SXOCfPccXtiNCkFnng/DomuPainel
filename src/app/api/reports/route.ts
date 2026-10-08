@@ -69,13 +69,24 @@ export async function GET(req: NextRequest) {
       .eq('tenant_id', tenantId);
 
     // 3. Logs de envio no período, para a série diária real do gráfico
-    const { data: logs } = await supabaseAdmin
-      .from('campaign_logs')
-      .select('sent_at, delivered_at')
-      .eq('tenant_id', tenantId)
-      .gte('sent_at', start.toISOString())
-      .not('sent_at', 'is', null)
-      .limit(20000);
+    // Paginado: o Supabase corta cada consulta em 1000 linhas (o .limit(20000)
+    // não passava disso) e o gráfico ficava errado para quem dispara mais.
+    const logs: { sent_at: string | null; delivered_at: string | null }[] = [];
+    const PAGE = 1000;
+    for (let from = 0; from < 20000; from += PAGE) {
+      const { data: page, error: logsError } = await supabaseAdmin
+        .from('campaign_logs')
+        .select('sent_at, delivered_at')
+        .eq('tenant_id', tenantId)
+        .gte('sent_at', start.toISOString())
+        .not('sent_at', 'is', null)
+        .order('sent_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (logsError) throw logsError;
+      logs.push(...(page || []));
+      if (!page || page.length < PAGE) break;
+    }
 
     let totalSent = 0;
     let totalDelivered = 0;

@@ -103,27 +103,33 @@ export async function GET(req: NextRequest) {
     let qualified = 0;
     let visitas = 0;
 
-    const { data: leads } = await supabaseAdmin
-      .from('leads')
-      .select('id, status, created_at')
-      .eq('tenant_id', tenantId);
+    // Contagens no banco: buscar as linhas parava em 1000 e o dashboard mostrava
+    // no máximo 1000 contatos.
+    const countLeads = async (
+      apply: (q: ReturnType<typeof baseLeadCount>) => ReturnType<typeof baseLeadCount>
+    ) => {
+      const { count } = await apply(baseLeadCount());
+      return count || 0;
+    };
+    const baseLeadCount = () =>
+      supabaseAdmin
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId);
 
-    const list = leads || [];
-    leadsTotal = list.length;
-    qualified = list.filter((l) =>
-      ['QUALIFIED', 'EM_ATENDIMENTO', 'VISITA_AGENDADA', 'PROPOSTA', 'FECHADO'].includes(
-        l.status || ''
-      )
-    ).length;
-    visitas = list.filter((l) => l.status === 'VISITA_AGENDADA').length;
-
-    list.forEach((l) => {
-      const created = l.created_at ? new Date(l.created_at).getTime() : 0;
-      if (created >= currentStart.getTime() && created < now.getTime()) leadsCurrent += 1;
-      if (created >= previousStart.getTime() && created < previousEnd.getTime()) {
-        leadsPrevious += 1;
-      }
-    });
+    [leadsTotal, qualified, visitas, leadsCurrent, leadsPrevious] = await Promise.all([
+      countLeads((q) => q),
+      countLeads((q) =>
+        q.in('status', ['QUALIFIED', 'EM_ATENDIMENTO', 'VISITA_AGENDADA', 'PROPOSTA', 'FECHADO'])
+      ),
+      countLeads((q) => q.eq('status', 'VISITA_AGENDADA')),
+      countLeads((q) =>
+        q.gte('created_at', currentStart.toISOString()).lt('created_at', now.toISOString())
+      ),
+      countLeads((q) =>
+        q.gte('created_at', previousStart.toISOString()).lt('created_at', previousEnd.toISOString())
+      ),
+    ]);
 
     const responseRate =
       totalDispatches > 0 ? Math.round((qualified / totalDispatches) * 1000) / 10 : 0;

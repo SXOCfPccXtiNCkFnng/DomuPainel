@@ -30,7 +30,17 @@ export interface SendTextOptions {
   tenantId?: string;
 }
 
-const META_GRAPH_API_VERSION = 'v20.0';
+/**
+ * Versão única da Graph API para todo o backend. A Meta mantém cada versão
+ * por ~2 anos; ao subir, confira o changelog e troque só aqui.
+ */
+export const META_GRAPH_API_VERSION = 'v21.0';
+/** Sem timeout, uma chamada travada na Meta segura o lote de disparo além do maxDuration. */
+const META_TIMEOUT_MS = 15_000;
+
+export function metaFetch(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(META_TIMEOUT_MS) });
+}
 
 function envMetaCredentials(): MetaCredentials | null {
   const accessToken = process.env.META_ACCESS_TOKEN || process.env.META_WHATSAPP_TOKEN;
@@ -40,7 +50,12 @@ function envMetaCredentials(): MetaCredentials | null {
   return { accessToken, phoneNumberId, wabaId, source: 'env' };
 }
 
-/** Credenciais do tenant (criptografadas) com fallback para env global. */
+/**
+ * Credenciais do tenant (criptografadas). O fallback para as credenciais
+ * globais do env só vale em desenvolvimento: em produção, um cliente sem
+ * WhatsApp conectado dispararia pelo número de OUTRA conta (cobrança, nome e
+ * qualidade de outro número).
+ */
 export async function resolveMetaCredentials(tenantId?: string): Promise<MetaCredentials> {
   if (tenantId) {
     const { data: cred } = await supabaseAdmin
@@ -73,11 +88,12 @@ export async function resolveMetaCredentials(tenantId?: string): Promise<MetaCre
     }
   }
 
-  const fromEnv = envMetaCredentials();
+  const allowEnvFallback = !tenantId || process.env.NODE_ENV !== 'production';
+  const fromEnv = allowEnvFallback ? envMetaCredentials() : null;
   if (fromEnv) return fromEnv;
 
   throw new Error(
-    'Credenciais Meta ausentes. Configure em Configurações do WhatsApp ou META_ACCESS_TOKEN / META_PHONE_NUMBER_ID no ambiente.'
+    'WhatsApp não conectado nesta conta. Conecte em Configurações → Integração WhatsApp.'
   );
 }
 
@@ -116,7 +132,7 @@ export async function sendMetaTemplate({
     payload.template.components = components;
   }
 
-  const response = await fetch(url, {
+  const response = await metaFetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${creds.accessToken}`,
@@ -170,7 +186,7 @@ export async function sendMetaText({
     },
   };
 
-  const response = await fetch(url, {
+  const response = await metaFetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${creds.accessToken}`,
@@ -203,6 +219,59 @@ export async function sendMetaText({
   };
 }
 
+/**
+ * Confere credenciais digitadas à mão (API Direta) antes de gravar:
+ * 1. o token tem acesso à WABA e o phone_number_id é dela (na Meta);
+ * 2. o número não está ligado a outra conta Domu.
+ * Sem isso, alguém gravava o phone_number_id de outro cliente e o webhook
+ * passava a entregar as mensagens recebidas dele na conta errada.
+ */
+export async function verifyMetaPhoneOwnership(input: {
+  tenantId: string;
+  accessToken: string;
+  wabaId: string;
+  phoneNumberId: string;
+}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  try {
+    const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(input.wabaId)}/phone_numbers?fields=id&limit=100`;
+    const res = await metaFetch(url, { headers: { Authorization: `Bearer ${input.accessToken}` } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: 400,
+        error: `A Meta recusou as credenciais: ${data?.error?.message || 'token sem acesso a esta WABA'}. Confira o Access Token e o WABA ID.`,
+      };
+    }
+    const ids: string[] = (Array.isArray(data?.data) ? data.data : []).map((row: { id?: string }) => String(row?.id || ''));
+    if (!ids.includes(input.phoneNumberId)) {
+      return {
+        ok: false,
+        status: 400,
+        error: 'Este Phone Number ID não pertence à WABA informada. Confira os dois IDs no painel da Meta.',
+      };
+    }
+  } catch {
+    return { ok: false, status: 502, error: 'Não foi possível validar as credenciais na Meta agora. Tente de novo.' };
+  }
+
+  const { data: otherOwner } = await supabaseAdmin
+    .from('tenant_credentials')
+    .select('tenant_id')
+    .eq('phone_number_id', input.phoneNumberId)
+    .neq('tenant_id', input.tenantId)
+    .limit(1);
+  if (otherOwner && otherOwner.length > 0) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Este número de WhatsApp já está conectado a outra conta da Domu. Fale com o suporte se ele é seu.',
+    };
+  }
+
+  return { ok: true };
+}
+
 export type PhoneNumberQuality = {
   qualityRating: 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
   messagingLimitTier: string | null;
@@ -219,7 +288,7 @@ export async function getPhoneNumberQuality(
 ): Promise<PhoneNumberQuality> {
   const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${credentials.phoneNumberId}?fields=quality_rating,messaging_limit_tier,name_status,display_phone_number`;
 
-  const response = await fetch(url, {
+  const response = await metaFetch(url, {
     headers: { Authorization: `Bearer ${credentials.accessToken}` },
   });
   const data = await response.json();
@@ -315,7 +384,7 @@ export async function createMetaMessageTemplate(options: {
     };
   }
 
-  const wabaId = creds.wabaId || process.env.META_WABA_ID;
+  const wabaId = creds.wabaId || (creds.source === 'env' ? process.env.META_WABA_ID : undefined);
   if (!wabaId) {
     return {
       success: false,
@@ -352,7 +421,7 @@ export async function createMetaMessageTemplate(options: {
     components,
   };
 
-  const response = await fetch(url, {
+  const response = await metaFetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${creds.accessToken}`,
@@ -403,7 +472,7 @@ export async function fetchMetaMessageTemplates(tenantId?: string): Promise<{
     };
   }
 
-  const wabaId = creds.wabaId || process.env.META_WABA_ID;
+  const wabaId = creds.wabaId || (creds.source === 'env' ? process.env.META_WABA_ID : undefined);
   if (!wabaId) {
     return {
       success: false,
@@ -413,7 +482,7 @@ export async function fetchMetaMessageTemplates(tenantId?: string): Promise<{
 
   try {
     const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/message_templates?fields=name,status,category,language,components,id&limit=100`;
-    const response = await fetch(url, {
+    const response = await metaFetch(url, {
       headers: {
         Authorization: `Bearer ${creds.accessToken}`,
       },

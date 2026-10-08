@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/requireAuth';
-import { resolveMetaCredentials } from '@/lib/metaClient';
+import { META_GRAPH_API_VERSION, metaFetch, resolveMetaCredentials } from '@/lib/metaClient';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
       const creds = await resolveMetaCredentials(tenantId);
       const phoneNumberId = searchParams.get('phoneNumberId') || creds.phoneNumberId;
 
-      const metaRes = await fetch(
-        `https://graph.facebook.com/v20.0/${phoneNumberId}?fields=messaging_limit_tier,quality_rating,display_phone_number,verified_name,status`,
+      const metaRes = await metaFetch(
+        `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${phoneNumberId}?fields=messaging_limit_tier,quality_rating,display_phone_number,verified_name,status`,
         {
           headers: {
             Authorization: `Bearer ${creds.accessToken}`,

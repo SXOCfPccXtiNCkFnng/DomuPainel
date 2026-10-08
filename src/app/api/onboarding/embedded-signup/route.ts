@@ -8,10 +8,11 @@ import { isValidBrazilianPhone } from '@/lib/validators';
 import { getMetaAppSecret } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
 import { pickOnboardedPhone, type ListedWhatsappPhone } from '@/lib/metaSignupPhone';
+import { META_GRAPH_API_VERSION, metaFetch } from '@/lib/metaClient';
 
 export const dynamic = 'force-dynamic';
 
-const META_API_VERSION = 'v21.0';
+
 
 /**
  * Troca o código do WhatsApp Embedded Signup (JS SDK popup) por um Business
@@ -26,13 +27,13 @@ async function exchangeCodeForToken(code: string): Promise<{ accessToken: string
     throw new Error('NEXT_PUBLIC_META_APP_ID / META_APP_SECRET não configurados no servidor.');
   }
 
-  const url = new URL(`https://graph.facebook.com/${META_API_VERSION}/oauth/access_token`);
+  const url = new URL(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/oauth/access_token`);
   url.searchParams.set('client_id', appId);
   url.searchParams.set('client_secret', appSecret);
   url.searchParams.set('grant_type', 'authorization_code');
   url.searchParams.set('code', code);
 
-  const res = await fetch(url.toString());
+  const res = await metaFetch(url.toString());
   const data = await res.json();
 
   if (!res.ok || !data.access_token) {
@@ -50,8 +51,8 @@ async function registerPhoneNumber(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const pin = String(randomInt(100000, 1000000));
-    const res = await fetch(
-      `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}/register`,
+    const res = await metaFetch(
+      `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${phoneNumberId}/register`,
       {
         method: 'POST',
         headers: {
@@ -78,11 +79,11 @@ async function listWabaPhoneNumbers(
   wabaId: string,
   accessToken: string
 ): Promise<ListedWhatsappPhone[]> {
-  const url = new URL(`https://graph.facebook.com/${META_API_VERSION}/${wabaId}/phone_numbers`);
+  const url = new URL(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/phone_numbers`);
   url.searchParams.set('fields', 'id,display_phone_number');
   url.searchParams.set('limit', '50');
 
-  const res = await fetch(url.toString(), {
+  const res = await metaFetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   const data = await res.json();
@@ -108,9 +109,9 @@ async function listWabaIdsFromToken(accessToken: string): Promise<string[]> {
     throw new Error('NEXT_PUBLIC_META_APP_ID / META_APP_SECRET não configurados no servidor.');
   }
 
-  const url = new URL(`https://graph.facebook.com/${META_API_VERSION}/debug_token`);
+  const url = new URL(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/debug_token`);
   url.searchParams.set('input_token', accessToken);
-  const res = await fetch(url.toString(), {
+  const res = await metaFetch(url.toString(), {
     headers: { Authorization: `Bearer ${appId}|${appSecret}` },
   });
   const data = await res.json();
@@ -144,6 +145,15 @@ async function resolveSignupIds(input: {
   const givenPhone = input.phoneNumberId?.trim() || '';
 
   if (givenWaba && givenPhone) {
+    // IDs vieram do navegador: confirma na Meta que o token autorizado tem
+    // acesso a essa WABA e que o número é dela. Sem isso dava para gravar o
+    // phone_number_id de outro cliente e desviar as mensagens recebidas dele.
+    const phones = await listWabaPhoneNumbers(givenWaba, input.accessToken);
+    if (!phones.some((phone) => phone.id === givenPhone)) {
+      throw new Error(
+        'A Meta confirmou a conta, mas o número informado não pertence a ela. Tente conectar de novo.'
+      );
+    }
     return { wabaId: givenWaba, phoneNumberId: givenPhone, lookedUpPhone: false };
   }
 
@@ -156,7 +166,8 @@ async function resolveSignupIds(input: {
 
   if (givenPhone) {
     const match = listed.find((phone) => phone.id === givenPhone);
-    const wabaId = match?.wabaId || (wabaIds.length === 1 ? wabaIds[0] : '');
+    // O número tem que estar entre os que o token enxerga (mesma razão acima).
+    const wabaId = match?.wabaId || '';
     if (!wabaId) {
       throw new Error(
         'A Meta confirmou o número, mas não informou a conta do WhatsApp. Tente conectar de novo.'
@@ -186,8 +197,8 @@ async function fetchDisplayPhoneNumber(
   accessToken: string
 ): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}?fields=display_phone_number`,
+    const res = await metaFetch(
+      `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${phoneNumberId}?fields=display_phone_number`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const data = await res.json();
@@ -203,8 +214,8 @@ async function subscribeAppToWaba(
   accessToken: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/${META_API_VERSION}/${wabaId}/subscribed_apps`,
+    const res = await metaFetch(
+      `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/subscribed_apps`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -301,6 +312,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: message },
         { status: customerCanRetry ? 400 : 502 }
+      );
+    }
+
+    // Um número só pode estar ligado a uma conta Domu: o webhook encontra o dono
+    // da mensagem pelo phone_number_id.
+    const { data: otherOwner } = await supabaseAdmin
+      .from('tenant_credentials')
+      .select('tenant_id')
+      .eq('phone_number_id', resolvedPhoneNumberId)
+      .neq('tenant_id', tenantId)
+      .limit(1);
+    if (otherOwner && otherOwner.length > 0) {
+      logger.warn('onboarding.embedded_signup_phone_taken', { tenantId, phoneNumberId: resolvedPhoneNumberId });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Este número de WhatsApp já está conectado a outra conta da Domu. Fale com o suporte se ele é seu.',
+        },
+        { status: 409 }
       );
     }
 

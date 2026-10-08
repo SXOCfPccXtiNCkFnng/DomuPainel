@@ -4,6 +4,7 @@ import { encryptData } from '@/lib/crypto';
 import { requireAdmin } from '@/lib/requireAuth';
 import { generateSecureToken } from '@/lib/email';
 import { isValidBrazilianPhone } from '@/lib/validators';
+import { verifyMetaPhoneOwnership } from '@/lib/metaClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,16 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Informe um número de WhatsApp válido, com DDD (ex: 11 98765-4321).' },
         { status: 400 }
       );
+    }
+
+    const ownership = await verifyMetaPhoneOwnership({
+      tenantId,
+      accessToken: accessToken.trim(),
+      wabaId: wabaId.trim(),
+      phoneNumberId: phoneNumberId.trim(),
+    });
+    if (!ownership.ok) {
+      return NextResponse.json({ success: false, error: ownership.error }, { status: ownership.status });
     }
 
     const { error: tenantError } = await supabaseAdmin

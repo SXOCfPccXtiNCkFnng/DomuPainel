@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { encryptData } from '@/lib/crypto';
+import { decryptData, encryptData } from '@/lib/crypto';
+import { verifyMetaPhoneOwnership } from '@/lib/metaClient';
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
 import { generateSecureToken } from '@/lib/email';
 
@@ -117,6 +118,30 @@ export async function POST(req: NextRequest) {
             { status: 400 }
           );
         }
+      }
+
+      // Token novo digitado ou o já salvo: em ambos os casos confere na Meta que
+      // ele enxerga esse número antes de ligar o número a esta conta.
+      let plainToken = '';
+      try {
+        plainToken =
+          accessToken?.trim() && !accessToken.includes('...')
+            ? accessToken.trim()
+            : decryptData(String(payload.encrypted_access_token), String(payload.token_encryption_iv));
+      } catch {
+        return NextResponse.json(
+          { success: false, error: 'Não foi possível ler o token salvo. Informe o Access Token novamente.' },
+          { status: 400 }
+        );
+      }
+      const ownership = await verifyMetaPhoneOwnership({
+        tenantId,
+        accessToken: plainToken,
+        wabaId: wabaId.trim(),
+        phoneNumberId: phoneNumberId.trim(),
+      });
+      if (!ownership.ok) {
+        return NextResponse.json({ success: false, error: ownership.error }, { status: ownership.status });
       }
 
       const { error: credError } = await supabaseAdmin

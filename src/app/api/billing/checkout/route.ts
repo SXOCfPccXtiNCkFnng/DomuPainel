@@ -8,6 +8,7 @@ import {
 } from '@/lib/billing';
 import { getPlanMonthlyLimit, isPlanAllowedForSegment } from '@/lib/planLimits';
 import { isValidBusinessSegment } from '@/lib/segmentConfig';
+import { verifyMetaPhoneOwnership } from '@/lib/metaClient';
 import {
   asaasCreateCustomer,
   asaasCreateSubscription,
@@ -114,6 +115,22 @@ export async function POST(req: NextRequest) {
     const basePrice = await getLivePlanPrice(planTier);
     const price = computeSubscriptionPrice({ planTier, paymentMethod, coupon, basePrice });
 
+    // Cupom de cortesia (zera o preço) é uma vez por empresa: sem isso, a mesma
+    // conta reaplicava o cupom a cada vencimento e nunca pagava.
+    if (coupon && price.finalPrice <= 0.009) {
+      const { data: currentSub } = await supabaseAdmin
+        .from('subscriptions')
+        .select('coupon_code')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (String(currentSub?.coupon_code || '').toUpperCase() === String(coupon.code || '').toUpperCase()) {
+        return NextResponse.json(
+          { success: false, error: 'Este cupom já foi usado por esta conta.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const { data: tenant } = await supabaseAdmin
       .from('tenants')
       .select('id, name, whatsapp_number, segment, status')
@@ -180,6 +197,16 @@ export async function POST(req: NextRequest) {
       body.phoneNumberId &&
       body.accessToken
     ) {
+      const ownership = await verifyMetaPhoneOwnership({
+        tenantId,
+        accessToken: String(body.accessToken).trim(),
+        wabaId: String(body.wabaId).trim(),
+        phoneNumberId: String(body.phoneNumberId).trim(),
+      });
+      if (!ownership.ok) {
+        return NextResponse.json({ success: false, error: ownership.error }, { status: ownership.status });
+      }
+
       const { encryptedText, iv } = encryptData(body.accessToken);
 
       // Reaproveita o verify_token já salvo (ex.: no passo 4 do onboarding) em vez de

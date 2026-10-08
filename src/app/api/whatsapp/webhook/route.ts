@@ -135,6 +135,11 @@ async function resolveTenantIdFromMetadata(value: any): Promise<string | null> {
     if (cred?.tenant_id) return cred.tenant_id;
   }
 
+  // Busca pelo número "digitado" (tenants.whatsapp_number) só em dev, junto do
+  // fallback de credenciais do env: em produção qualquer admin edita esse campo
+  // sem verificação e capturaria mensagens recebidas de outro número.
+  if (isProduction()) return null;
+
   const displayPhone = String(value?.metadata?.display_phone_number || '').replace(/\D/g, '');
   if (displayPhone) {
     const phones = [displayPhone];

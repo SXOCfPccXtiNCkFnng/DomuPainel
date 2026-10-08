@@ -8,6 +8,25 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const BUCKET = 'campaign-media';
 
+/** Tipo real pelos primeiros bytes (magic numbers). */
+function detectImageType(buf: Buffer): string | null {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (
+    buf.length >= 8 &&
+    buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    return 'image/png';
+  }
+  if (
+    buf.length >= 12 &&
+    buf.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buf.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireDispatcher(req);
@@ -38,6 +57,15 @@ export async function POST(req: NextRequest) {
     const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
     const safeName = `${tenantId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // O tipo informado pelo navegador é só uma declaração: confere a assinatura
+    // real do arquivo para o bucket público não servir HTML/script "disfarçado".
+    if (detectImageType(buffer) !== file.type) {
+      return NextResponse.json(
+        { success: false, error: 'O arquivo não é uma imagem JPG, PNG ou WebP válida.' },
+        { status: 400 }
+      );
+    }
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from(BUCKET)

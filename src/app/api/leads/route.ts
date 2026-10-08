@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
+import { chunk } from '@/lib/batch';
 
 export const dynamic = 'force-dynamic';
+
+const LEADS_PAGE_SIZE = 1000;
+const MAX_LEADS_LISTED = 50_000;
+const MAX_IMPORT_BATCH = 10_000;
 
 function formatWhatsAppPhone(rawPhone: string): string {
   if (!rawPhone) return '';
@@ -28,25 +33,36 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status');
     const q = searchParams.get('q');
 
-    let query = supabaseAdmin
-      .from('leads')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false });
+    const buildQuery = () => {
+      let query = supabaseAdmin
+        .from('leads')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true });
 
-    if (interest) query = query.eq('interest_segment', interest);
-    if (region) query = query.eq('region', region);
-    if (propertyType) query = query.eq('interest_property_type', propertyType);
-    if (status) query = query.eq('status', status);
-    if (budgetMax) {
-      const max = Number(budgetMax);
-      if (!Number.isNaN(max)) query = query.lte('budget_max', max);
+      if (interest) query = query.eq('interest_segment', interest);
+      if (region) query = query.eq('region', region);
+      if (propertyType) query = query.eq('interest_property_type', propertyType);
+      if (status) query = query.eq('status', status);
+      if (budgetMax) {
+        const max = Number(budgetMax);
+        if (!Number.isNaN(max)) query = query.lte('budget_max', max);
+      }
+      return query;
+    };
+
+    // O Supabase devolve no máximo 1000 linhas por consulta: sem paginar, quem
+    // tem mais contatos não via (nem conseguia selecionar para campanha) o resto.
+    const leads: Record<string, any>[] = [];
+    for (let from = 0; from < MAX_LEADS_LISTED; from += LEADS_PAGE_SIZE) {
+      const { data: page, error } = await buildQuery().range(from, from + LEADS_PAGE_SIZE - 1);
+      if (error) throw error;
+      leads.push(...(page || []));
+      if (!page || page.length < LEADS_PAGE_SIZE) break;
     }
 
-    const { data: leads, error } = await query;
-    if (error) throw error;
-
-    let result = leads || [];
+    let result = leads;
     if (q?.trim()) {
       const needle = q.trim().toLowerCase();
       const digits = needle.replace(/\D/g, '');
@@ -82,16 +98,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const leadsToInsert = contacts
+    if (contacts.length > MAX_IMPORT_BATCH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Importe no máximo ${MAX_IMPORT_BATCH.toLocaleString('pt-BR')} contatos por vez. Divida a planilha em partes.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const mapped = contacts
       .map((c: any) => {
+        // Sem status/created_at: reimportar a mesma lista não pode voltar
+        // contatos em atendimento para "NOVO" nem apagar a data de entrada.
+        // Linha nova recebe os defaults do banco.
         const item: Record<string, unknown> = {
           tenant_id: tenantId,
-          name: c.name?.trim() || 'Contato Importado',
-          phone: formatWhatsAppPhone(c.phone),
-          status: c.status || 'NOVO',
-          created_at: new Date().toISOString(),
+          name: String(c.name || '').trim() || 'Contato Importado',
+          phone: formatWhatsAppPhone(String(c.phone || '')),
           updated_at: new Date().toISOString(),
         };
+        if (c.status) item.status = c.status;
 
         const interest = c.interest || c.interest_segment;
         if (interest) item.interest_segment = interest;
@@ -109,11 +137,24 @@ export async function POST(req: NextRequest) {
 
         return item;
       })
-      .filter((c: any) => c.phone.length >= 10);
+      .filter((c: any) => String(c.phone).length >= 10);
+
+    // Telefone repetido na planilha derrubava a importação inteira (o upsert
+    // não pode tocar a mesma linha duas vezes). Fica a última ocorrência.
+    const byPhone = new Map<string, Record<string, unknown>>();
+    for (const item of mapped) byPhone.set(String(item.phone), item);
+    const leadsToInsert = [...byPhone.values()];
+
+    if (leadsToInsert.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Nenhum telefone válido na lista (use DDD + número).' },
+        { status: 400 }
+      );
+    }
 
     let { data: inserted, error } = await supabaseAdmin
       .from('leads')
-      .upsert(leadsToInsert, { onConflict: 'tenant_id,phone' })
+      .upsert(leadsToInsert, { onConflict: 'tenant_id,phone', defaultToNull: false })
       .select('*');
 
     if (error && (error.message?.includes("'region'") || error.message?.includes('schema cache'))) {
@@ -124,7 +165,7 @@ export async function POST(req: NextRequest) {
       });
       const retryUpsert = await supabaseAdmin
         .from('leads')
-        .upsert(sanitized, { onConflict: 'tenant_id,phone' })
+        .upsert(sanitized, { onConflict: 'tenant_id,phone', defaultToNull: false })
         .select('*');
       inserted = retryUpsert.data;
       error = retryUpsert.error;
@@ -208,28 +249,32 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    let { data, error } = await supabaseAdmin
-      .from('leads')
-      .update(payload)
-      .eq('tenant_id', tenantId)
-      .in('id', targetIds)
-      .select('*');
-
-    if (error && error.message?.includes("'region'") && 'region' in payload) {
-      delete payload.region;
-      const retry = await supabaseAdmin
+    const updatedLeads: Record<string, any>[] = [];
+    for (const part of chunk(targetIds.map(String))) {
+      let { data, error } = await supabaseAdmin
         .from('leads')
         .update(payload)
         .eq('tenant_id', tenantId)
-        .in('id', targetIds)
+        .in('id', part)
         .select('*');
-      data = retry.data;
-      error = retry.error;
+
+      if (error && error.message?.includes("'region'") && 'region' in payload) {
+        delete payload.region;
+        const retry = await supabaseAdmin
+          .from('leads')
+          .update(payload)
+          .eq('tenant_id', tenantId)
+          .in('id', part)
+          .select('*');
+        data = retry.data;
+        error = retry.error;
+      }
+
+      if (error) throw error;
+      updatedLeads.push(...(data || []));
     }
 
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, updated: data?.length || 0, leads: data });
+    return NextResponse.json({ success: true, updated: updatedLeads.length, leads: updatedLeads });
   } catch (error: any) {
     console.error('[Leads API PATCH Error]', error);
     return internalErrorResponse('api.leads', error);
@@ -255,15 +300,19 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const { error, count } = await supabaseAdmin
-      .from('leads')
-      .delete({ count: 'exact' })
-      .eq('tenant_id', tenantId)
-      .in('id', ids);
+    // Em lotes: `.in()` com muitos IDs estoura o tamanho da URL ("selecionar todos").
+    let deleted = 0;
+    for (const part of chunk(ids.map(String))) {
+      const { error, count } = await supabaseAdmin
+        .from('leads')
+        .delete({ count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .in('id', part);
+      if (error) throw error;
+      deleted += count ?? part.length;
+    }
 
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, deleted: count ?? ids.length });
+    return NextResponse.json({ success: true, deleted });
   } catch (error: any) {
     console.error('[Leads API DELETE Error]', error);
     return internalErrorResponse('api.leads', error);

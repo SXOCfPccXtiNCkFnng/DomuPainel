@@ -12,6 +12,7 @@ import {
 import { dispatchCampaignPending } from '@/lib/campaignDispatch';
 import { ensureTemplateIdForTenant } from '@/lib/globalTemplates';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
+import { chunk } from '@/lib/batch';
 
 export const dynamic = 'force-dynamic';
 /** O disparo imediato roda o primeiro lote (~40s) dentro do POST. */
@@ -173,12 +174,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { data: selectedLeads } = await supabaseAdmin
-      .from('leads')
-      .select('id, opt_in')
-      .eq('tenant_id', tenantId)
-      .in('id', leadIds);
-    const eligibleCount = (selectedLeads || []).filter((lead) => lead.opt_in !== false).length;
+    // Em lotes: `.in()` com centenas de IDs estoura o tamanho da URL e cada
+    // consulta para em 1000 linhas — campanhas grandes falhavam ou saíam pela metade.
+    const uniqueLeadIds = [...new Set(leadIds.map((id: unknown) => String(id)))];
+    const selectedLeads: { id: string; opt_in: boolean | null }[] = [];
+    for (const ids of chunk(uniqueLeadIds)) {
+      const { data, error: leadsError } = await supabaseAdmin
+        .from('leads')
+        .select('id, opt_in')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+      if (leadsError) throw leadsError;
+      selectedLeads.push(...(data || []));
+    }
+    const eligibleCount = selectedLeads.filter((lead) => lead.opt_in !== false).length;
     if (eligibleCount === 0) {
       return NextResponse.json(
         {
@@ -241,7 +250,7 @@ export async function POST(req: NextRequest) {
       status: isScheduled ? 'SCHEDULED' : 'RUNNING',
       scheduled_at: isScheduled ? new Date(scheduledAt).toISOString() : null,
       started_at: isScheduled ? null : nowIso,
-      total_leads: leadIds.length,
+      total_leads: selectedLeads.length,
       sent_count: 0,
       delivered_count: 0,
       read_count: 0,
@@ -279,13 +288,7 @@ export async function POST(req: NextRequest) {
     if (campError) throw campError;
     if (!campaign) throw new Error('Campanha não criada.');
 
-    const { data: leads } = await supabaseAdmin
-      .from('leads')
-      .select('id, phone, name, opt_in')
-      .eq('tenant_id', tenantId)
-      .in('id', leadIds);
-
-    const leadList = leads || [];
+    const leadList = selectedLeads;
     const logs = leadList.map((lead) => ({
       tenant_id: tenantId,
       campaign_id: campaign.id,
@@ -294,9 +297,21 @@ export async function POST(req: NextRequest) {
       error_message: lead.opt_in === false ? 'Opt-out: contato pediu para não receber.' : null,
     }));
 
-    if (logs.length > 0) {
-      const { error: logError } = await supabaseAdmin.from('campaign_logs').insert(logs);
-      if (logError) console.error('[Campaign logs insert]', logError);
+    for (const part of chunk(logs, 1000)) {
+      const { error: logError } = await supabaseAdmin.from('campaign_logs').insert(part);
+      if (logError) {
+        // Sem a fila de envio a campanha "concluiria" com zero envios: marca falha e avisa.
+        console.error('[Campaign logs insert]', logError);
+        await supabaseAdmin
+          .from('campaigns')
+          .update({ status: 'FAILED', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('id', campaign.id)
+          .eq('tenant_id', tenantId);
+        return NextResponse.json(
+          { success: false, error: 'Não foi possível montar a fila de envio. Nenhuma mensagem foi enviada; tente de novo.' },
+          { status: 500 }
+        );
+      }
     }
 
     let finalStatus = isScheduled ? 'SCHEDULED' : 'RUNNING';
