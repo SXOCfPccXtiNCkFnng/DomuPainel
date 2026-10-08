@@ -40,11 +40,19 @@ export async function GET(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
+    // Consulta à parte: se a migration de business_segment não rodou, só vem null.
+    const { data: business } = await supabaseAdmin
+      .from('tenants')
+      .select('business_segment')
+      .eq('id', tenantId)
+      .maybeSingle();
+
     return NextResponse.json({
       success: true,
       authenticated: true,
       isOnboarded: isTenantOnboarded(subscription, tenant),
       segment: (tenant.segment as TenantSegment) || 'geral',
+      businessSegment: business?.business_segment || null,
       companyName: tenant.name || 'Empresa DOMU',
       tenantId: tenant.id,
       whatsappPhone: tenant.whatsapp_number || '',

@@ -36,6 +36,27 @@ describe('planLimits', () => {
   });
 });
 
+describe('Somente Disparos x planos', () => {
+  it('só permite Starter no Somente Disparos', async () => {
+    const { isPlanAllowedForSegment } = await import('../planLimits');
+    expect(isPlanAllowedForSegment('marketing_apenas', 'STARTER')).toBe(true);
+    expect(isPlanAllowedForSegment('marketing_apenas', 'PRO')).toBe(false);
+    expect(isPlanAllowedForSegment('marketing_apenas', 'ENTERPRISE')).toBe(false);
+    expect(isPlanAllowedForSegment('imobiliario', 'PRO')).toBe(true);
+  });
+
+  it('upgrade a partir do Somente Disparos vai para o ramo do negócio', async () => {
+    const { segmentAfterPlanActivation } = await import('../planLimits');
+    expect(segmentAfterPlanActivation('marketing_apenas', 'PRO', 'saude')).toBe('saude');
+    expect(segmentAfterPlanActivation('marketing_apenas', 'ENTERPRISE', 'alimentacao')).toBe('alimentacao');
+    // Conta antiga sem ramo salvo: módulo genérico.
+    expect(segmentAfterPlanActivation('marketing_apenas', 'PRO', null)).toBe('geral');
+    expect(segmentAfterPlanActivation('marketing_apenas', 'PRO', 'marketing_apenas')).toBe('geral');
+    expect(segmentAfterPlanActivation('marketing_apenas', 'STARTER')).toBe('marketing_apenas');
+    expect(segmentAfterPlanActivation('imobiliario', 'ENTERPRISE')).toBe('imobiliario');
+  });
+});
+
 describe('email tokens', () => {
   it('hashes deterministically', () => {
     const token = generateSecureToken(16);

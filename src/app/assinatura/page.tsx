@@ -15,7 +15,13 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
-import { PLAN_DISPATCH_LIMITS, PLAN_PRICES_BRL, PlanTier } from '@/lib/planLimits';
+import {
+  PLAN_DISPATCH_LIMITS,
+  PLAN_PRICES_BRL,
+  PlanTier,
+  isPlanAllowedForSegment,
+} from '@/lib/planLimits';
+import { BUSINESS_SEGMENT_OPTIONS, getSegmentFromStorage } from '@/lib/segmentConfig';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 
 type PlanFeature = { label: string; comingSoon?: boolean };
@@ -103,6 +109,23 @@ export default function AssinaturaPage() {
     paymentMethod: 'PIX',
     renewalDate: '01/10',
   });
+
+  // Segmento vem do storage (sincronizado pelo AppLayoutGuard via /api/auth/session).
+  const [segment, setSegment] = useState<string>('geral');
+  const [modalBusinessSegment, setModalBusinessSegment] = useState('');
+  useEffect(() => {
+    setSegment(getSegmentFromStorage());
+    // Ramo salvo no cadastro, para já vir preenchido no upgrade.
+    fetch('/api/auth/session')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.businessSegment) setModalBusinessSegment(String(data.businessSegment));
+      })
+      .catch(() => {
+        /* sem ramo salvo: a pessoa escolhe no modal */
+      });
+  }, []);
+  const dispatchOnly = !isPlanAllowedForSegment(segment, 'PRO');
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -199,6 +222,7 @@ export default function AssinaturaPage() {
   };
 
   const modalPlanData = PLANS.find((p) => p.tier === modalPlan) || PLANS[0];
+  const upgradingFromDispatch = dispatchOnly && modalPlan !== 'STARTER';
   const modalBasePrice = livePrices[modalPlan] ?? PLAN_PRICES_BRL[modalPlan];
   const modalPixPrice = (modalBasePrice * (1 - PIX_DISCOUNT)).toFixed(2);
   const modalDisplayPrice = modalPaymentMethod === 'PIX' ? modalPixPrice : String(modalBasePrice);
@@ -246,6 +270,11 @@ export default function AssinaturaPage() {
       return;
     }
 
+    if (upgradingFromDispatch && !modalBusinessSegment) {
+      setModalError('Selecione o ramo do seu negócio para ativar as ferramentas certas.');
+      return;
+    }
+
     if (!modalAcceptedTerms) {
       setModalError('Aceite os Termos de Uso e a Política de Privacidade para continuar.');
       return;
@@ -263,6 +292,7 @@ export default function AssinaturaPage() {
           paymentMethod: modalPaymentMethod,
           acceptedTerms: modalAcceptedTerms,
           cpfCnpj: modalCpfCnpj.trim(),
+          ...(upgradingFromDispatch ? { businessSegment: modalBusinessSegment } : {}),
           couponCode: modalCoupon.trim() || undefined,
         }),
       });
@@ -461,6 +491,16 @@ export default function AssinaturaPage() {
           </p>
         </div>
 
+        {dispatchOnly && (
+          <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-xs text-slate-700 leading-relaxed">
+            <p className="font-bold text-slate-900 mb-1">Sua conta está no modo Somente Disparos (plano Starter)</p>
+            Quando precisar de mais volume, mais pessoas na equipe ou do atendimento das respostas, é só assinar
+            o <strong>Pro</strong> ou o <strong>Enterprise</strong>: assim que o pagamento confirmar, sua conta ativa
+            as ferramentas do ramo do seu negócio. Contatos, campanhas, templates e a conexão do WhatsApp continuam
+            iguais.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PLANS.map((plan) => {
             const isCurrent = subData.planTier === plan.tier;
@@ -493,6 +533,12 @@ export default function AssinaturaPage() {
                   <span className="text-xs text-slate-400 font-semibold">/mês</span>
                 </p>
                 <ul className="space-y-2.5 flex-1 mb-6">
+                  {dispatchOnly && plan.tier !== 'STARTER' && (
+                    <li className="flex items-start gap-2 text-xs text-domu-blue font-bold">
+                      <Zap className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>Ativa as ferramentas do seu ramo</span>
+                    </li>
+                  )}
                   {plan.features.map((f) => (
                     <li key={f.label} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
                       <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
@@ -532,7 +578,9 @@ export default function AssinaturaPage() {
                       ? 'Pagar este plano'
                       : plan.tier === 'STARTER'
                         ? 'Mudar para Starter'
-                        : `Ir para ${plan.name}`}
+                        : dispatchOnly
+                          ? `Fazer upgrade para ${plan.name}`
+                          : `Ir para ${plan.name}`}
                   </button>
                 )}
               </div>
@@ -600,6 +648,33 @@ export default function AssinaturaPage() {
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
                     />
                   </div>
+
+                  {upgradingFromDispatch && (
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="upgrade-business-segment"
+                        className="text-[11px] font-bold uppercase text-slate-600"
+                      >
+                        Ramo do seu negócio
+                      </label>
+                      <select
+                        id="upgrade-business-segment"
+                        value={modalBusinessSegment}
+                        onChange={(e) => setModalBusinessSegment(e.target.value)}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30"
+                      >
+                        <option value="">Selecione o ramo</option>
+                        {BUSINESS_SEGMENT_OPTIONS.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-500">
+                        Ao confirmar o pagamento, sua conta sai do Somente Disparos e ativa as ferramentas desse ramo.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Payment method */}
                   <div className="space-y-2">

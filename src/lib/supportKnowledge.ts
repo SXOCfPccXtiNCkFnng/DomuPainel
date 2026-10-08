@@ -292,7 +292,7 @@ O disparo é bloqueado se qualquer um dos dois for passar. Para ampliar o da Dom
     keywords: ['plano', 'planos', 'assinatura', 'pix', 'cartao de credito', 'cartão de crédito', 'mensalidade', 'trocar plano', 'mudar plano', 'upgrade', 'cancelar assinatura', 'renovar', 'vencimento'],
     answer: `Tudo fica em **Assinatura e Planos** (só Administradores):
 
-• Planos **Starter**, **Pro** e **Enterprise** — o valor atualizado aparece na própria tela.
+• Planos **Starter**, **Pro** e **Enterprise** — o valor atualizado aparece na própria tela. Contas no modo **Somente Disparos** usam o Starter; assinar Pro ou Enterprise passa a conta para o modo completo.
 • Pagamento mensal por **PIX** (5% de desconto, o QR Code é gerado na hora) ou **cartão de crédito**.
 • **Trocar de plano:** escolha o novo plano e conclua o pagamento; ele vale quando o pagamento é confirmado.
 • **Cancelar:** pelo botão de cancelamento na mesma tela; as cobranças futuras são encerradas.
@@ -345,12 +345,10 @@ Ao trocar a senha, os outros aparelhos conectados saem da conta por segurança.`
     question: 'Qual a diferença entre o segmento Imobiliário e o Somente Disparos? Posso trocar?',
     shortLabel: 'Segmento da conta',
     keywords: ['segmento', 'somente disparos', 'imobiliario', 'imobiliário', 'trocar segmento', 'mudar segmento', 'modo', 'completo'],
-    answer: `O segmento muda o foco do painel, não o limite do plano:
+    answer: `• **Somente Disparos:** painel enxuto (campanhas, templates, contatos e métricas de envio). É exclusivo do plano **Starter**.
+• **Modo completo:** os mesmos disparos e, em breve, atendimento das respostas (**Leads e Respostas**) — vem nos planos **Pro** e **Enterprise**.
 
-• **Somente Disparos:** painel enxuto, só campanhas, templates, contatos e métricas de envio.
-• **Imobiliário:** os mesmos disparos e, em breve, **Imóveis** e **Leads e Respostas**.
-
-O segmento é escolhido no cadastro inicial. Para trocar depois, fale com o suporte.`,
+Para sair do Somente Disparos não precisa trocar nada à mão: em **Assinatura e Planos**, assine o **Pro** ou o **Enterprise** e confirme o ramo do seu negócio (barbearia, pizzaria, imobiliária...). Quando o pagamento confirmar, a conta ativa as ferramentas desse ramo sozinha. Contatos, campanhas, templates e a conexão do WhatsApp continuam iguais.`,
   },
 ];
 

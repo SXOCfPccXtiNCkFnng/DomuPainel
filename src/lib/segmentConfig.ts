@@ -21,6 +21,23 @@ export const SEGMENT_WELCOME: Record<TenantSegment, string> = {
   geral: 'Automatize comunicação e engajamento com seus clientes.',
 };
 
+/**
+ * Ramos de negócio (business_segment). Quem começa no Somente Disparos também
+ * informa o ramo: no upgrade a conta vai para o módulo desse ramo.
+ * Ao criar um módulo novo (ex.: barbearia própria), adicione aqui.
+ */
+export const BUSINESS_SEGMENT_OPTIONS: { id: TenantSegment; label: string }[] = [
+  { id: 'imobiliario', label: 'Imobiliário (imobiliárias e corretores)' },
+  { id: 'saude', label: 'Saúde e Beleza (barbearia, salão, clínica)' },
+  { id: 'alimentacao', label: 'Alimentação (pizzaria, restaurante, delivery)' },
+  { id: 'ecommerce', label: 'E-commerce e Varejo' },
+  { id: 'geral', label: 'Serviços, Jurídico e Outros' },
+];
+
+export function isValidBusinessSegment(value: unknown): value is TenantSegment {
+  return BUSINESS_SEGMENT_OPTIONS.some((opt) => opt.id === value);
+}
+
 export function isRealEstateSegment(segment: TenantSegment | string | null): boolean {
   return segment === 'imobiliario';
 }
@@ -84,6 +101,7 @@ export const PLATFORM_NAV: NavItemConfig[] = [
     href: '/imoveis',
     badge: 'Pro',
     isComingSoon: true,
+    segments: ['imobiliario'],
   },
   {
     id: 'atendimento',

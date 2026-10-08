@@ -57,6 +57,36 @@ export function isUnlimitedPlanLimit(limit: number): boolean {
   return limit >= 100000;
 }
 
+/**
+ * "Somente Disparos" é a porta de entrada: só existe no Starter. Ao assinar
+ * Pro/Enterprise a conta vai para o módulo do RAMO dela (business_segment:
+ * barbearia → saude, pizzaria → alimentacao...) — mesmo tenant,
+ * contatos/campanhas/templates continuam.
+ */
+const DISPATCH_ONLY_SEGMENT = 'marketing_apenas';
+const DISPATCH_ONLY_PLANS: PlanTier[] = ['STARTER'];
+/** Ramo desconhecido (conta antiga sem business_segment): módulo genérico. */
+export const UPGRADED_FROM_DISPATCH_SEGMENT = 'geral';
+
+export function isPlanAllowedForSegment(
+  segment: string | null | undefined,
+  planTier: string | null | undefined
+): boolean {
+  if (segment !== DISPATCH_ONLY_SEGMENT) return true;
+  return DISPATCH_ONLY_PLANS.includes(normalizePlanTier(planTier));
+}
+
+/** Segmento que a conta deve ter depois de ativar `planTier`. */
+export function segmentAfterPlanActivation(
+  segment: string | null | undefined,
+  planTier: string | null | undefined,
+  businessSegment?: string | null
+): string | null {
+  if (isPlanAllowedForSegment(segment, planTier)) return segment ?? null;
+  if (businessSegment && businessSegment !== DISPATCH_ONLY_SEGMENT) return businessSegment;
+  return UPGRADED_FROM_DISPATCH_SEGMENT;
+}
+
 /** Limite de usuários por tenant (ADMIN + convites). */
 export const PLAN_USER_LIMITS: Record<PlanTier, number> = {
   STARTER: 3,

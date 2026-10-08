@@ -28,7 +28,7 @@ import { TenantSegment } from '@/types';
 import { SegmentIcon } from '@/components/icons/DomuIcons';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, setAuthItem, syncSessionToActiveStorage } from '@/lib/authStorage';
-import { SEGMENT_LABELS } from '@/lib/segmentConfig';
+import { BUSINESS_SEGMENT_OPTIONS, SEGMENT_LABELS } from '@/lib/segmentConfig';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 import { CityStateSelect } from '@/components/shared/CityStateSelect';
 import {
@@ -36,7 +36,7 @@ import {
   validateCityState,
   validateWhatsAppPhone,
 } from '@/lib/onboardingValidation';
-import { PLAN_PRICES_BRL } from '@/lib/planLimits';
+import { PLAN_PRICES_BRL, isPlanAllowedForSegment } from '@/lib/planLimits';
 
 const STEPS = [
   { id: 1, label: 'Segmento' },
@@ -108,6 +108,21 @@ const PLAN_OPTIONS: {
   },
 ];
 
+/** Somente Disparos = só Starter, com a lista de recursos do que ele realmente usa. */
+const DISPATCH_ONLY_STARTER: (typeof PLAN_OPTIONS)[number] = {
+  ...PLAN_OPTIONS[0],
+  tagline: 'Somente Disparos',
+  audience: 'Campanhas pelo WhatsApp oficial, sem cadastros complexos. Quando crescer, faça upgrade para o modo completo.',
+  features: [
+    { label: 'Campanhas e ofertas em massa com template aprovado' },
+    { label: 'Contatos + tags e gestão de opt-out' },
+    { label: 'Agendamento e acompanhamento de entrega' },
+    { label: 'Até 1.500 disparos/mês (limite DOMU)' },
+    { label: 'Até 200 disparos/dia (trava de segurança)' },
+    { label: 'Upgrade para Pro a qualquer momento, sem perder dados' },
+  ],
+};
+
 interface SegmentOption {
   id: TenantSegment;
   title: string;
@@ -123,6 +138,10 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [selectedSegment, setSelectedSegment] = useState<TenantSegment>('imobiliario');
+  // Ramo real do negócio — pedido também no Somente Disparos, para o upgrade
+  // futuro cair no módulo certo (barbearia, pizzaria, imobiliária...).
+  const [businessSegment, setBusinessSegment] = useState<TenantSegment | ''>('');
+  const needsBusinessSegment = selectedSegment === 'marketing_apenas' && !businessSegment;
 
   // Step 2 Form States
   const [companyName, setCompanyName] = useState('');
@@ -248,6 +267,11 @@ export default function OnboardingPage() {
         /* mantém os preços padrão em caso de falha */
       });
   }, []);
+
+  // Somente Disparos só tem Starter: se a pessoa tinha marcado Pro e trocou de modo, volta pro Starter.
+  useEffect(() => {
+    if (!isPlanAllowedForSegment(selectedSegment, selectedPlan)) setSelectedPlan('STARTER');
+  }, [selectedSegment, selectedPlan]);
 
   const handleMetaConnected = (result: MetaConnectResult) => {
     setAuthItem('domu_whatsapp_phone', result.whatsappPhone || whatsappPhone.trim());
@@ -504,6 +528,7 @@ export default function OnboardingPage() {
           paymentMethod,
           couponCode: couponCode.trim() || undefined,
           segment: selectedSegment,
+          businessSegment: selectedSegment === 'marketing_apenas' ? businessSegment : selectedSegment,
           companyName,
           whatsappPhone,
           connectionType,
@@ -703,6 +728,33 @@ export default function OnboardingPage() {
               })}
             </div>
 
+            {selectedSegment === 'marketing_apenas' && (
+              <div className="p-5 bg-white border-2 border-purple-200 space-y-3">
+                <div>
+                  <label htmlFor="business-segment" className="text-sm font-bold text-slate-900">
+                    Qual é o ramo do seu negócio?
+                  </label>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Você começa só com disparos. Quando quiser mais (atendimento, mais volume), o upgrade já
+                    ativa as ferramentas do seu ramo.
+                  </p>
+                </div>
+                <select
+                  id="business-segment"
+                  value={businessSegment}
+                  onChange={(e) => setBusinessSegment(e.target.value as TenantSegment)}
+                  className="w-full px-3 py-2.5 border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-domu-blue"
+                >
+                  <option value="">Selecione o ramo</option>
+                  {BUSINESS_SEGMENT_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Banner: Pedir Novo Segmento Personalizado */}
             <div className="p-5 bg-[#0B132B] text-white border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -726,10 +778,14 @@ export default function OnboardingPage() {
               </a>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end items-center gap-3 pt-2">
+              {needsBusinessSegment && (
+                <span className="text-xs text-slate-500">Selecione o ramo do seu negócio para continuar.</span>
+              )}
               <button
                 onClick={() => setCurrentStep(2)}
-                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2"
+                disabled={needsBusinessSegment}
+                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2 disabled:opacity-50"
               >
                 <span>Continuar</span>
                 <ArrowRight className="w-4 h-4" />
@@ -1307,7 +1363,10 @@ export default function OnboardingPage() {
 
         {/* STEP 5: Pricing Plan & Payment Selection */}
         {currentStep === 5 && (() => {
-          const basePlan = PLAN_OPTIONS.find((p) => p.id === selectedPlan) || PLAN_OPTIONS[1];
+          const dispatchOnly = !isPlanAllowedForSegment(selectedSegment, 'PRO');
+          const visiblePlans = dispatchOnly ? [DISPATCH_ONLY_STARTER] : PLAN_OPTIONS;
+          const basePlan =
+            visiblePlans.find((p) => p.id === selectedPlan) || visiblePlans[dispatchOnly ? 0 : 1];
           const activePlan = { ...basePlan, price: livePrices[basePlan.id] ?? basePlan.price };
           const pixPrice = Math.round(activePlan.price * 0.95);
 
@@ -1325,8 +1384,14 @@ export default function OnboardingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-              {PLAN_OPTIONS.map((plan) => {
+            <div
+              className={
+                dispatchOnly
+                  ? 'grid grid-cols-1 gap-4 pt-1 max-w-md mx-auto w-full'
+                  : 'grid grid-cols-1 md:grid-cols-3 gap-4 pt-1'
+              }
+            >
+              {visiblePlans.map((plan) => {
                 const isSelected = selectedPlan === plan.id;
                 const isPro = plan.highlight;
 

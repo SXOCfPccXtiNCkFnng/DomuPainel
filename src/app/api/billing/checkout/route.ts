@@ -6,7 +6,8 @@ import {
   findActiveCoupon,
   activateTenantSubscription,
 } from '@/lib/billing';
-import { getPlanMonthlyLimit } from '@/lib/planLimits';
+import { getPlanMonthlyLimit, isPlanAllowedForSegment } from '@/lib/planLimits';
+import { isValidBusinessSegment } from '@/lib/segmentConfig';
 import {
   asaasCreateCustomer,
   asaasCreateSubscription,
@@ -48,6 +49,27 @@ export async function POST(req: NextRequest) {
       | 'CREDIT_CARD';
     const couponCode = typeof body.couponCode === 'string' ? body.couponCode : '';
     const acceptedTerms = Boolean(body.acceptedTerms);
+
+    // Onboarding escolhendo Somente Disparos: só Starter. (Upgrade feito depois,
+    // pela tela Assinatura, não manda segment — e passa a conta para o modo
+    // completo quando o pagamento confirmar.)
+    if (body.segment && !isPlanAllowedForSegment(body.segment, planTier)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'O modo Somente Disparos é exclusivo do plano Starter. Para Pro ou Enterprise, escolha o modo completo.',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (body.businessSegment !== undefined && !isValidBusinessSegment(body.businessSegment)) {
+      return NextResponse.json(
+        { success: false, error: 'Selecione o ramo do seu negócio.' },
+        { status: 400 }
+      );
+    }
 
     if (!acceptedTerms) {
       return NextResponse.json(
@@ -123,6 +145,22 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', tenantId);
+    }
+
+    // Ramo do negócio: vem explícito (Somente Disparos / upgrade) ou é o próprio
+    // segmento de ramo escolhido no onboarding. Update separado: se a migration
+    // de business_segment não rodou, só isso falha — o resto do checkout segue.
+    const businessSegment = isValidBusinessSegment(body.businessSegment)
+      ? body.businessSegment
+      : isValidBusinessSegment(body.segment)
+        ? body.segment
+        : null;
+    if (businessSegment) {
+      const { error: bizError } = await supabaseAdmin
+        .from('tenants')
+        .update({ business_segment: businessSegment })
+        .eq('id', tenantId);
+      if (bizError) console.warn('[Checkout] business_segment não salvo:', bizError.message);
     }
 
     if (body.ownerName) {

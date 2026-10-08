@@ -3,6 +3,7 @@ import {
   getPlanPrice,
   normalizePlanTier,
   PlanTier,
+  segmentAfterPlanActivation,
 } from '@/lib/planLimits';
 import { getLivePlanPrice } from '@/lib/planPricing';
 import { notifyTenantAdmins } from '@/lib/notify';
@@ -188,9 +189,25 @@ export async function activateTenantSubscription(input: {
   );
 
   if (status === 'ACTIVE' || status === 'TRIAL') {
+    // select('*'): não quebra se a migration de business_segment ainda não rodou.
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants')
+      .select('*')
+      .eq('id', input.tenantId)
+      .maybeSingle();
+    // Somente Disparos só existe no Starter: plano maior pago = módulo do ramo do cliente.
+    const nextSegment = segmentAfterPlanActivation(
+      tenant?.segment,
+      planTier,
+      tenant?.business_segment
+    );
     await supabaseAdmin
       .from('tenants')
-      .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
+      .update({
+        status: 'ACTIVE',
+        ...(nextSegment && nextSegment !== tenant?.segment ? { segment: nextSegment } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', input.tenantId);
   }
 
