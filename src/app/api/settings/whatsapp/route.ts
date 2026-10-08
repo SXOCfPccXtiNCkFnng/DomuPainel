@@ -65,18 +65,32 @@ export async function POST(req: NextRequest) {
       appId,
     } = body;
 
-    const { error: tenantError } = await supabaseAdmin
-      .from('tenants')
-      .update({
-        whatsapp_number: whatsappPhone?.trim() || '',
-        coexistence_status: 'CONNECTED',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', tenantId);
+    // Sem IDs da Meta: só dá para guardar o número digitado se a conta ainda
+    // não tem WhatsApp conectado. Conectada, o número vem SEMPRE da Meta —
+    // trocar à mão faria o cadastro divergir do número que realmente envia.
+    if (!phoneNumberId?.trim() || !wabaId?.trim()) {
+      const { data: existingCred } = await supabaseAdmin
+        .from('tenant_credentials')
+        .select('phone_number_id')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (existingCred?.phone_number_id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'O número desta conta vem da conexão com a Meta. Para usar outro número, reconecte o WhatsApp com o novo número.',
+          },
+          { status: 400 }
+        );
+      }
+      const { error: tenantError } = await supabaseAdmin
+        .from('tenants')
+        .update({ whatsapp_number: whatsappPhone?.trim() || '', updated_at: new Date().toISOString() })
+        .eq('id', tenantId);
+      if (tenantError) throw tenantError;
+    }
 
-    if (tenantError) throw tenantError;
-
-    // Só atualiza credenciais se enviou IDs
     if (phoneNumberId?.trim() && wabaId?.trim()) {
       const payload: Record<string, unknown> = {
         tenant_id: tenantId,
@@ -149,6 +163,17 @@ export async function POST(req: NextRequest) {
         .upsert(payload, { onConflict: 'tenant_id' });
 
       if (credError) throw credError;
+
+      // Número oficial da Meta, conferido acima — nunca o digitado.
+      const { error: tenantError } = await supabaseAdmin
+        .from('tenants')
+        .update({
+          whatsapp_number: ownership.displayPhoneNumber,
+          coexistence_status: 'CONNECTED',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tenantId);
+      if (tenantError) throw tenantError;
     }
 
     return NextResponse.json({

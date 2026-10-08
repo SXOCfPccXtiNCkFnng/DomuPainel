@@ -92,6 +92,8 @@ export async function GET(req: NextRequest) {
         renewalDate: renewalDateFormatted,
         asaasSubscriptionId: sub?.asaas_subscription_id || null,
         pendingPaymentId: sub?.pending_payment_id || null,
+        // Troca de plano aguardando pagamento (o plano atual segue ativo até lá).
+        pendingPlanTier: sub?.pending_asaas_subscription_id ? sub?.pending_plan_tier || null : null,
       },
     });
   } catch (error: any) {
@@ -125,7 +127,7 @@ export async function DELETE(req: NextRequest) {
 
     const { data: sub } = await supabaseAdmin
       .from('subscriptions')
-      .select('id, status, asaas_subscription_id')
+      .select('*')
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
@@ -160,6 +162,7 @@ export async function DELETE(req: NextRequest) {
       if (getAsaasApiKey()) {
         const idsToCancel = new Set<string>();
         if (sub.asaas_subscription_id) idsToCancel.add(sub.asaas_subscription_id);
+        if (sub.pending_asaas_subscription_id) idsToCancel.add(sub.pending_asaas_subscription_id);
 
         if (user?.email) {
           const customer = await asaasFindCustomerByEmail(user.email);
@@ -186,6 +189,20 @@ export async function DELETE(req: NextRequest) {
     await supabaseAdmin
       .from('subscriptions')
       .update({ status: 'CANCELED', updated_at: new Date().toISOString() })
+      .eq('tenant_id', tenantId);
+
+    // Descarta também uma troca de plano pendente (update à parte: não falha se
+    // a migration da troca pendente ainda não rodou).
+    await supabaseAdmin
+      .from('subscriptions')
+      .update({
+        pending_plan_tier: null,
+        pending_monthly_price_brl: null,
+        pending_payment_method: null,
+        pending_coupon_code: null,
+        pending_asaas_subscription_id: null,
+        pending_created_at: null,
+      })
       .eq('tenant_id', tenantId);
 
     return NextResponse.json({

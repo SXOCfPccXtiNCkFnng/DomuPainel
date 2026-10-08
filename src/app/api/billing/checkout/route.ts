@@ -5,8 +5,10 @@ import {
   computeSubscriptionPrice,
   findActiveCoupon,
   activateTenantSubscription,
+  isActiveSubscription,
+  type SubscriptionRow,
 } from '@/lib/billing';
-import { getPlanMonthlyLimit, isPlanAllowedForSegment } from '@/lib/planLimits';
+import { getPlanMonthlyLimit, isPlanAllowedForSegment, normalizePlanTier } from '@/lib/planLimits';
 import { isValidBusinessSegment } from '@/lib/segmentConfig';
 import { verifyMetaPhoneOwnership } from '@/lib/metaClient';
 import {
@@ -115,14 +117,28 @@ export async function POST(req: NextRequest) {
     const basePrice = await getLivePlanPrice(planTier);
     const price = computeSubscriptionPrice({ planTier, paymentMethod, coupon, basePrice });
 
+    // select('*'): inclui as colunas da troca de plano pendente (se a migration rodou).
+    const { data: existingSubRow } = await supabaseAdmin
+      .from('subscriptions')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const existingSub = existingSubRow as (SubscriptionRow & { status?: string | null }) | null;
+
+    if (
+      isActiveSubscription(existingSub) &&
+      normalizePlanTier(existingSub?.plan_tier) === price.planTier
+    ) {
+      return NextResponse.json(
+        { success: false, error: `Sua conta já está no plano ${price.planTier}.` },
+        { status: 400 }
+      );
+    }
+
     // Cupom de cortesia (zera o preço) é uma vez por empresa: sem isso, a mesma
     // conta reaplicava o cupom a cada vencimento e nunca pagava.
     if (coupon && price.finalPrice <= 0.009) {
-      const { data: currentSub } = await supabaseAdmin
-        .from('subscriptions')
-        .select('coupon_code')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
+      const currentSub = existingSub;
       if (String(currentSub?.coupon_code || '').toUpperCase() === String(coupon.code || '').toUpperCase()) {
         return NextResponse.json(
           { success: false, error: 'Este cupom já foi usado por esta conta.' },
@@ -150,15 +166,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Persistir dados de onboarding (sem ativar plano ainda)
-    if (body.companyName || body.segment || body.whatsappPhone) {
+    // Persistir dados de onboarding (sem ativar plano ainda). O número do
+    // WhatsApp NÃO é gravado aqui a partir do que foi digitado: com WhatsApp
+    // conectado ele vem da Meta (abaixo / na conexão), senão divergiria do
+    // número que realmente envia e o disparo ficaria bloqueado.
+    if (body.companyName || body.segment) {
       await supabaseAdmin
         .from('tenants')
         .update({
           name: body.companyName || tenant?.name,
           segment: body.segment || tenant?.segment || 'imobiliario',
-          whatsapp_number: body.whatsappPhone || tenant?.whatsapp_number || '',
-          coexistence_status: body.connectionType ? 'CONNECTED' : undefined,
           updated_at: new Date().toISOString(),
         })
         .eq('id', tenantId);
@@ -236,6 +253,28 @@ export async function POST(req: NextRequest) {
         },
         { onConflict: 'tenant_id' }
       );
+
+      await supabaseAdmin
+        .from('tenants')
+        .update({
+          whatsapp_number: ownership.displayPhoneNumber,
+          coexistence_status: 'CONNECTED',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tenantId);
+    } else if (body.whatsappPhone) {
+      // Ainda sem WhatsApp conectado: guarda o número digitado só como contato.
+      const { data: existingCred } = await supabaseAdmin
+        .from('tenant_credentials')
+        .select('phone_number_id')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!existingCred?.phone_number_id) {
+        await supabaseAdmin
+          .from('tenants')
+          .update({ whatsapp_number: body.whatsappPhone, updated_at: new Date().toISOString() })
+          .eq('id', tenantId);
+      }
     }
 
     // Cupom 100% / valor zerado: libera sem passar no Asaas.
@@ -248,6 +287,21 @@ export async function POST(req: NextRequest) {
         couponCode: price.couponCode,
         status: 'ACTIVE',
       });
+      // Plano agora é cortesia: encerra as cobranças que existiam no Asaas
+      // (a assinatura paga anterior e uma troca pendente), senão seguiriam cobrando.
+      if (!isBillingMockEnabled()) {
+        for (const oldId of [
+          existingSub?.asaas_subscription_id,
+          existingSub?.pending_asaas_subscription_id,
+        ]) {
+          if (!oldId) continue;
+          try {
+            await asaasFetch(`/subscriptions/${oldId}`, { method: 'DELETE' });
+          } catch (cancelErr) {
+            console.warn('[Checkout] Falha ao cancelar cobrança anterior (cortesia):', cancelErr);
+          }
+        }
+      }
       return NextResponse.json({
         success: true,
         complimentary: true,
@@ -307,14 +361,24 @@ export async function POST(req: NextRequest) {
       customer = await asaasUpdateCustomer(customer.id, { cpfCnpj: cpfCnpjDigits });
     }
 
-    // Cancel existing Asaas subscription before creating a new one
-    const { data: existingSub } = await supabaseAdmin
-      .from('subscriptions')
-      .select('asaas_subscription_id')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
+    const isPlanChange = isActiveSubscription(existingSub);
 
-    if (existingSub?.asaas_subscription_id) {
+    if (isPlanChange) {
+      // TROCA DE PLANO com a assinatura ativa: a atual continua valendo (e
+      // cobrando) até o novo pagamento cair. Só uma troca pendente por vez —
+      // se já havia outra (ex.: pediu Pro, desistiu, agora quer Enterprise),
+      // cancela aquela cobrança antes de criar a nova.
+      const previousPending = (existingSub as SubscriptionRow).pending_asaas_subscription_id;
+      if (previousPending) {
+        try {
+          await asaasFetch(`/subscriptions/${previousPending}`, { method: 'DELETE' });
+        } catch (cancelErr) {
+          console.warn('[Checkout] Falha ao cancelar troca pendente anterior:', cancelErr);
+        }
+      }
+    } else if (existingSub?.asaas_subscription_id) {
+      // Sem assinatura ativa (primeira contratação, vencida ou cancelada):
+      // substitui a cobrança antiga pela nova.
       try {
         await asaasFetch(`/subscriptions/${existingSub.asaas_subscription_id}`, { method: 'DELETE' });
       } catch (cancelErr) {
@@ -341,6 +405,54 @@ export async function POST(req: NextRequest) {
       } catch {
         pix = null;
       }
+    }
+
+    if (isPlanChange) {
+      // Guarda a troca como PENDENTE; status, plano e assinatura atuais não mudam.
+      const { error: pendingError } = await supabaseAdmin
+        .from('subscriptions')
+        .update({
+          pending_plan_tier: price.planTier,
+          pending_monthly_price_brl: price.finalPrice,
+          pending_payment_method: paymentMethod,
+          pending_coupon_code: price.couponCode,
+          pending_asaas_subscription_id: subscription.id,
+          pending_created_at: new Date().toISOString(),
+          pending_payment_id: payment?.id || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenantId);
+
+      if (pendingError) {
+        // Migration da troca pendente não rodou: desfaz a cobrança nova para
+        // não deixar o cliente com duas assinaturas, e não mexe na atual.
+        try {
+          await asaasFetch(`/subscriptions/${subscription.id}`, { method: 'DELETE' });
+        } catch {
+          /* registrado abaixo */
+        }
+        throw new Error(`Troca de plano indisponível (pendência não salva): ${pendingError.message}`);
+      }
+
+      return NextResponse.json({
+        success: true,
+        mock: false,
+        price,
+        status: 'PENDING_PAYMENT',
+        planChange: true,
+        asaas: {
+          customerId: customer.id,
+          subscriptionId: subscription.id,
+          paymentId: payment?.id || null,
+          invoiceUrl: payment?.invoiceUrl || null,
+          pix,
+        },
+        isOnboarded: true,
+        message:
+          paymentMethod === 'PIX'
+            ? `Pague o PIX para mudar para o plano ${price.planTier}. Seu plano atual continua ativo até lá.`
+            : `Conclua o pagamento no link do Asaas para mudar para o plano ${price.planTier}. Seu plano atual continua ativo até lá.`,
+      });
     }
 
     await supabaseAdmin.from('subscriptions').upsert(

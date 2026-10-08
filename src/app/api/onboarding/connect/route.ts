@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
       .update({
         name: companyName || undefined,
         segment: segment || undefined,
-        whatsapp_number: whatsappPhone || '',
+        // Número oficial da Meta (verificado acima), nunca o digitado.
+        whatsapp_number: ownership.displayPhoneNumber,
         coexistence_status: 'CONNECTED',
         updated_at: new Date().toISOString(),
       })

@@ -4,6 +4,7 @@ import { requireDispatcher } from '@/lib/requireAuth';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 
 /**
  * Envio avulso para um contato do próprio tenant.
@@ -81,6 +82,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Mesma trava das campanhas: número do próprio cliente, conferido na Meta.
+    const gate = await assertMetaDispatchAllowed(tenantId, 1);
+    if (!gate.ok) {
+      return NextResponse.json(
+        { success: false, error: gate.error },
+        { status: gate.transient ? 503 : 409 }
+      );
+    }
+    const credentials = gate.credentials;
+
     if (type === 'template') {
       if (!templateName) {
         return NextResponse.json(
@@ -97,7 +108,7 @@ export async function POST(req: NextRequest) {
         templateName,
         languageCode,
         components,
-        tenantId,
+        credentials,
       });
 
       if (!result.success) {
@@ -120,7 +131,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const result = await sendMetaText({ to, textBody, tenantId });
+      const result = await sendMetaText({ to, textBody, credentials });
 
       if (!result.success) {
         return NextResponse.json(result, { status: result.status || 500 });

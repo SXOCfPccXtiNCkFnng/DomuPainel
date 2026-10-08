@@ -1,10 +1,16 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { resolveMetaCredentials, sendMetaTemplate } from '@/lib/metaClient';
+import { sendMetaTemplate, type MetaCredentials } from '@/lib/metaClient';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 import { logOpsAlert } from '@/lib/opsAlert';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { GLOBAL_SYSTEM_TEMPLATES } from '@/lib/globalTemplates';
+import {
+  buildBodyComponent,
+  defaultParams,
+  extractTemplateVariables,
+  validateTemplateParams,
+} from '@/lib/templateParams';
 
 export type DispatchResult = {
   processed: number;
@@ -81,7 +87,8 @@ export async function dispatchCampaignPending(
   const deadline = options?.deadline ?? Date.now() + DEFAULT_TIME_BUDGET_MS;
   let query = supabaseAdmin
     .from('campaigns')
-    .select('id, tenant_id, status, scheduled_at, updated_at, template_id, name, hsm_templates(name, language, variables)')
+    // '*' (e não colunas fixas): inclui template_params sem quebrar se a migration não rodou.
+    .select('*, hsm_templates(name, language, variables, body_text)')
     .eq('id', campaignId);
 
   if (options?.tenantId) {
@@ -172,6 +179,7 @@ export async function dispatchCampaignPending(
             ? 'en_US'
             : templateObj.language || 'pt_BR',
         variables: templateObj.variables || [],
+        bodyText: templateObj.body_text || '',
       }
     : await resolveTemplateDetails(campaign.template_id, campaign.tenant_id);
 
@@ -208,34 +216,107 @@ export async function dispatchCampaignPending(
     };
   }
 
-  let credentials;
-  try {
-    credentials = await resolveMetaCredentials(campaign.tenant_id);
-  } catch (err: any) {
+  // Valor de cada variável do template: o que foi escolhido na criação da
+  // campanha (template_params). Campanha antiga sem isso usa a sugestão padrão
+  // — e falha (sem enviar nada) se alguma variável exigir um texto.
+  const templateVariables = extractTemplateVariables(templateMeta?.bodyText);
+  const storedParams = (campaign as { template_params?: unknown }).template_params;
+  const paramsCheck = validateTemplateParams(
+    templateVariables,
+    Array.isArray(storedParams) ? storedParams : defaultParams(templateVariables)
+  );
+  if (!paramsCheck.ok) {
+    const reason = `Não foi possível montar a mensagem: ${paramsCheck.error} Crie a campanha de novo preenchendo as variáveis.`;
+    await supabaseAdmin
+      .from('campaign_logs')
+      .update({ status: 'FAILED', error_message: reason })
+      .eq('campaign_id', campaignId)
+      .eq('tenant_id', campaign.tenant_id)
+      .eq('status', 'PENDING');
     await supabaseAdmin
       .from('campaigns')
-      .update({
-        status: 'FAILED',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', campaignId);
-
-    await logOpsAlert({
-      source: 'campanha',
-      message: err?.message || 'Credenciais Meta ausentes.',
-      tenantId: campaign.tenant_id,
-    });
-
+      .update({ status: 'FAILED', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', campaignId)
+      .eq('tenant_id', campaign.tenant_id);
     return {
       processed: 0,
       sent: 0,
       failed: 0,
       skippedOptOut: 0,
       skipped: true,
-      reason: err?.message || 'Credenciais Meta ausentes.',
+      reason,
       campaignStatus: 'FAILED',
     };
+  }
+  const templateParams = paramsCheck.params;
+
+  const { data: tenantRow } = await supabaseAdmin
+    .from('tenants')
+    .select('name')
+    .eq('id', campaign.tenant_id)
+    .maybeSingle();
+  const companyName = tenantRow?.name || '';
+
+  const { count: pendingTotal } = await supabaseAdmin
+    .from('campaign_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('campaign_id', campaignId)
+    .eq('tenant_id', campaign.tenant_id)
+    .in('status', ['PENDING', 'SENDING']);
+
+  // Antes de QUALQUER envio: número do próprio cliente, conferido na Meta e
+  // igual ao do cadastro (requireVerifiedWhatsApp). As credenciais usadas no
+  // loop são SÓ as devolvidas aqui.
+  let credentials: MetaCredentials | null = null;
+  if ((pendingTotal || 0) > 0) {
+    const gate = await assertMetaDispatchAllowed(campaign.tenant_id, pendingTotal || 0, {
+      excludeCampaignId: campaignId,
+    });
+    if (!gate.ok) {
+      if (gate.transient) {
+        // Meta instável: não falha a campanha, a próxima rodada tenta de novo.
+        return {
+          processed: 0,
+          sent: 0,
+          failed: 0,
+          skippedOptOut: 0,
+          skipped: true,
+          reason: gate.error,
+          campaignStatus: status,
+        };
+      }
+      // Fecha os logs também — senão ficam "Na fila" para sempre numa campanha FAILED.
+      await supabaseAdmin
+        .from('campaign_logs')
+        .update({ status: 'FAILED', error_message: gate.error })
+        .eq('campaign_id', campaignId)
+        .eq('tenant_id', campaign.tenant_id)
+        .eq('status', 'PENDING');
+      await supabaseAdmin
+        .from('campaigns')
+        .update({
+          status: 'FAILED',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', campaignId)
+        .eq('tenant_id', campaign.tenant_id);
+      await logOpsAlert({
+        source: 'campanha',
+        message: `Disparo bloqueado (${campaign.name || campaignId}): ${gate.error}`,
+        tenantId: campaign.tenant_id,
+      });
+      return {
+        processed: 0,
+        sent: 0,
+        failed: 0,
+        skippedOptOut: 0,
+        skipped: true,
+        reason: gate.error,
+        campaignStatus: 'FAILED',
+      };
+    }
+    credentials = gate.credentials;
   }
 
   const nowIso = new Date().toISOString();
@@ -275,56 +356,17 @@ export async function dispatchCampaignPending(
       .eq('status', 'RUNNING');
   }
 
-  const { count: pendingTotal } = await supabaseAdmin
-    .from('campaign_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('campaign_id', campaignId)
-    .eq('tenant_id', campaign.tenant_id)
-    .in('status', ['PENDING', 'SENDING']);
-
   const { data: pendingLogs } = await supabaseAdmin
     .from('campaign_logs')
-    .select('id, lead_id, leads(phone, name, opt_in)')
+    .select('id, lead_id, leads(phone, name, opt_in, tenant_id)')
     .eq('campaign_id', campaignId)
     .eq('tenant_id', campaign.tenant_id)
     .eq('status', 'PENDING')
     .order('created_at', { ascending: true })
     .limit(BATCH_LIMIT);
 
-  const logs = pendingLogs || [];
-  if (logs.length > 0) {
-    const gate = await assertMetaDispatchAllowed(
-      campaign.tenant_id,
-      pendingTotal || logs.length,
-      { excludeCampaignId: campaignId }
-    );
-    if (!gate.ok) {
-      // Fecha os logs também — senão ficam "Na fila" para sempre numa campanha FAILED.
-      await supabaseAdmin
-        .from('campaign_logs')
-        .update({ status: 'FAILED', error_message: gate.error })
-        .eq('campaign_id', campaignId)
-        .eq('tenant_id', campaign.tenant_id)
-        .eq('status', 'PENDING');
-      await supabaseAdmin
-        .from('campaigns')
-        .update({
-          status: 'FAILED',
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', campaignId);
-      return {
-        processed: 0,
-        sent: 0,
-        failed: 0,
-        skippedOptOut: 0,
-        skipped: true,
-        reason: gate.error,
-        campaignStatus: 'FAILED',
-      };
-    }
-  }
+  // Sem credenciais verificadas não sai nada (ex.: fila apareceu depois da verificação).
+  const logs = credentials ? pendingLogs || [] : [];
   let sent = 0;
   let failed = 0;
   let skippedOptOut = 0;
@@ -351,7 +393,17 @@ export async function dispatchCampaignPending(
     const optIn = lead?.opt_in;
     const patch: Record<string, unknown> = {};
 
-    if (optIn === false) {
+    if (!lead || lead.tenant_id !== campaign.tenant_id) {
+      // Defesa extra: nunca enviar para contato de outra conta, mesmo com dado inconsistente.
+      patch.status = 'FAILED';
+      patch.error_message = 'Contato não pertence a esta conta.';
+      failed += 1;
+      await logOpsAlert({
+        source: 'campanha.isolamento',
+        message: `Log ${log.id} da campanha ${campaignId} aponta para contato de outra conta. Envio bloqueado.`,
+        tenantId: campaign.tenant_id,
+      });
+    } else if (optIn === false) {
       patch.status = 'FAILED';
       patch.error_message = 'Opt-out: contato pediu para não receber.';
       skippedOptOut += 1;
@@ -374,27 +426,20 @@ export async function dispatchCampaignPending(
               ],
             },
           ];
-        } else if (
-          templateMeta?.variables &&
-          Array.isArray(templateMeta.variables) &&
-          templateMeta.variables.length > 0
-        ) {
-          components = [
-            {
-              type: 'body',
-              parameters: templateMeta.variables.map(() => ({
-                type: 'text',
-                text: lead?.name || 'Cliente',
-              })),
-            },
-          ];
+        } else {
+          // Cada variável recebe o valor escolhido na campanha (nome do
+          // contato, nome da empresa ou texto fixo) — na ordem que a Meta espera.
+          components = buildBodyComponent(templateParams, {
+            contactName: lead?.name,
+            companyName,
+          });
         }
 
         const result = await sendMetaTemplate({
           to: phone,
           templateName,
           languageCode,
-          credentials,
+          credentials: credentials!,
           components,
         });
         if (result.success && result.messageId) {
@@ -484,11 +529,11 @@ export async function dispatchCampaignPending(
 async function resolveTemplateDetails(
   templateId: string | null,
   tenantId: string
-): Promise<{ name: string; language: string; variables?: string[] } | null> {
+): Promise<{ name: string; language: string; variables?: string[]; bodyText?: string } | null> {
   if (!templateId) return null;
   const { data } = await supabaseAdmin
     .from('hsm_templates')
-    .select('name, language, variables')
+    .select('name, language, variables, body_text')
     .eq('id', templateId)
     .eq('tenant_id', tenantId)
     .maybeSingle();
@@ -498,6 +543,7 @@ async function resolveTemplateDetails(
       name: data.name,
       language: data.language || (data.name.startsWith('jaspers_') ? 'en_US' : 'pt_BR'),
       variables: data.variables || [],
+      bodyText: data.body_text || '',
     };
   }
 
@@ -511,6 +557,7 @@ async function resolveTemplateDetails(
       name: globalTpl.name,
       language: globalTpl.language || 'pt_BR',
       variables: globalTpl.variables || [],
+      bodyText: globalTpl.body_text,
     };
   }
 

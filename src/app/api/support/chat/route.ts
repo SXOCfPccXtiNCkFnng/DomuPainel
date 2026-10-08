@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/requireAuth';
 import { formatSupportKnowledge } from '@/lib/supportKnowledge';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { getPhoneNumberQuality, resolveMetaCredentials } from '@/lib/metaClient';
+import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import { checkRateLimit } from '@/lib/rateLimit';
 import {
   getPlanDailyLimit,
@@ -187,15 +187,14 @@ async function loadAccountContext(
   const monthlyLimit = fromSub > 0 ? fromSub : getPlanMonthlyLimit(planTier);
   const dailyLimit = getPlanDailyLimit(planTier);
 
-  let whatsapp = 'WhatsApp NÃO conectado nesta conta (a conexão fica em Configurações).';
-  try {
-    const creds = await resolveMetaCredentials(tenantId);
-    const quality = await getPhoneNumberQuality(creds);
-    whatsapp = `WhatsApp conectado. Número: ${quality.displayPhoneNumber || tenant?.whatsapp_number || 'não informado'}. Qualidade Meta: ${quality.qualityRating}. Limite Meta (conversas/24h): ${quality.messagingLimitTier || 'não informado'}. Status do nome: ${quality.nameStatus || 'não informado'}.`;
-  } catch {
-    if (tenant?.whatsapp_number) {
-      whatsapp = `Número cadastrado na Domu: ${tenant.whatsapp_number}, mas a API da Meta não confirmou a conexão agora (pode estar desconectado ou com token expirado).`;
-    }
+  // Mesma verificação que libera o envio: se ela bloqueia, o chat explica o motivo real.
+  let whatsapp: string;
+  const connection = await requireVerifiedWhatsApp(tenantId);
+  if (connection.ok) {
+    const quality = connection.quality;
+    whatsapp = `WhatsApp conectado e verificado. Número: ${connection.displayPhoneNumber}. Qualidade Meta: ${quality.qualityRating}. Limite Meta (conversas/24h): ${quality.messagingLimitTier || 'não informado'}. Status do nome: ${quality.nameStatus || 'não informado'}.`;
+  } else {
+    whatsapp = `Envio pelo WhatsApp BLOQUEADO nesta conta. Motivo: ${connection.error}`;
   }
 
   const templateLines = (templates || []).length

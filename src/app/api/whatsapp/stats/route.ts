@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/requireAuth';
-import { META_GRAPH_API_VERSION, metaFetch, resolveMetaCredentials } from '@/lib/metaClient';
+import { META_GRAPH_API_VERSION, metaFetch } from '@/lib/metaClient';
+import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
 export const dynamic = 'force-dynamic';
@@ -11,17 +12,25 @@ export async function GET(req: NextRequest) {
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
-    const { searchParams } = new URL(req.url);
     let messagingLimitTier: string | null = null;
     let qualityRating: string | null = null;
     let displayPhoneNumber = '';
     let verifiedName = '';
     let phoneStatus = '';
     let isConnected = false;
+    let connectionError: string | null = null;
 
     try {
-      const creds = await resolveMetaCredentials(tenantId);
-      const phoneNumberId = searchParams.get('phoneNumberId') || creds.phoneNumberId;
+      // "Conectado" = a mesma verificação que libera o envio (número do próprio
+      // cliente, conferido na Meta e igual ao cadastro). Nada de phoneNumberId
+      // vindo da URL: só o número desta conta.
+      const connection = await requireVerifiedWhatsApp(tenantId);
+      if (!connection.ok) {
+        connectionError = connection.error;
+        throw new Error(connection.error);
+      }
+      const creds = connection.credentials;
+      const phoneNumberId = creds.phoneNumberId;
 
       const metaRes = await metaFetch(
         `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${phoneNumberId}?fields=messaging_limit_tier,quality_rating,display_phone_number,verified_name,status`,
@@ -42,7 +51,7 @@ export async function GET(req: NextRequest) {
         isConnected = true;
       }
     } catch (metaErr) {
-      console.warn('[Meta API Stats] sem credenciais reais ainda:', metaErr);
+      console.warn('[Meta API Stats] WhatsApp não verificado:', metaErr instanceof Error ? metaErr.message : metaErr);
     }
 
     let numericLimit: number | null = null;
@@ -118,6 +127,7 @@ export async function GET(req: NextRequest) {
         verifiedName,
         phoneStatus,
         isConnected,
+        connectionError,
         sentLast24h,
         remaining24h,
       },

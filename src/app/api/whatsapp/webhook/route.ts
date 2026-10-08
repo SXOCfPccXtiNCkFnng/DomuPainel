@@ -66,15 +66,21 @@ async function bumpCampaignCounter(
     .eq('id', campaignId);
 }
 
-async function handleStatusUpdate(status: any) {
+async function handleStatusUpdate(status: any, tenantId: string | null) {
   const wamid = status.id;
   const mapped = normalizeStatus(status.status);
   if (!wamid || !mapped) return;
+  // Status só vale para envios da conta dona do número que gerou o evento.
+  if (!tenantId) {
+    logger.info('webhook.status_without_tenant', { wamid });
+    return;
+  }
 
   const { data: log } = await supabaseAdmin
     .from('campaign_logs')
     .select('id, campaign_id, status, delivered_at, read_at')
     .eq('wamid', wamid)
+    .eq('tenant_id', tenantId)
     .maybeSingle();
 
   if (!log) {
@@ -106,6 +112,7 @@ async function handleStatusUpdate(status: any) {
     .from('campaign_logs')
     .update(patch)
     .eq('id', log.id)
+    .eq('tenant_id', tenantId)
     .eq('status', prev)
     .select('id');
   if (!changed || changed.length === 0) return;
@@ -124,38 +131,27 @@ async function handleStatusUpdate(status: any) {
   }
 }
 
+/**
+ * Dono do evento = a conta cujo número CONECTADO na Meta (phone_number_id) é o
+ * que a Meta informa no evento. Nada de procurar por número digitado. Se o
+ * número não estiver ligado a exatamente UMA conta, o evento é descartado —
+ * melhor perder um evento do que entregá-lo para a conta errada.
+ */
 async function resolveTenantIdFromMetadata(value: any): Promise<string | null> {
-  const phoneNumberId = value?.metadata?.phone_number_id;
-  if (phoneNumberId) {
-    const { data: cred } = await supabaseAdmin
-      .from('tenant_credentials')
-      .select('tenant_id')
-      .eq('phone_number_id', String(phoneNumberId))
-      .maybeSingle();
-    if (cred?.tenant_id) return cred.tenant_id;
+  const phoneNumberId = String(value?.metadata?.phone_number_id || '').trim();
+  if (!phoneNumberId) return null;
+
+  const { data: owners, error } = await supabaseAdmin
+    .from('tenant_credentials')
+    .select('tenant_id')
+    .eq('phone_number_id', phoneNumberId)
+    .limit(2);
+  if (error || !owners || owners.length === 0) return null;
+  if (owners.length > 1) {
+    logger.error('webhook.phone_number_id_ambiguous', { phoneNumberId });
+    return null;
   }
-
-  // Busca pelo número "digitado" (tenants.whatsapp_number) só em dev, junto do
-  // fallback de credenciais do env: em produção qualquer admin edita esse campo
-  // sem verificação e capturaria mensagens recebidas de outro número.
-  if (isProduction()) return null;
-
-  const displayPhone = String(value?.metadata?.display_phone_number || '').replace(/\D/g, '');
-  if (displayPhone) {
-    const phones = [displayPhone];
-    if (displayPhone.startsWith('55') && displayPhone.length > 11) phones.push(displayPhone.slice(2));
-    else if (displayPhone.length <= 11) phones.push(`55${displayPhone}`);
-
-    const { data: tenant } = await supabaseAdmin
-      .from('tenants')
-      .select('id')
-      .in('whatsapp_number', phones)
-      .limit(1)
-      .maybeSingle();
-    if (tenant?.id) return tenant.id;
-  }
-
-  return null;
+  return owners[0].tenant_id;
 }
 
 async function handleInboundMessage(message: any, tenantId: string | null, metadataPhone?: string) {
@@ -196,6 +192,7 @@ async function handleInboundMessage(message: any, tenantId: string | null, metad
     const { data: existing } = await supabaseAdmin
       .from('chat_messages')
       .select('id')
+      .eq('tenant_id', tenantId)
       .eq('wamid', message.id)
       .limit(1);
     if (existing && existing.length > 0) return;
@@ -297,14 +294,17 @@ export async function POST(req: NextRequest) {
         const value = change.value;
         if (!value) continue;
 
+        if (!value.statuses && !value.messages) continue;
+        // Uma resolução por evento, só pelo número conectado (phone_number_id).
+        const tenantId = await resolveTenantIdFromMetadata(value);
+
         if (value.statuses) {
           for (const status of value.statuses) {
-            await handleStatusUpdate(status);
+            await handleStatusUpdate(status, tenantId);
           }
         }
 
         if (value.messages) {
-          const tenantId = await resolveTenantIdFromMetadata(value);
           const metaPhone = value.metadata?.display_phone_number;
           for (const message of value.messages) {
             await handleInboundMessage(message, tenantId, metaPhone);

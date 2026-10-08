@@ -335,6 +335,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Número oficial da Meta para este phone_number_id. É ele que vai para o
+    // cadastro (nunca o digitado) e é com ele que todo envio é conferido depois.
+    const realPhoneNumber = await fetchDisplayPhoneNumber(resolvedPhoneNumberId, accessToken);
+    if (!realPhoneNumber) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'A Meta não confirmou o número do WhatsApp agora. Tente conectar de novo em instantes.',
+        },
+        { status: 502 }
+      );
+    }
+
     const warnings: string[] = [];
 
     const registerResult = await registerPhoneNumber(resolvedPhoneNumberId, accessToken);
@@ -391,8 +404,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const realPhoneNumber = await fetchDisplayPhoneNumber(resolvedPhoneNumberId, accessToken);
-    const resolvedPhone = realPhoneNumber || whatsappPhone || undefined;
+    const resolvedPhone = realPhoneNumber;
 
     await supabaseAdmin
       .from('tenants')

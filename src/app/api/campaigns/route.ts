@@ -13,6 +13,11 @@ import { dispatchCampaignPending } from '@/lib/campaignDispatch';
 import { ensureTemplateIdForTenant } from '@/lib/globalTemplates';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 import { chunk } from '@/lib/batch';
+import {
+  defaultParams,
+  extractTemplateVariables,
+  validateTemplateParams,
+} from '@/lib/templateParams';
 
 export const dynamic = 'force-dynamic';
 /** O disparo imediato roda o primeiro lote (~40s) dentro do POST. */
@@ -227,7 +232,7 @@ export async function POST(req: NextRequest) {
 
     const { data: templateRow } = await supabaseAdmin
       .from('hsm_templates')
-      .select('status')
+      .select('status, body_text')
       .eq('id', resolvedTemplateId)
       .eq('tenant_id', tenantId)
       .maybeSingle();
@@ -242,6 +247,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Valor de cada variável do template: vem do assistente; sem isso, usa a
+    // sugestão padrão (nome do contato / empresa) — e recusa se alguma
+    // variável precisar de um texto que não foi informado.
+    const templateVariables = extractTemplateVariables(templateRow?.body_text);
+    const paramsCheck = validateTemplateParams(
+      templateVariables,
+      Array.isArray(body.templateParams) ? body.templateParams : defaultParams(templateVariables)
+    );
+    if (!paramsCheck.ok) {
+      return NextResponse.json({ success: false, error: paramsCheck.error }, { status: 400 });
+    }
+    const templateParams = paramsCheck.params;
+
     const campaignPayload: Record<string, unknown> = {
       tenant_id: tenantId,
       template_id: resolvedTemplateId,
@@ -255,6 +273,7 @@ export async function POST(req: NextRequest) {
       delivered_count: 0,
       read_count: 0,
       failed_count: 0,
+      template_params: templateParams,
     };
     if (propertyId) {
       // Confirma que o imóvel é do próprio tenant antes de gravar a referência —
@@ -276,6 +295,22 @@ export async function POST(req: NextRequest) {
 
     if (campError && propertyId) {
       delete campaignPayload.property_id;
+      const retry = await supabaseAdmin
+        .from('campaigns')
+        .insert(campaignPayload)
+        .select('*')
+        .single();
+      campaign = retry.data;
+      campError = retry.error;
+    }
+
+    // Migration de template_params ainda não rodou: só dá para seguir sem a
+    // coluna se nenhuma variável usa texto fixo (o disparo recalcula o padrão).
+    if (campError && String(campError.message || '').includes('template_params')) {
+      if (templateParams.some((p) => p.source === 'fixed')) {
+        throw new Error('Coluna campaigns.template_params ausente — rode a migration 20261008_campaign_template_params.');
+      }
+      delete campaignPayload.template_params;
       const retry = await supabaseAdmin
         .from('campaigns')
         .insert(campaignPayload)

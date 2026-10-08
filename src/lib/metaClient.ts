@@ -14,20 +14,22 @@ export type MetaCredentials = {
   source: 'tenant' | 'env';
 };
 
+/**
+ * Envio exige credenciais JÁ verificadas (requireVerifiedWhatsApp) — não há
+ * mais resolução implícita aqui, para nenhum caminho enviar por número errado.
+ */
 export interface SendTemplateOptions {
   to: string;
   templateName: string;
   languageCode?: string;
   components?: any[];
-  credentials?: MetaCredentials;
-  tenantId?: string;
+  credentials: MetaCredentials;
 }
 
 export interface SendTextOptions {
   to: string;
   textBody: string;
-  credentials?: MetaCredentials;
-  tenantId?: string;
+  credentials: MetaCredentials;
 }
 
 /**
@@ -51,10 +53,10 @@ function envMetaCredentials(): MetaCredentials | null {
 }
 
 /**
- * Credenciais do tenant (criptografadas). O fallback para as credenciais
- * globais do env só vale em desenvolvimento: em produção, um cliente sem
- * WhatsApp conectado dispararia pelo número de OUTRA conta (cobrança, nome e
- * qualidade de outro número).
+ * Credenciais do tenant (criptografadas). Para ENVIAR use requireVerifiedWhatsApp
+ * (whatsappConnection.ts), que além disso confere o número na Meta.
+ * Sem fallback para as credenciais globais quando há tenant: um cliente sem
+ * WhatsApp conectado dispararia pelo número de OUTRA conta.
  */
 export async function resolveMetaCredentials(tenantId?: string): Promise<MetaCredentials> {
   if (tenantId) {
@@ -88,21 +90,14 @@ export async function resolveMetaCredentials(tenantId?: string): Promise<MetaCre
     }
   }
 
-  const allowEnvFallback = !tenantId || process.env.NODE_ENV !== 'production';
-  const fromEnv = allowEnvFallback ? envMetaCredentials() : null;
+  // Com tenant: NUNCA cai nas credenciais globais (nem em dev) — cliente sem
+  // WhatsApp próprio não envia. O env só serve para chamadas sem tenant.
+  const fromEnv = tenantId ? null : envMetaCredentials();
   if (fromEnv) return fromEnv;
 
   throw new Error(
     'WhatsApp não conectado nesta conta. Conecte em Configurações → Integração WhatsApp.'
   );
-}
-
-async function resolveCreds(options: {
-  credentials?: MetaCredentials;
-  tenantId?: string;
-}): Promise<MetaCredentials> {
-  if (options.credentials) return options.credentials;
-  return resolveMetaCredentials(options.tenantId);
 }
 
 export async function sendMetaTemplate({
@@ -111,9 +106,11 @@ export async function sendMetaTemplate({
   languageCode = 'en_US',
   components = [],
   credentials,
-  tenantId,
 }: SendTemplateOptions) {
-  const creds = await resolveCreds({ credentials, tenantId });
+  if (!credentials?.accessToken || !credentials.phoneNumberId) {
+    throw new Error('Envio bloqueado: credenciais do WhatsApp não verificadas.');
+  }
+  const creds = credentials;
   const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${creds.phoneNumberId}/messages`;
   const sanitizedTo = to.replace(/\D/g, '');
 
@@ -169,9 +166,11 @@ export async function sendMetaText({
   to,
   textBody,
   credentials,
-  tenantId,
 }: SendTextOptions) {
-  const creds = await resolveCreds({ credentials, tenantId });
+  if (!credentials?.accessToken || !credentials.phoneNumberId) {
+    throw new Error('Envio bloqueado: credenciais do WhatsApp não verificadas.');
+  }
+  const creds = credentials;
   const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${creds.phoneNumberId}/messages`;
   const sanitizedTo = to.replace(/\D/g, '');
 
@@ -223,6 +222,8 @@ export async function sendMetaText({
  * Confere credenciais digitadas à mão (API Direta) antes de gravar:
  * 1. o token tem acesso à WABA e o phone_number_id é dela (na Meta);
  * 2. o número não está ligado a outra conta Domu.
+ * Devolve o número oficial (display_phone_number) — é ELE que deve ser gravado
+ * em tenants.whatsapp_number, nunca o que a pessoa digitou.
  * Sem isso, alguém gravava o phone_number_id de outro cliente e o webhook
  * passava a entregar as mensagens recebidas dele na conta errada.
  */
@@ -231,9 +232,12 @@ export async function verifyMetaPhoneOwnership(input: {
   accessToken: string;
   wabaId: string;
   phoneNumberId: string;
-}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+}): Promise<
+  { ok: true; displayPhoneNumber: string } | { ok: false; status: number; error: string }
+> {
+  let displayPhoneNumber = '';
   try {
-    const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(input.wabaId)}/phone_numbers?fields=id&limit=100`;
+    const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(input.wabaId)}/phone_numbers?fields=id,display_phone_number&limit=100`;
     const res = await metaFetch(url, { headers: { Authorization: `Bearer ${input.accessToken}` } });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -243,13 +247,18 @@ export async function verifyMetaPhoneOwnership(input: {
         error: `A Meta recusou as credenciais: ${data?.error?.message || 'token sem acesso a esta WABA'}. Confira o Access Token e o WABA ID.`,
       };
     }
-    const ids: string[] = (Array.isArray(data?.data) ? data.data : []).map((row: { id?: string }) => String(row?.id || ''));
-    if (!ids.includes(input.phoneNumberId)) {
+    const rows: { id?: string; display_phone_number?: string }[] = Array.isArray(data?.data) ? data.data : [];
+    const match = rows.find((row) => String(row?.id || '') === input.phoneNumberId);
+    if (!match) {
       return {
         ok: false,
         status: 400,
         error: 'Este Phone Number ID não pertence à WABA informada. Confira os dois IDs no painel da Meta.',
       };
+    }
+    displayPhoneNumber = String(match.display_phone_number || '');
+    if (!displayPhoneNumber) {
+      return { ok: false, status: 400, error: 'A Meta não informou o número deste Phone Number ID.' };
     }
   } catch {
     return { ok: false, status: 502, error: 'Não foi possível validar as credenciais na Meta agora. Tente de novo.' };
@@ -269,7 +278,7 @@ export async function verifyMetaPhoneOwnership(input: {
     };
   }
 
-  return { ok: true };
+  return { ok: true, displayPhoneNumber };
 }
 
 export type PhoneNumberQuality = {

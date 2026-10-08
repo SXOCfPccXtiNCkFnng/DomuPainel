@@ -3,7 +3,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import WhatsAppPreview, { renderTemplateVariables } from '@/components/shared/WhatsAppPreview';
+import WhatsAppPreview from '@/components/shared/WhatsAppPreview';
+import {
+  MAX_PARAM_LENGTH,
+  PARAM_SOURCE_LABELS,
+  defaultParams,
+  extractTemplateVariables,
+  renderWithParams,
+  resolveParamValues,
+  validateTemplateParams,
+  variableLabel,
+  type ParamSource,
+  type TemplateParam,
+} from '@/lib/templateParams';
 import ImageSourceField from '@/components/shared/ImageSourceField';
 import {
   X,
@@ -118,6 +130,7 @@ export default function CampaignWizardModal({
     remaining24h: number | null;
     qualityRating: string | null;
     isConnected: boolean;
+    connectionError?: string | null;
   } | null>(null);
 
   const [templates, setTemplates] = useState<any[]>([]);
@@ -126,6 +139,15 @@ export default function CampaignWizardModal({
     'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&auto=format&fit=crop&q=80'
   );
   const [variableTestName, setVariableTestName] = useState('Carlos Eduardo');
+  // Valor de cada variável do template ({{nome}}, {{data}}...) — vai para o servidor.
+  const [templateParams, setTemplateParams] = useState<TemplateParam[]>([]);
+  const templateVariables = useMemo(
+    () => extractTemplateVariables(selectedTemplate?.body_text),
+    [selectedTemplate]
+  );
+  useEffect(() => {
+    setTemplateParams(defaultParams(templateVariables));
+  }, [templateVariables]);
   const [companyName, setCompanyName] = useState('Sua Empresa');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -170,6 +192,7 @@ export default function CampaignWizardModal({
           remaining24h: json.stats.remaining24h ?? null,
           qualityRating: json.stats.qualityRating ?? null,
           isConnected: Boolean(json.stats.isConnected),
+          connectionError: json.stats.connectionError ?? null,
         });
       }
     } catch (err) {
@@ -304,16 +327,30 @@ export default function CampaignWizardModal({
     Boolean(selectedTemplate?.header_content) ||
     Boolean(campaignImageUrl && selectedTemplate?.name?.includes('imagem'));
 
+  const paramsValidation = validateTemplateParams(templateVariables, templateParams);
+
+  // Preview com os valores reais que vão sair (o nome do contato usa o nome de teste).
   const getRenderedPreviewText = () => {
     if (!selectedTemplate) return 'Selecione um template aprovado para visualizar o preview.';
-    return renderTemplateVariables(selectedTemplate.body_text || '', {
-      nome: variableTestName || 'Cliente',
-      horario: '15:00',
+    const values = resolveParamValues(templateParams, {
+      contactName: variableTestName || 'Cliente',
+      companyName,
     });
+    return renderWithParams(selectedTemplate.body_text || '', templateVariables, values);
+  };
+
+  const updateParam = (index: number, patch: Partial<TemplateParam>) => {
+    setTemplateParams((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, ...patch } : p))
+    );
   };
 
   const handleFinishAndStart = async () => {
     if (!selectedTemplate || targetCount === 0 || isSubmitting) return;
+    if (!paramsValidation.ok) {
+      setErrorMessage(paramsValidation.error);
+      return;
+    }
     setIsSubmitting(true);
     const finalScheduledAt =
       dispatchTiming === 'SCHEDULED' ? `${scheduledDate}T${scheduledTime}:00` : null;
@@ -330,6 +367,7 @@ export default function CampaignWizardModal({
           name: title,
           templateName: selectedTemplate.name,
           templateId: selectedTemplate.id,
+          templateParams: paramsValidation.params,
           leadIds,
           propertyId: propertyId || null,
           scheduledAt: finalScheduledAt,
@@ -606,9 +644,10 @@ export default function CampaignWizardModal({
                   )}
                   {metaStats?.isConnected === false && (
                     <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800">
-                      <p className="font-bold">WhatsApp ainda não conectado</p>
+                      <p className="font-bold">Envio bloqueado: WhatsApp não verificado</p>
                       <p className="text-[11px] mt-1 leading-snug">
-                        Conecte o número em Configurações. Sem a API oficial a Meta não envia a campanha.
+                        {metaStats.connectionError ||
+                          'Conecte o número em Configurações. Sem a API oficial a Meta não envia a campanha.'}
                       </p>
                     </div>
                   )}
@@ -916,16 +955,79 @@ export default function CampaignWizardModal({
                       </div>
                     </div>
 
-                    <div>
-                      <SectionLabel>Nome de teste no preview</SectionLabel>
-                      <input
-                        type="text"
-                        value={variableTestName}
-                        onChange={(e) => setVariableTestName(e.target.value)}
-                        placeholder="ex: Carlos Eduardo"
-                        className={inputClass}
-                      />
-                    </div>
+                    {templateVariables.length > 0 && (
+                      <div className="space-y-3">
+                        <div>
+                          <SectionLabel>Variáveis da mensagem</SectionLabel>
+                          <p className="text-[11px] text-slate-500 -mt-1">
+                            Escolha o que entra em cada variável. Confira no preview ao lado como a mensagem vai chegar.
+                          </p>
+                        </div>
+                        {templateVariables.map((variable, index) => {
+                          const param = templateParams[index] || { source: 'fixed' as const };
+                          return (
+                            <div
+                              key={variable}
+                              className="p-3 bg-white border border-slate-200 rounded-xl space-y-2"
+                            >
+                              <label
+                                htmlFor={`param-source-${index}`}
+                                className="text-xs font-bold text-slate-800 font-mono"
+                              >
+                                {variableLabel(variable)}
+                              </label>
+                              <select
+                                id={`param-source-${index}`}
+                                value={param.source}
+                                onChange={(e) =>
+                                  updateParam(index, {
+                                    source: e.target.value as ParamSource,
+                                    value: e.target.value === 'fixed' ? param.value || '' : undefined,
+                                  })
+                                }
+                                className={inputClass}
+                              >
+                                {(Object.keys(PARAM_SOURCE_LABELS) as ParamSource[]).map((source) => (
+                                  <option key={source} value={source}>
+                                    {PARAM_SOURCE_LABELS[source]}
+                                  </option>
+                                ))}
+                              </select>
+                              {param.source === 'fixed' && (
+                                <input
+                                  type="text"
+                                  value={param.value || ''}
+                                  maxLength={MAX_PARAM_LENGTH}
+                                  onChange={(e) => updateParam(index, { value: e.target.value })}
+                                  placeholder="ex: 15/10 às 14h, R$ 49,90, Pizza Calabresa..."
+                                  aria-label={`Texto de ${variableLabel(variable)}`}
+                                  className={inputClass}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                        {!paramsValidation.ok && (
+                          <p className="text-[11px] text-amber-700 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            {paramsValidation.error}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {templateParams.some((p) => p.source === 'contact_name') && (
+                      <div>
+                        <SectionLabel>Nome de exemplo no preview</SectionLabel>
+                        <input
+                          type="text"
+                          value={variableTestName}
+                          onChange={(e) => setVariableTestName(e.target.value)}
+                          placeholder="ex: Carlos Eduardo"
+                          className={inputClass}
+                        />
+                      </div>
+                    )}
 
                     {/* Aviso proativo de forma de pagamento na Meta para modelos de Marketing */}
                     {selectedTemplate?.category === 'MARKETING' && (
@@ -1030,6 +1132,7 @@ export default function CampaignWizardModal({
               disabled={
                 targetCount === 0 ||
                 !selectedTemplate ||
+                !paramsValidation.ok ||
                 isSubmitting ||
                 qualityBlocked ||
                 notConnected ||

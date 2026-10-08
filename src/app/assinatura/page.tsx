@@ -108,6 +108,7 @@ export default function AssinaturaPage() {
     status: 'ACTIVE',
     paymentMethod: 'PIX',
     renewalDate: '01/10',
+    pendingPlanTier: null as PlanTier | null,
   });
 
   // Segmento vem do storage (sincronizado pelo AppLayoutGuard via /api/auth/session).
@@ -184,6 +185,7 @@ export default function AssinaturaPage() {
           status: json.subscription.status || 'ACTIVE',
           paymentMethod: json.subscription.paymentMethod || 'PIX',
           renewalDate: json.subscription.renewalDate || '01/10',
+          pendingPlanTier: (json.subscription.pendingPlanTier || null) as PlanTier | null,
         });
       }
     } catch (err) {
@@ -490,6 +492,14 @@ export default function AssinaturaPage() {
             Troca de plano é registrada na sua conta. Cobrança conforme o ciclo vigente.
           </p>
         </div>
+
+        {subData.pendingPlanTier && (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+            <p className="font-bold mb-1">Troca para o plano {subData.pendingPlanTier} aguardando pagamento</p>
+            Seu plano atual continua ativo, com disparos liberados. Assim que o pagamento for confirmado, a troca
+            acontece sozinha e a cobrança do plano antigo é encerrada. Se o pagamento não for feito, nada muda.
+          </div>
+        )}
 
         {dispatchOnly && (
           <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-xs text-slate-700 leading-relaxed">

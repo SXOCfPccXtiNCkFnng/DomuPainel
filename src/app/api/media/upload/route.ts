@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireDispatcher } from '@/lib/requireAuth';
 import { isProduction } from '@/lib/envSecrets';
@@ -55,7 +56,9 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-    const safeName = `${tenantId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    // Nome imprevisível: o link é público (o WhatsApp precisa baixar), então não
+    // pode dar para "chutar" o arquivo de outro cliente.
+    const safeName = `${tenantId}/${randomUUID()}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // O tipo informado pelo navegador é só uma declaração: confere a assinatura

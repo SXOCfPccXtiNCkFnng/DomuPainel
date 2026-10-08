@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { getPhoneNumberQuality, resolveMetaCredentials } from '@/lib/metaClient';
+import { requireVerifiedWhatsApp, type VerifiedWhatsApp } from '@/lib/whatsappConnection';
 
 const TIER_LIMIT: Record<string, number> = {
   TIER_50: 50,
@@ -11,10 +11,14 @@ const TIER_LIMIT: Record<string, number> = {
 };
 
 export type DispatchGate =
-  | { ok: true; warning?: string }
-  | { ok: false; error: string };
+  | ({ ok: true; warning?: string } & VerifiedWhatsApp)
+  | { ok: false; error: string; transient: boolean };
 
-/** Trava o disparo nas regras que a Meta aplica de fato: conexão, qualidade vermelha e cota de 24h. */
+/**
+ * Trava o disparo nas regras que a Meta aplica de fato: número conectado e
+ * conferido (requireVerifiedWhatsApp), qualidade vermelha e cota de 24h.
+ * Devolve as credenciais já verificadas — use SÓ elas para enviar.
+ */
 export async function assertMetaDispatchAllowed(
   tenantId: string,
   batchSize: number,
@@ -25,33 +29,24 @@ export async function assertMetaDispatchAllowed(
   }
 ): Promise<DispatchGate> {
   if (batchSize <= 0) {
-    return { ok: false, error: 'Nenhum contato elegível para este disparo.' };
+    return { ok: false, error: 'Nenhum contato elegível para este disparo.', transient: false };
   }
 
-  let creds;
-  try {
-    creds = await resolveMetaCredentials(tenantId);
-  } catch {
-    return {
-      ok: false,
-      error:
-        'Conecte o WhatsApp em Configurações antes de disparar. Sem a API oficial a Meta não envia a campanha.',
-    };
-  }
-
-  let quality;
-  try {
-    quality = await getPhoneNumberQuality(creds);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Falha ao consultar a Meta.';
-    return { ok: false, error: `Não foi possível confirmar o número na Meta. ${message}` };
-  }
+  const connection = await requireVerifiedWhatsApp(tenantId);
+  if (!connection.ok) return connection;
+  const { quality } = connection;
+  const verified: VerifiedWhatsApp = {
+    credentials: connection.credentials,
+    quality: connection.quality,
+    displayPhoneNumber: connection.displayPhoneNumber,
+  };
 
   if (quality.qualityRating === 'RED') {
     return {
       ok: false,
       error:
         'A Meta classificou este número com qualidade baixa (vermelha). Campanhas ficam pausadas até a nota melhorar, para o número não ser restringido.',
+      transient: false,
     };
   }
 
@@ -85,6 +80,7 @@ export async function assertMetaDispatchAllowed(
           remaining === 0
             ? `Limite da Meta nas últimas 24 horas esgotado (${tierLimit.toLocaleString('pt-BR')} conversas iniciadas). Espere a cota renovar ou agende para depois.`
             : `A Meta ainda libera ${remaining.toLocaleString('pt-BR')} envios neste número nas próximas 24 horas. Você selecionou ${batchSize.toLocaleString('pt-BR')}. Reduza a lista.`,
+        transient: false,
       };
     }
   }
@@ -94,8 +90,9 @@ export async function assertMetaDispatchAllowed(
       ok: true,
       warning:
         'A qualidade deste número está média (amarela) na Meta. A campanha pode seguir, mas novas denúncias podem reduzir o limite.',
+      ...verified,
     };
   }
 
-  return { ok: true };
+  return { ok: true, ...verified };
 }

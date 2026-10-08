@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import {
-  activateTenantSubscription,
+  activatePaidPayment,
+  discardPendingPlanChange,
   mapAsaasPaymentStatusToSubscription,
   mapAsaasSubscriptionStatus,
+  type SubscriptionRow,
 } from '@/lib/billing';
 import {
   asaasGetPayment,
@@ -179,13 +181,27 @@ export async function POST(req: NextRequest) {
         const verifiedStatus = String(source.status || '');
 
         const mapped = mapAsaasPaymentStatusToSubscription(verifiedStatus);
-        const { data: current } = await supabaseAdmin
+        // select('*'): inclui as colunas da troca de plano pendente (se a migration rodou).
+        const { data: currentRow } = await supabaseAdmin
           .from('subscriptions')
-          .select(
-            'plan_tier, monthly_price_brl, payment_method, coupon_code, asaas_customer_id, asaas_subscription_id, status'
-          )
+          .select('*')
           .eq('tenant_id', tenantId)
           .maybeSingle();
+        const current = currentRow as (SubscriptionRow & { status?: string | null }) | null;
+
+        const paymentSubId = source.subscription || null;
+        const isPendingPlanPayment = Boolean(
+          current?.pending_asaas_subscription_id &&
+            paymentSubId === current.pending_asaas_subscription_id
+        );
+        // Pagamento de uma assinatura que não é a atual nem a da troca pendente
+        // (ex.: a antiga, já cancelada após uma troca): não mexe na conta.
+        const isForeignSubscription = Boolean(
+          paymentSubId &&
+            current?.asaas_subscription_id &&
+            paymentSubId !== current.asaas_subscription_id &&
+            !isPendingPlanPayment
+        );
 
         await supabaseAdmin
           .from('subscriptions')
@@ -196,20 +212,22 @@ export async function POST(req: NextRequest) {
           })
           .eq('tenant_id', tenantId);
 
-        if (mapped === 'ACTIVE') {
-          await activateTenantSubscription({
-            tenantId,
-            planTier: current?.plan_tier || 'STARTER',
-            monthlyPrice: Number(current?.monthly_price_brl) || 0,
-            paymentMethod:
-              current?.payment_method || source.billingType || 'PIX',
-            asaasCustomerId: current?.asaas_customer_id,
-            asaasSubscriptionId:
-              current?.asaas_subscription_id || source.subscription,
-            couponCode:
-              current?.status === 'ACTIVE' ? null : current?.coupon_code || null,
-            status: 'ACTIVE',
+        if (isForeignSubscription) {
+          logger.info('billing.webhook_foreign_subscription_ignored', {
+            paymentId: payment.id,
+            paymentSubId,
+            mapped,
           });
+        } else if (mapped === 'ACTIVE') {
+          await activatePaidPayment({
+            tenantId,
+            sub: current,
+            paymentSubscriptionId: paymentSubId,
+            fallbackPaymentMethod: source.billingType,
+          });
+        } else if ((mapped === 'PAST_DUE' || mapped === 'CANCELED') && isPendingPlanPayment) {
+          // Pix do upgrade venceu/foi cancelado: descarta só a troca, o plano atual segue ativo.
+          await discardPendingPlanChange(tenantId, current);
         } else if (mapped === 'PAST_DUE' || mapped === 'CANCELED') {
           await supabaseAdmin
             .from('subscriptions')
@@ -234,7 +252,7 @@ export async function POST(req: NextRequest) {
             await sendPixRenewalEmail({
               tenantId,
               paymentId: payment.id,
-              planTier: current.plan_tier,
+              planTier: current.plan_tier || 'STARTER',
               monthlyPrice: Number(current.monthly_price_brl) || 0,
             });
           }

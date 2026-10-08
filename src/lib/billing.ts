@@ -242,6 +242,150 @@ export function isSubscriptionAllowedToDispatch(status: string | null | undefine
   return status === 'ACTIVE' || status === 'TRIAL';
 }
 
+/** Conta com assinatura vigente: nova contratação vira TROCA de plano (pendente). */
+export function isActiveSubscription(sub: { status?: string | null } | null | undefined): boolean {
+  return sub?.status === 'ACTIVE' || sub?.status === 'TRIAL';
+}
+
+/** Linha de public.subscriptions (lida com select('*'), colunas novas podem faltar). */
+export type SubscriptionRow = {
+  plan_tier?: string | null;
+  monthly_price_brl?: number | string | null;
+  payment_method?: string | null;
+  coupon_code?: string | null;
+  status?: string | null;
+  asaas_customer_id?: string | null;
+  asaas_subscription_id?: string | null;
+  pending_plan_tier?: string | null;
+  pending_monthly_price_brl?: number | string | null;
+  pending_payment_method?: string | null;
+  pending_coupon_code?: string | null;
+  pending_asaas_subscription_id?: string | null;
+};
+
+export type PaidPlan = {
+  planTier: string;
+  monthlyPrice: number;
+  paymentMethod: string;
+  asaasSubscriptionId: string | null;
+  couponCode: string | null;
+  /** true = este pagamento efetiva uma troca de plano pendente. */
+  isPlanChange: boolean;
+};
+
+/**
+ * Qual plano ativar quando um pagamento é confirmado. Se o pagamento é da
+ * assinatura da TROCA pendente, ativa o plano novo; senão é renovação do
+ * plano atual. Sem efeitos colaterais (testável).
+ */
+export function resolvePaidPlan(
+  sub: SubscriptionRow | null | undefined,
+  paymentSubscriptionId: string | null | undefined
+): PaidPlan {
+  const pendingSubId = sub?.pending_asaas_subscription_id || null;
+  if (pendingSubId && paymentSubscriptionId && paymentSubscriptionId === pendingSubId) {
+    return {
+      planTier: sub?.pending_plan_tier || sub?.plan_tier || 'STARTER',
+      monthlyPrice: Number(sub?.pending_monthly_price_brl) || 0,
+      paymentMethod: sub?.pending_payment_method || sub?.payment_method || 'PIX',
+      asaasSubscriptionId: pendingSubId,
+      couponCode: sub?.pending_coupon_code || null,
+      isPlanChange: true,
+    };
+  }
+  return {
+    planTier: sub?.plan_tier || 'STARTER',
+    monthlyPrice: Number(sub?.monthly_price_brl) || 0,
+    paymentMethod: sub?.payment_method || 'PIX',
+    asaasSubscriptionId: sub?.asaas_subscription_id || paymentSubscriptionId || null,
+    // Cupom só conta na primeira ativação, não em renovação.
+    couponCode: sub?.status === 'ACTIVE' ? null : sub?.coupon_code || null,
+    isPlanChange: false,
+  };
+}
+
+const PENDING_PLAN_CLEARED = {
+  pending_plan_tier: null,
+  pending_monthly_price_brl: null,
+  pending_payment_method: null,
+  pending_coupon_code: null,
+  pending_asaas_subscription_id: null,
+  pending_created_at: null,
+};
+
+async function cancelAsaasSubscriptionSafe(id: string | null | undefined, context: string) {
+  if (!id) return;
+  try {
+    const { asaasCancelSubscription, isBillingMockEnabled } = await import('@/lib/asaasClient');
+    if (isBillingMockEnabled()) return;
+    await asaasCancelSubscription(id);
+  } catch (err) {
+    // Não derruba a ativação; fica registrado para cancelar à mão no Asaas.
+    const { logOpsAlert } = await import('@/lib/opsAlert');
+    await logOpsAlert({
+      source: 'billing.cancelamento',
+      message: `${context}: falha ao cancelar a assinatura ${id} no Asaas — cancele manualmente para evitar cobrança dupla. ${
+        err instanceof Error ? err.message : ''
+      }`,
+    });
+  }
+}
+
+/**
+ * Ativa um pagamento confirmado: renovação do plano atual ou efetivação da
+ * troca de plano pendente (aí cancela a assinatura ANTIGA no Asaas e limpa a
+ * pendência). Use em todo lugar que confirma pagamento.
+ */
+export async function activatePaidPayment(input: {
+  tenantId: string;
+  sub: SubscriptionRow | null | undefined;
+  paymentSubscriptionId: string | null | undefined;
+  fallbackPaymentMethod?: string | null;
+}): Promise<PaidPlan> {
+  const plan = resolvePaidPlan(input.sub, input.paymentSubscriptionId);
+  const previousAsaasSubId = input.sub?.asaas_subscription_id || null;
+
+  await activateTenantSubscription({
+    tenantId: input.tenantId,
+    planTier: plan.planTier,
+    monthlyPrice: plan.monthlyPrice,
+    paymentMethod: plan.paymentMethod || input.fallbackPaymentMethod || 'PIX',
+    asaasCustomerId: input.sub?.asaas_customer_id,
+    asaasSubscriptionId: plan.asaasSubscriptionId,
+    couponCode: plan.couponCode,
+    status: 'ACTIVE',
+  });
+
+  if (plan.isPlanChange) {
+    if (previousAsaasSubId && previousAsaasSubId !== plan.asaasSubscriptionId) {
+      await cancelAsaasSubscriptionSafe(previousAsaasSubId, `Troca de plano (${input.tenantId})`);
+    }
+    const { error } = await supabaseAdmin
+      .from('subscriptions')
+      .update(PENDING_PLAN_CLEARED)
+      .eq('tenant_id', input.tenantId);
+    if (error) console.warn('[billing] pendência de troca não limpa:', error.message);
+  }
+
+  return plan;
+}
+
+/**
+ * O pagamento da troca venceu/foi cancelado: descarta só a troca. O plano
+ * atual continua ativo — nada de marcar a conta como inadimplente.
+ */
+export async function discardPendingPlanChange(
+  tenantId: string,
+  sub: SubscriptionRow | null | undefined
+): Promise<void> {
+  await cancelAsaasSubscriptionSafe(sub?.pending_asaas_subscription_id, `Troca de plano não paga (${tenantId})`);
+  const { error } = await supabaseAdmin
+    .from('subscriptions')
+    .update({ ...PENDING_PLAN_CLEARED, updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId);
+  if (error) console.warn('[billing] pendência de troca não descartada:', error.message);
+}
+
 const PAID_PAYMENT_STATUSES = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'] as const;
 
 export function parsePlanTierFromAsaasDescription(description: string): PlanTier | null {
@@ -283,6 +427,19 @@ export async function syncTenantSubscriptionFromAsaas(
     .maybeSingle();
 
   if (sub?.status === 'CANCELED') return { synced: false, status: 'CANCELED' };
+
+  // Conta já ativa: NÃO reativa de novo (isso empurrava o vencimento 30 dias a
+  // cada consulta de status). Só confere se a troca de plano pendente foi paga.
+  if (sub?.status === 'ACTIVE' || sub?.status === 'TRIAL') {
+    const pendingSubId = (sub as SubscriptionRow).pending_asaas_subscription_id;
+    if (!pendingSubId) return { synced: false, status: sub.status };
+    const payments = await asaasListSubscriptionPayments(pendingSubId);
+    if (!payments.some((p) => isPaidAsaasPayment(p.status))) {
+      return { synced: false, status: sub.status };
+    }
+    const plan = await activatePaidPayment({ tenantId, sub, paymentSubscriptionId: pendingSubId });
+    return { synced: true, planTier: normalizePlanTier(plan.planTier), status: 'ACTIVE' };
+  }
 
   let asaasSub: Awaited<ReturnType<typeof asaasGetSubscription>> | null = null;
   let paidPayment: Awaited<ReturnType<typeof asaasListSubscriptionPayments>>[number] | null =

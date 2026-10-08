@@ -7,7 +7,7 @@ import {
   isBillingMockEnabled,
   AsaasApiError,
 } from '@/lib/asaasClient';
-import { activateTenantSubscription, mapAsaasPaymentStatusToSubscription, syncTenantSubscriptionFromAsaas } from '@/lib/billing';
+import { activatePaidPayment, mapAsaasPaymentStatusToSubscription, syncTenantSubscriptionFromAsaas } from '@/lib/billing';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,21 +91,17 @@ export async function GET(req: NextRequest) {
 
         const mapped = mapAsaasPaymentStatusToSubscription(payment.status);
         if (mapped === 'ACTIVE') {
-          await activateTenantSubscription({
+          // Renovação do plano atual ou efetivação da troca pendente (cancela a antiga).
+          const plan = await activatePaidPayment({
             tenantId,
-            planTier: sub.plan_tier,
-            monthlyPrice: Number(sub.monthly_price_brl) || 0,
-            paymentMethod: sub.payment_method || 'PIX',
-            asaasCustomerId: sub.asaas_customer_id,
-            asaasSubscriptionId: sub.asaas_subscription_id,
-            couponCode: sub.status === 'ACTIVE' ? null : sub.coupon_code,
-            status: 'ACTIVE',
+            sub,
+            paymentSubscriptionId: payment.subscription || null,
           });
           return NextResponse.json({
             success: true,
             status: 'ACTIVE',
             isOnboarded: true,
-            planTier: sub.plan_tier,
+            planTier: plan.planTier,
             paymentStatus,
             invoiceUrl,
           });
