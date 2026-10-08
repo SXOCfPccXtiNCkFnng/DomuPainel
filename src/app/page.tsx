@@ -24,6 +24,7 @@ import {
   isDispatchOnlySegment,
 } from '@/lib/segmentConfig';
 import { getAuthItem } from '@/lib/authStorage';
+import FirstStepsChecklist from '@/components/dashboard/FirstStepsChecklist';
 
 export default function DashboardPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -37,6 +38,10 @@ export default function DashboardPage() {
   const [metaQuality, setMetaQuality] = useState<string | null>(null);
   const [metaTierLabel, setMetaTierLabel] = useState<string | null>(null);
   const [metaVerifiedName, setMetaVerifiedName] = useState<string | null>(null);
+  const [setupReady, setSetupReady] = useState(false);
+  const [contactCount, setContactCount] = useState(0);
+  const [templateCount, setTemplateCount] = useState(0);
+  const [campaignCount, setCampaignCount] = useState(0);
   const [roiMetrics, setRoiMetrics] = useState([
     { label: 'Contatos atingidos', value: '0', hint: 'Entregas no período' },
     { label: 'Taxa de resposta', value: '0%', hint: 'Quem engajou' },
@@ -92,6 +97,10 @@ export default function DashboardPage() {
         if (json.metrics.whatsappPhone && json.metrics.whatsappPhone !== 'Não cadastrado') {
           setWhatsappPhone(json.metrics.whatsappPhone);
         }
+        setContactCount(Number(json.metrics.totalLeads) || 0);
+        setTemplateCount(Number(json.metrics.templateCount) || 0);
+        setCampaignCount(Number(json.metrics.campaignsCount) || 0);
+        if (json.metrics.metaConnected) setMetaConnected(true);
 
         if (dispatchOnly) {
           setRoiMetrics([
@@ -143,6 +152,8 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error('Erro ao buscar dados do dashboard:', err);
+    } finally {
+      setSetupReady(true);
     }
   };
 
@@ -172,6 +183,14 @@ export default function DashboardPage() {
           <span>Novo Disparo</span>
         </button>
       </div>
+
+      <FirstStepsChecklist
+        ready={setupReady}
+        whatsappConnected={metaConnected === true}
+        contactCount={contactCount}
+        templateCount={templateCount}
+        campaignCount={campaignCount}
+      />
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">

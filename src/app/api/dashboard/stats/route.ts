@@ -128,6 +128,12 @@ export async function GET(req: NextRequest) {
     const responseRate =
       totalDispatches > 0 ? Math.round((qualified / totalDispatches) * 1000) / 10 : 0;
 
+    const { count: templateCountRaw, error: templateCountError } = await supabaseAdmin
+      .from('hsm_templates')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId);
+    const templateCount = templateCountError ? 0 : templateCountRaw || 0;
+
     return NextResponse.json({
       success: true,
       metrics: {
@@ -144,6 +150,7 @@ export async function GET(req: NextRequest) {
         tenantName: tenant?.name || 'Sua Empresa',
         segment: tenant?.segment || 'geral',
         campaignsCount: allCampaigns.length,
+        templateCount,
         // ROI strip
         atingidos: deliveredCount || totalDispatches,
         taxaResposta: responseRate,

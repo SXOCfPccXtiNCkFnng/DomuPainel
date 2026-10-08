@@ -20,9 +20,12 @@ import TeamSettingsPanel from '@/components/configuracoes/TeamSettingsPanel';
 import ProfileSettingsPanel from '@/components/configuracoes/ProfileSettingsPanel';
 import { MetaConnectButton, MetaConnectResult } from '@/components/shared/MetaConnectButton';
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
-import { User } from 'lucide-react';
+import { reopenFirstSteps } from '@/lib/firstSteps';
+import { useRouter } from 'next/navigation';
+import { User, ListChecks } from 'lucide-react';
 
 export default function ConfiguracoesPage() {
+  const router = useRouter();
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
   const [accessToken, setAccessToken] = useState('');
@@ -63,6 +66,9 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     loadSettings();
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('secao') === 'meta') {
+      setActiveSection('meta');
+    }
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -160,6 +166,20 @@ export default function ConfiguracoesPage() {
             <span className="inline-flex items-center gap-2">
               <ShieldCheck className="w-4 h-4" />
               Equipe e permissões
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              reopenFirstSteps(getAuthItem('domu_tenant_id') || 'local');
+              router.push('/');
+            }}
+            className="w-full text-left px-4 py-3 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:border-slate-300 transition-colors"
+          >
+            <span className="inline-flex items-center gap-2">
+              <ListChecks className="w-4 h-4" />
+              Ver primeiros passos
             </span>
           </button>
         </aside>
