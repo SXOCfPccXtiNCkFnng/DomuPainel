@@ -508,13 +508,15 @@ export default function ConfiguracoesPage() {
                       <Phone className="w-3.5 h-3.5" />
                       Número do WhatsApp comercial
                     </label>
-                    <input
-                      type="text"
-                      placeholder="+55 11 99999-8888"
-                      value={whatsappPhone}
-                      onChange={(e) => setWhatsappPhone(e.target.value)}
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue/30 focus:border-domu-blue"
-                    />
+                    {/* Não é digitado: ao salvar, o número vem da própria Meta (conferido
+                        pelo ID do número), sempre no formato oficial. */}
+                    <p className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
+                      {whatsappPhone ? (
+                        <span className="font-mono text-sm text-slate-900">{whatsappPhone}</span>
+                      ) : (
+                        'Preenchido automaticamente pela Meta ao salvar, a partir do ID do número.'
+                      )}
+                    </p>
                   </div>
 
                   {/* IDs */}
