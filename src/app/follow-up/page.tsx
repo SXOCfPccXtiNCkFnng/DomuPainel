@@ -162,7 +162,12 @@ function Card({
         </div>
         {aside}
       </div>
-      <div className={muted ? 'opacity-60' : ''}>{children}</div>
+      {/* Desligado: só título e botão; ligou, abre a configuração. */}
+      {muted ? (
+        <p className="text-[11px] text-slate-400">Desligado. Ligue para configurar.</p>
+      ) : (
+        <div>{children}</div>
+      )}
     </section>
   );
 }
@@ -251,10 +256,8 @@ function MessageEditor({
           {value.length}/{FOLLOW_UP_MESSAGE_MAX}
         </span>
       </div>
-      <p className="text-[11px] text-slate-500 leading-relaxed">
-        Para a mensagem chegar com o nome da pessoa, inclua <strong className="font-mono text-slate-700">{'{{nome}}'}</strong>{' '}
-        onde o nome deve aparecer (use o botão &quot;+ Nome do contato&quot;). Ex.: &quot;Oi {'{{nome}}'}, tudo bem?&quot; chega
-        como &quot;Oi Carlos, tudo bem?&quot;.
+      <p className="text-[11px] text-slate-500">
+        Use <strong>+ Nome do contato</strong> para a mensagem chegar com o nome da pessoa.
       </p>
       {error ? (
         <p className="text-[11px] text-amber-700 flex items-start gap-1.5">
@@ -512,13 +515,13 @@ export default function FollowUpPage() {
             icon={<Send className="w-3.5 h-3.5" />}
             label="Enviados"
             value={s.sent.toLocaleString('pt-BR')}
-            caption="Follow-ups que saíram para contatos que pararam de responder."
+            caption="Mensagens de follow-up enviadas."
           />
           <MetricCard
             icon={<MessageSquareReply className="w-3.5 h-3.5" />}
             label="Responderam"
             value={responseRate == null ? '—' : `${responseRate}%`}
-            caption={`${s.recovered.toLocaleString('pt-BR')} contato(s) voltaram a responder depois do follow-up.`}
+            caption={`${s.recovered.toLocaleString('pt-BR')} voltaram a conversar.`}
             tone="text-emerald-600"
             highlight
           />
@@ -526,20 +529,20 @@ export default function FollowUpPage() {
             icon={<Clock className="w-3.5 h-3.5" />}
             label="Aguardando"
             value={s.pending.toLocaleString('pt-BR')}
-            caption="Ainda no prazo de espera. Se responderem, nada é enviado."
+            caption="No prazo de espera."
             tone="text-domu-blue"
           />
           <MetricCard
             icon={<CheckCircle2 className="w-3.5 h-3.5" />}
             label="Nem precisou"
             value={s.repliedBefore.toLocaleString('pt-BR')}
-            caption="Responderam antes do prazo, então o follow-up foi cancelado."
+            caption="Responderam antes do prazo."
           />
           <MetricCard
             icon={<ShieldCheck className="w-3.5 h-3.5" />}
             label="Evitados"
             value={s.avoided.toLocaleString('pt-BR')}
-            caption="Barrados pelas proteções (conversa encerrada, negócio fechado...). Veja o motivo na lista."
+            caption="Barrados pelas proteções."
             tone="text-violet-700"
           />
         </div>
@@ -548,13 +551,33 @@ export default function FollowUpPage() {
         ) : null}
       </section>
 
+      <Disclosure title="Como o follow-up funciona" subtitle="Conversas, campanhas e quando a mensagem sai">
+        <div className="space-y-3 pt-2 text-[11.5px] text-slate-600 leading-relaxed">
+          <p>
+            <strong className="text-slate-800">Conversa:</strong> quando você responde um contato (pelo celular ou pela
+            plataforma) e ele para de responder, o follow-up sai depois do tempo escolhido. Ele sempre sai antes de a
+            conversa do WhatsApp fechar (24h depois da última mensagem do contato), e não precisa de aprovação da Meta.
+          </p>
+          <p>
+            <strong className="text-slate-800">Campanha:</strong> para quem recebeu uma campanha e nunca respondeu. Como
+            essa pessoa ainda não abriu conversa, o WhatsApp exige que a Meta aprove a mensagem — enviamos para aprovação
+            automaticamente ao salvar, uma vez só.
+          </p>
+          <p>
+            <strong className="text-slate-800">Antes de enviar:</strong> se o contato responder, o follow-up é cancelado;
+            as proteções conferem a conversa e, na dúvida, nada é enviado. O follow-up não conta no limite de disparos do
+            seu plano.
+          </p>
+        </div>
+      </Disclosure>
+
       {/* Configuração */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-7 space-y-5">
           <Card
             icon={<MessagesSquare className="w-4 h-4" />}
             title="Follow-up de conversa"
-            description="Para quem conversou com você e parou de responder. Vale para mensagens enviadas pelo celular ou pelo painel. Sai sempre antes de a conversa do WhatsApp fechar (24h) — sem aprovação da Meta."
+            description="Para quem conversou com você e parou de responder. Sem aprovação da Meta."
             aside={
               <Toggle
                 checked={form.conversation_enabled}
@@ -598,7 +621,7 @@ export default function FollowUpPage() {
           <Card
             icon={<Megaphone className="w-4 h-4" />}
             title="Follow-up de campanha (opcional)"
-            description="Para quem recebeu uma campanha e nunca respondeu. Como essa pessoa ainda não abriu conversa, o WhatsApp exige que a Meta aprove a mensagem — enviamos para aprovação automaticamente ao salvar."
+            description="Para quem recebeu uma campanha e nunca respondeu. A mensagem passa pela aprovação da Meta."
             aside={
               <Toggle
                 checked={form.campaign_enabled}
