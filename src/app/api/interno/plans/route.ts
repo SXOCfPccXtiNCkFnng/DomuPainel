@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/platformAdmin';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { normalizePlanTier } from '@/lib/planLimits';
+import { normalizePlanTier, PlanTier } from '@/lib/planLimits';
+import { getLivePlanPrices } from '@/lib/planPricing';
+import { adjustSubscriptionPrice } from '@/lib/billing';
 import { isBillingMockEnabled, asaasUpdateSubscriptionValue } from '@/lib/asaasClient';
 import { sendEmail, appBaseUrl } from '@/lib/email';
 import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
@@ -55,6 +57,10 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Nenhum plano informado.' }, { status: 400 });
     }
 
+    // Preço de tabela ANTES de salvar: o painel manda os 3 planos sempre, e só
+    // plano cujo preço realmente mudou pode mexer em assinante.
+    const oldTable = await getLivePlanPrices();
+
     // 1. Preço "de tabela" pra cadastro novo — vale imediatamente.
     const { error: upsertErr } = await supabaseAdmin
       .from('plan_prices')
@@ -67,8 +73,11 @@ export async function PATCH(req: NextRequest) {
     let loweredNow = 0;
     let scheduledIncreases = 0;
 
-    // 2. Assinantes ativos que já pagam por aquele plano.
-    for (const { plan_tier: tier, price_brl: newPrice } of rows) {
+    const changedRows = rows.filter((r) => oldTable[r.plan_tier as PlanTier] !== r.price_brl);
+
+    // 2. Assinantes ativos que já pagam por um plano cujo preço mudou.
+    for (const { plan_tier: tier, price_brl: newTablePrice } of changedRows) {
+      const oldTablePrice = oldTable[tier as PlanTier];
       const { data: activeSubs } = await supabaseAdmin
         .from('subscriptions')
         .select('tenant_id, asaas_subscription_id, monthly_price_brl')
@@ -76,10 +85,37 @@ export async function PATCH(req: NextRequest) {
         .eq('status', 'ACTIVE');
 
       for (const sub of activeSubs || []) {
-        const oldPrice = Number(sub.monthly_price_brl);
-        if (!Number.isFinite(oldPrice) || oldPrice === newPrice) continue;
+        const paying = Number(sub.monthly_price_brl);
 
-        if (newPrice < oldPrice) {
+        // Reajuste ainda não aplicado deste assinante: é a referência do novo
+        // cálculo e será substituído (nada de empilhar avisos/cobranças).
+        const { data: pending } = await supabaseAdmin
+          .from('subscription_price_changes')
+          .select('id, new_price_brl')
+          .eq('tenant_id', sub.tenant_id)
+          .is('applied_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        const reference = pending?.[0] ? Number(pending[0].new_price_brl) : paying;
+
+        // Proporcional à tabela: mantém PIX/cupom; cortesia (R$ 0) fica fora.
+        const newPrice = adjustSubscriptionPrice(reference, oldTablePrice, newTablePrice);
+        if (newPrice == null) continue;
+
+        const { error: cancelErr } = await supabaseAdmin
+          .from('subscription_price_changes')
+          .delete()
+          .eq('tenant_id', sub.tenant_id)
+          .is('applied_at', null);
+        if (cancelErr) {
+          logger.error('interno.plan_price_cancel_pending_failed', {
+            tenantId: sub.tenant_id,
+            message: cancelErr.message,
+          });
+          continue;
+        }
+
+        if (newPrice <= paying) {
           // Redução: aplica na hora, sem aviso prévio (é a favor do cliente).
           try {
             if (!isBillingMockEnabled() && sub.asaas_subscription_id) {
@@ -112,7 +148,7 @@ export async function PATCH(req: NextRequest) {
             tenant_id: sub.tenant_id,
             asaas_subscription_id: sub.asaas_subscription_id,
             plan_tier: tier,
-            old_price_brl: oldPrice,
+            old_price_brl: paying,
             new_price_brl: newPrice,
             effective_at: effectiveAt,
             created_by: gate.email,
@@ -139,7 +175,7 @@ export async function PATCH(req: NextRequest) {
 
           const recipients = (admins || []).map((a) => a.email).filter(Boolean);
           const expiresAt = formatDateBR(effectiveAt);
-          const oldLabel = oldPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          const oldLabel = paying.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
           const newLabel = newPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
           const base = appBaseUrl();
 
@@ -175,6 +211,7 @@ export async function PATCH(req: NextRequest) {
     logger.info('interno.plan_prices_updated', {
       byEmail: gate.email,
       prices: Object.fromEntries(rows.map((r) => [r.plan_tier, r.price_brl])),
+      changedTiers: changedRows.map((r) => r.plan_tier),
       loweredNow,
       scheduledIncreases,
     });

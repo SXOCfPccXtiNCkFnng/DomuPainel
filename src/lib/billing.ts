@@ -77,6 +77,31 @@ export function computeSubscriptionPrice(input: {
   };
 }
 
+/**
+ * Novo valor de um assinante quando o preço de TABELA do plano muda.
+ *
+ * O assinante não paga o preço de tabela: paga com PIX (-5%), cupom, ou é
+ * cortesia (R$ 0). Por isso o reajuste é proporcional ao da tabela — quem
+ * paga 187,15 (197 no PIX) e a tabela vai de 197 → 247 passa a pagar 234,65,
+ * mantendo o desconto. Cortesia/cupom de 100% (valor 0) nunca é reajustado.
+ *
+ * `currentPrice` deve ser o valor de referência mais recente do assinante:
+ * o de um reajuste ainda pendente, se houver, senão o que ele paga hoje.
+ * Retorna null quando não há nada a fazer.
+ */
+export function adjustSubscriptionPrice(
+  currentPrice: number,
+  oldTablePrice: number,
+  newTablePrice: number
+): number | null {
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0) return null;
+  if (!Number.isFinite(oldTablePrice) || oldTablePrice <= 0) return null;
+  if (!Number.isFinite(newTablePrice) || newTablePrice <= 0) return null;
+  if (oldTablePrice === newTablePrice) return null;
+  const next = Math.round(currentPrice * (newTablePrice / oldTablePrice) * 100) / 100;
+  return next === currentPrice ? null : next;
+}
+
 export async function findActiveCoupon(
   code: string,
   planTier?: string
