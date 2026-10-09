@@ -16,8 +16,10 @@ import {
   CreditCard,
   Loader2,
   Unplug,
+  Zap,
 } from 'lucide-react';
 import CoexistenceWidget from '@/components/dashboard/CoexistenceWidget';
+import Disclosure from '@/components/shared/Disclosure';
 import TeamSettingsPanel from '@/components/configuracoes/TeamSettingsPanel';
 import ProfileSettingsPanel from '@/components/configuracoes/ProfileSettingsPanel';
 import { MetaConnectButton, MetaConnectResult } from '@/components/shared/MetaConnectButton';
@@ -45,6 +47,7 @@ export default function ConfiguracoesPage() {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState('');
   const [statusWidgetKey, setStatusWidgetKey] = useState(0);
+  const [showManualCredentials, setShowManualCredentials] = useState(false);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -101,7 +104,10 @@ export default function ConfiguracoesPage() {
         return;
       }
       if (whatsappPhone) setAuthItem('domu_whatsapp_phone', whatsappPhone);
+      if (json.warning) setErrorMsg(json.warning);
       setSavedSuccess(true);
+      // Credenciais novas: o quadro de status confere a conexão de novo.
+      setStatusWidgetKey((k) => k + 1);
       setHasToken(Boolean(phoneNumberId && wabaId));
       if (accessToken && !accessToken.includes('•')) {
         setAccessToken('••••••••••••••••');
@@ -322,6 +328,21 @@ export default function ConfiguracoesPage() {
                       }}
                       className="btn-domu-primary text-sm py-3 px-6"
                     />
+                    {/* Número já ligado à API por outro sistema: conecta com o token,
+                        sem refazer o QR code. Continua em coexistência. */}
+                    <button
+                      type="button"
+                      onClick={() => setShowManualCredentials((v) => !v)}
+                      className="block text-[11px] font-bold text-slate-500 hover:text-domu-blue"
+                    >
+                      {showManualCredentials ? 'Ocultar conexão por token' : 'Avançado: conectar com token da Meta'}
+                    </button>
+                    {showManualCredentials ? (
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Para quem já tem o número ligado à API oficial. Preencha o formulário abaixo — o app no celular
+                        continua funcionando normalmente.
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500">
@@ -394,8 +415,8 @@ export default function ConfiguracoesPage() {
               </div>
             )}
 
-            {/* Tips — só fazem sentido pra quem está em coexistência (app + API no mesmo número) */}
-            {(isMetaConnected || connectionMode === 'COEXISTENCE') && (
+            {/* Antes de conectar (coexistência): o que muda no dia a dia */}
+            {isMetaConnected === false && connectionMode === 'COEXISTENCE' && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { title: 'App no celular', text: 'Continue respondendo conversas no WhatsApp Business normalmente.' },
@@ -413,224 +434,233 @@ export default function ConfiguracoesPage() {
               </div>
             )}
 
-            {/* Informação Oficial de Pagamento e Faturamento Meta */}
-            <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-5 space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-domu-blue/10 text-domu-blue flex items-center justify-center shrink-0 mt-0.5">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-bold text-slate-900">
-                      Como funciona a cobrança oficial do WhatsApp (Meta)?
-                    </h4>
-                    <p className="text-[11.5px] text-slate-600 leading-relaxed max-w-2xl">
-                      Para disparos de campanhas em massa (categoria <em>MARKETING</em>), a Meta cobra uma taxa por conversa iniciada (aprox. R$ 0,30 a R$ 0,35 por contato no Brasil) e exige um <strong>cartão de crédito cadastrado</strong> no WhatsApp Manager da sua conta para que as mensagens sejam entregues fisicamente nos aparelhos dos clientes.
-                    </p>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      <strong>Dica de economia:</strong> Quando o cliente responde à sua mensagem, abre-se uma <strong>janela de atendimento de 24 horas</strong> onde você pode trocar mensagens à vontade sem nenhuma cobrança adicional da Meta.
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href="https://business.facebook.com/latest/whatsapp_manager/overview/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-domu-primary text-xs py-2 px-3.5 shrink-0 flex items-center gap-1.5 self-start sm:self-center"
-                >
-                  <span>Gerenciador de Pagamentos Meta</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            </div>
-
-            {/* Como subir o limite diário da Meta (Upgrade Automático de Tier) */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h4 className="text-xs font-bold text-slate-900">
-                  Como subir o Limite Diário oficial da Meta (De 250 para 1.000 e 10.000)?
-                </h4>
-                <span className="text-[10px] font-bold text-domu-blue bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-                  Upgrade 100% Automático
-                </span>
-              </div>
-              <p className="text-[11.5px] text-slate-600 leading-relaxed">
-                Você não precisa solicitar nem pagar nada à Meta para aumentar o limite. A promoção entre os tiers (250 ➔ 1.000 ➔ 10.000 ➔ 100.000) ocorre de forma automática pelo algoritmo da Meta ao cumprir 3 condições:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-[11.5px]">
-                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
-                  <span className="font-bold text-slate-800 block">1. Qualidade Verde</span>
-                  <p className="text-slate-600 leading-snug">
-                    Mantenha a nota do número alta (use variáveis como nome do cliente e envie apenas para quem demonstrou interesse).
-                  </p>
-                </div>
-                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
-                  <span className="font-bold text-slate-800 block">2. Utilizar a cota atual</span>
-                  <p className="text-slate-600 leading-snug">
-                    Dispare pelo menos 50% do limite atual em um intervalo de até 7 dias (ex: enviar mais de 125 mensagens quando estiver em 250).
-                  </p>
-                </div>
-                <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
-                  <span className="font-bold text-slate-800 block">3. Liberação em até 48h</span>
-                  <p className="text-slate-600 leading-snug">
-                    Ao atingir esse volume com boa aceitação dos clientes, a Meta eleva seu limite diário automaticamente para o próximo patamar.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Credentials form */}
-            <form
-              onSubmit={handleSave}
-              className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                    <Key className="w-4 h-4 text-domu-blue" />
-                    Credenciais da API (avançado)
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {isLoading
-                      ? 'Carregando…'
-                      : hasToken
-                        ? 'Suas credenciais estão salvas e criptografadas.'
-                        : 'Alternativa manual ao botão "Conectar com Meta" acima — use se preferir colar as credenciais direto (número dedicado, sem coexistência).'}
-                  </p>
-                </div>
-                <a
-                  href="https://developers.facebook.com/apps/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-domu-blue px-4 py-2.5 rounded-xl border border-slate-200 hover:border-domu-blue/40 transition-colors"
-                >
-                  Abrir Meta Developers
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-
-              <div className="p-6 space-y-6">
-                {/* WhatsApp number */}
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase text-slate-600 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5" />
-                    Número do WhatsApp comercial
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="+55 11 99999-8888"
-                    value={whatsappPhone}
-                    onChange={(e) => setWhatsappPhone(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue/30 focus:border-domu-blue"
-                  />
-                </div>
-
-                {/* IDs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold uppercase text-slate-600">
-                        ID do Número (Phone Number ID)
-                      </label>
-                      {phoneNumberId && (
-                        <button
-                          type="button"
-                          onClick={() => copyValue('phone', phoneNumberId)}
-                          className="text-[10px] font-bold text-domu-blue flex items-center gap-1"
-                        >
-                          <Copy className="w-3 h-3" />
-                          {copied === 'phone' ? 'Copiado' : 'Copiar'}
-                        </button>
-                      )}
+            {/* Conectado: IDs só para consulta (trocar de número = desconectar e conectar de novo). */}
+            {isMetaConnected && (
+              <Disclosure
+                icon={<Key className="w-4 h-4" />}
+                title="Detalhes técnicos"
+                subtitle="IDs da conexão com a Meta — o suporte pode pedir"
+              >
+                <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  {[
+                    { key: 'phone', label: 'ID do número (Phone Number ID)', value: phoneNumberId },
+                    { key: 'waba', label: 'ID da conta WhatsApp (WABA)', value: wabaId },
+                  ].map((item) => (
+                    <div key={item.key} className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <dt className="text-[10px] font-bold uppercase text-slate-500 flex items-center justify-between">
+                        {item.label}
+                        {item.value ? (
+                          <button
+                            type="button"
+                            onClick={() => copyValue(item.key, item.value)}
+                            className="text-[10px] font-bold text-domu-blue flex items-center gap-1 normal-case"
+                          >
+                            <Copy className="w-3 h-3" />
+                            {copied === item.key ? 'Copiado' : 'Copiar'}
+                          </button>
+                        ) : null}
+                      </dt>
+                      <dd className='text-xs font-mono text-slate-800 mt-1 break-all'>{item.value || '—'}</dd>
                     </div>
-                    <input
-                      type="text"
-                      value={phoneNumberId}
-                      onChange={(e) => setPhoneNumberId(e.target.value)}
-                      placeholder="Ex: 109848492049281"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-domu-blue/30"
-                    />
-                    <p className="text-[10px] text-slate-400">Encontrado no painel da Meta em WhatsApp &gt; Configuração da API.</p>
+                  ))}
+                </dl>
+                <p className="text-[11px] text-slate-500 mt-3">
+                  Para trocar de número, use <strong>Desconectar</strong> acima e conecte de novo.
+                </p>
+              </Disclosure>
+            )}
+
+            {/* Número dedicado: credenciais coladas à mão — único caso em que o formulário aparece. */}
+            {isMetaConnected === false && (connectionMode === 'DIRECT_API' || showManualCredentials) && (
+              <form
+                onSubmit={handleSave}
+                className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden"
+              >
+                <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                      <Key className="w-4 h-4 text-domu-blue" />
+                      Credenciais da API (avançado)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {isLoading
+                        ? 'Carregando…'
+                        : hasToken
+                          ? 'Suas credenciais estão salvas e criptografadas.'
+                          : 'Cole os IDs e o token gerados na Meta. Funciona para número em coexistência ou dedicado.'}
+                    </p>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold uppercase text-slate-600">
-                        ID da Conta WhatsApp (WABA)
-                      </label>
-                      {wabaId && (
-                        <button
-                          type="button"
-                          onClick={() => copyValue('waba', wabaId)}
-                          className="text-[10px] font-bold text-domu-blue flex items-center gap-1"
-                        >
-                          <Copy className="w-3 h-3" />
-                          {copied === 'waba' ? 'Copiado' : 'Copiar'}
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={wabaId}
-                      onChange={(e) => setWabaId(e.target.value)}
-                      placeholder="Ex: 998341029348123"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-domu-blue/30"
-                    />
-                    <p className="text-[10px] text-slate-400">Identificador da sua conta comercial do WhatsApp na Meta.</p>
-                  </div>
-                </div>
-
-                {/* Token */}
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase text-slate-600">
-                    Token de acesso (Access Token)
-                  </label>
-                  <input
-                    type="password"
-                    value={accessToken}
-                    onChange={(e) => setAccessToken(e.target.value)}
-                    placeholder={hasToken ? 'Token salvo — cole um novo para substituir' : 'Cole aqui o token gerado na Meta'}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-domu-blue/30"
-                  />
-                  <p className="text-[11px] text-slate-400 flex items-start gap-1.5">
-                    <Smartphone className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    O token é criptografado antes de ser salvo. Para trocar, cole um novo e clique em salvar.
-                  </p>
-                </div>
-
-                {errorMsg && (
-                  <div className="flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {errorMsg}
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
-                  {savedSuccess ? (
-                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Configurações salvas com sucesso!
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-400">
-                      As alterações só entram em vigor depois de salvar.
-                    </span>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={isSaving || isLoading}
-                    className="btn-domu-primary text-xs py-2.5 px-6 inline-flex items-center gap-1.5 disabled:opacity-50"
+                  <a
+                    href="https://developers.facebook.com/apps/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-domu-blue px-4 py-2.5 rounded-xl border border-slate-200 hover:border-domu-blue/40 transition-colors"
                   >
-                    {isSaving ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
-                    Salvar configurações
-                  </button>
+                    Abrir Meta Developers
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
-              </div>
-            </form>
+
+                <div className="p-6 space-y-6">
+                  {/* WhatsApp number */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase text-slate-600 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5" />
+                      Número do WhatsApp comercial
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="+55 11 99999-8888"
+                      value={whatsappPhone}
+                      onChange={(e) => setWhatsappPhone(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-domu-blue/30 focus:border-domu-blue"
+                    />
+                  </div>
+
+                  {/* IDs */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold uppercase text-slate-600">
+                          ID do Número (Phone Number ID)
+                        </label>
+                        {phoneNumberId && (
+                          <button
+                            type="button"
+                            onClick={() => copyValue('phone', phoneNumberId)}
+                            className="text-[10px] font-bold text-domu-blue flex items-center gap-1"
+                          >
+                            <Copy className="w-3 h-3" />
+                            {copied === 'phone' ? 'Copiado' : 'Copiar'}
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={phoneNumberId}
+                        onChange={(e) => setPhoneNumberId(e.target.value)}
+                        placeholder="Ex: 109848492049281"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-domu-blue/30"
+                      />
+                      <p className="text-[10px] text-slate-400">Encontrado no painel da Meta em WhatsApp &gt; Configuração da API.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold uppercase text-slate-600">
+                          ID da Conta WhatsApp (WABA)
+                        </label>
+                        {wabaId && (
+                          <button
+                            type="button"
+                            onClick={() => copyValue('waba', wabaId)}
+                            className="text-[10px] font-bold text-domu-blue flex items-center gap-1"
+                          >
+                            <Copy className="w-3 h-3" />
+                            {copied === 'waba' ? 'Copiado' : 'Copiar'}
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={wabaId}
+                        onChange={(e) => setWabaId(e.target.value)}
+                        placeholder="Ex: 998341029348123"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-domu-blue/30"
+                      />
+                      <p className="text-[10px] text-slate-400">Identificador da sua conta comercial do WhatsApp na Meta.</p>
+                    </div>
+                  </div>
+
+                  {/* Token */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase text-slate-600">
+                      Token de acesso (Access Token)
+                    </label>
+                    <input
+                      type="password"
+                      value={accessToken}
+                      onChange={(e) => setAccessToken(e.target.value)}
+                      placeholder={hasToken ? 'Token salvo — cole um novo para substituir' : 'Cole aqui o token gerado na Meta'}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-domu-blue/30"
+                    />
+                    <p className="text-[11px] text-slate-400 flex items-start gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      O token é criptografado antes de ser salvo. Para trocar, cole um novo e clique em salvar.
+                    </p>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      {errorMsg}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                    {savedSuccess ? (
+                      <span className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Configurações salvas com sucesso!
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">
+                        As alterações só entram em vigor depois de salvar.
+                      </span>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={isSaving || isLoading}
+                      className="btn-domu-primary text-xs py-2.5 px-6 inline-flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isSaving ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      Salvar configurações
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* Explicações da Meta: consulta, ficam recolhidas. */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-1">Dúvidas frequentes</p>
+              <Disclosure icon={<CreditCard className="w-4 h-4" />} title="Como funciona a cobrança da Meta?">
+                <div className="space-y-2 text-[11.5px] text-slate-600 leading-relaxed pt-2">
+                  <p>
+                    Para campanhas (categoria <em>Marketing</em>), a Meta cobra por conversa iniciada — cerca de R$ 0,30 a
+                    R$ 0,35 por contato no Brasil — e exige um <strong>cartão de crédito cadastrado</strong> no WhatsApp
+                    Manager para as mensagens serem entregues.
+                  </p>
+                  <p>
+                    <strong>Dica de economia:</strong> quando o cliente responde, abre uma janela de 24 horas em que você
+                    conversa à vontade sem cobrança adicional.
+                  </p>
+                  <a
+                    href="https://business.facebook.com/latest/whatsapp_manager/overview/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-domu-blue hover:underline"
+                  >
+                    Abrir pagamentos no WhatsApp Manager
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </Disclosure>
+              <Disclosure icon={<Zap className="w-4 h-4" />} title="Como aumentar o limite diário?" subtitle="250 → 1.000 → 10.000 → 100.000, automático">
+                <div className="space-y-3 text-[11.5px] text-slate-600 leading-relaxed pt-2">
+                  <p>Você não precisa pedir nem pagar nada à Meta. O limite sobe sozinho quando o número cumpre 3 condições:</p>
+                  <ol className="space-y-1.5 list-decimal pl-4">
+                    <li><strong>Qualidade alta (verde):</strong> use o nome do cliente e envie só para quem demonstrou interesse.</li>
+                    <li><strong>Usar a cota atual:</strong> enviar pelo menos metade do limite em até 7 dias (ex.: mais de 125 quando estiver em 250).</li>
+                    <li><strong>Esperar até 48h:</strong> com boa aceitação, a Meta libera o próximo patamar.</li>
+                  </ol>
+                </div>
+              </Disclosure>
+            </div>
           </div>
 
           <div className={activeSection === 'team' ? 'block' : 'hidden'}>

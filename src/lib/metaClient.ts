@@ -586,3 +586,30 @@ export async function fetchMetaTemplateStatus(
     return { ok: false, error: err?.message || 'Erro de conexão com a Meta.' };
   }
 }
+
+/**
+ * Inscreve o app dono do token nos webhooks da conta WhatsApp (WABA): sem
+ * isso a Meta não manda para a Domu as mensagens recebidas, os status de
+ * entrega nem as mensagens enviadas pelo celular. Idempotente.
+ */
+export async function subscribeAppToWaba(
+  wabaId: string,
+  accessToken: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await metaFetch(
+      `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/subscribed_apps`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      return { ok: false, error: data?.error?.message || 'subscribed_apps falhou' };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'subscribed_apps falhou' };
+  }
+}

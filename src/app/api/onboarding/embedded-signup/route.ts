@@ -8,7 +8,7 @@ import { isValidBrazilianPhone } from '@/lib/validators';
 import { getMetaAppSecret } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
 import { pickOnboardedPhone, type ListedWhatsappPhone } from '@/lib/metaSignupPhone';
-import { META_GRAPH_API_VERSION, metaFetch } from '@/lib/metaClient';
+import { META_GRAPH_API_VERSION, metaFetch, subscribeAppToWaba } from '@/lib/metaClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -205,29 +205,6 @@ async function fetchDisplayPhoneNumber(
     return res.ok ? data.display_phone_number || null : null;
   } catch {
     return null;
-  }
-}
-
-/** Assina o app nos webhooks da WABA do cliente (mensagens, status etc.). */
-async function subscribeAppToWaba(
-  wabaId: string,
-  accessToken: string
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await metaFetch(
-      `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/subscribed_apps`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      return { ok: false, error: data?.error?.message || 'subscribed_apps falhou' };
-    }
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'subscribed_apps falhou' };
   }
 }
 

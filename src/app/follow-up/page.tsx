@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import WhatsAppPreview from '@/components/shared/WhatsAppPreview';
+import Disclosure from '@/components/shared/Disclosure';
 import { LEAD_STATUS_OPTIONS } from '@/lib/contactTags';
 import {
   CAMPAIGN_DELAY_OPTIONS,
@@ -672,15 +673,9 @@ export default function FollowUpPage() {
                   />
                 </div>
                 <p className="text-[11px] text-slate-600">
-                  Antes de cada follow-up de conversa, a IA lê as últimas mensagens e não envia se perceber:
+                  Antes de cada follow-up de conversa, a IA lê as últimas mensagens e só envia se a conversa estiver
+                  mesmo esperando resposta.
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {CONTEXT_PROTECTIONS.map((p) => (
-                    <span key={p} className="px-2 py-0.5 rounded-md bg-white border border-violet-100 text-[10.5px] text-slate-700">
-                      {p}
-                    </span>
-                  ))}
-                </div>
                 {!aiAvailable ? (
                   <p className="text-[11px] text-amber-700">
                     A IA não está configurada no servidor (GEMINI_API_KEY). Por segurança, com ela ligada os follow-ups de
@@ -689,14 +684,28 @@ export default function FollowUpPage() {
                 ) : null}
               </div>
 
-              <div>
-                <p className="text-[11px] font-bold text-slate-700 mb-1.5">Sempre ativas</p>
-                <ul className="text-[11px] text-slate-600 space-y-1">
-                  <li>• Se o contato responder, o follow-up é cancelado.</li>
-                  <li>• Se a última mensagem da conversa for do contato, nada é enviado (é a sua vez de responder).</li>
-                  <li>• Quem pediu para não receber mensagens (opt-out) ou foi pausado não recebe.</li>
-                </ul>
-              </div>
+              <Disclosure title="O que as proteções verificam" subtitle="Situações em que o follow-up não é enviado">
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-700 mb-1.5">A IA barra quando percebe</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CONTEXT_PROTECTIONS.map((p) => (
+                        <span key={p} className="px-2 py-0.5 rounded-md bg-violet-50 border border-violet-100 text-[10.5px] text-slate-700">
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-700 mb-1.5">Sempre ativas</p>
+                    <ul className="text-[11px] text-slate-600 space-y-1">
+                      <li>• Se o contato responder, o follow-up é cancelado.</li>
+                      <li>• Se a última mensagem da conversa for do contato, nada é enviado (é a sua vez de responder).</li>
+                      <li>• Quem pediu para não receber mensagens (opt-out) ou foi pausado não recebe.</li>
+                    </ul>
+                  </div>
+                </div>
+              </Disclosure>
 
               <div>
                 <p className="text-[11px] font-bold text-slate-700 mb-1.5">Não enviar para contatos com status</p>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { decryptData, encryptData } from '@/lib/crypto';
-import { verifyMetaPhoneOwnership } from '@/lib/metaClient';
+import { subscribeAppToWaba, verifyMetaPhoneOwnership } from '@/lib/metaClient';
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
 import { generateSecureToken } from '@/lib/email';
 
@@ -174,6 +174,17 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', tenantId);
       if (tenantError) throw tenantError;
+
+      // Igual ao login da Meta: inscreve o app do token na conta WhatsApp, senão
+      // as mensagens dos clientes não chegam na Domu. Falha não desfaz o salvamento.
+      const subscribed = await subscribeAppToWaba(wabaId.trim(), plainToken);
+      if (!subscribed.ok) {
+        return NextResponse.json({
+          success: true,
+          message: 'Configurações salvas.',
+          warning: `Credenciais salvas, mas a Meta não confirmou o recebimento de mensagens: ${subscribed.error}`,
+        });
+      }
     }
 
     return NextResponse.json({
