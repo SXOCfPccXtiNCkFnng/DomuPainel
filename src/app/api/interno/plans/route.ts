@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/platformAdmin';
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { normalizePlanTier, PlanTier } from '@/lib/planLimits';
+import { getPlanDisplayName, normalizePlanTier, PlanTier } from '@/lib/planLimits';
 import { getLivePlanPrices } from '@/lib/planPricing';
 import { adjustSubscriptionPrice } from '@/lib/billing';
 import { isBillingMockEnabled, asaasUpdateSubscriptionValue } from '@/lib/asaasClient';
-import { sendEmail, appBaseUrl } from '@/lib/email';
+import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
 import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
 import { logOpsAlert } from '@/lib/opsAlert';
@@ -183,11 +183,11 @@ export async function PATCH(req: NextRequest) {
             await sendEmail({
               to,
               subject: `Aviso de reajuste — seu plano Domu Tech vai mudar em ${expiresAt}`,
-              text: `Olá!\n\nO plano ${tier} vai passar de ${oldLabel} para ${newLabel}/mês a partir de ${expiresAt}. Isso dá o aviso prévio de ${NOTICE_DAYS} dias previsto nos nossos Termos de Uso. Se quiser cancelar antes disso, não haverá cobrança do novo valor.\n\nEquipe Domu Tech`,
+              text: `Olá!\n\nO plano ${getPlanDisplayName(tier)} vai passar de ${oldLabel} para ${newLabel}/mês a partir de ${expiresAt}. Isso dá o aviso prévio de ${NOTICE_DAYS} dias previsto nos nossos Termos de Uso. Se quiser cancelar antes disso, não haverá cobrança do novo valor.\n\nEquipe Domu Tech${contactFooterText()}`,
               html: brandedEmailHtml({
                 heading: 'Aviso de reajuste no seu plano',
                 bodyHtml: `<p style="margin:0 0 12px;">Olá!</p>
-                  <p style="margin:0 0 12px;">O plano <strong>${escapeHtml(tier)}</strong> vai passar de <strong>${oldLabel}</strong> para <strong>${newLabel}/mês</strong> a partir de <strong>${expiresAt}</strong>.</p>
+                  <p style="margin:0 0 12px;">O plano <strong>${escapeHtml(getPlanDisplayName(tier))}</strong> vai passar de <strong>${oldLabel}</strong> para <strong>${newLabel}/mês</strong> a partir de <strong>${expiresAt}</strong>.</p>
                   <p style="margin:0 0 12px;">Isso respeita o aviso prévio de ${NOTICE_DAYS} dias previsto nos nossos Termos de Uso. Se preferir cancelar antes dessa data, não haverá cobrança do novo valor.</p>`,
                 ctaLabel: 'Gerenciar assinatura',
                 ctaUrl: `${base}/assinatura`,

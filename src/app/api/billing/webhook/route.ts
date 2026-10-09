@@ -14,7 +14,7 @@ import {
   getAsaasWebhookToken,
   isBillingMockEnabled,
 } from '@/lib/asaasClient';
-import { getPlanMonthlyLimit, normalizePlanTier } from '@/lib/planLimits';
+import { getPlanDisplayName, getPlanMonthlyLimit, normalizePlanTier } from '@/lib/planLimits';
 import { isProduction } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
 import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
@@ -60,19 +60,22 @@ async function sendPixRenewalEmail(input: {
       style: 'currency',
       currency: 'BRL',
     });
-    const qrImage = pix.encodedImage ? `data:image/png;base64,${pix.encodedImage}` : null;
+    // Sem QR em imagem: o Gmail (e outros) bloqueiam imagem "data:" base64 e ela
+    // chegava quebrada. O copia e cola funciona em qualquer app de banco; o QR
+    // fica no painel.
+    const planName = getPlanDisplayName(input.planTier);
 
     const subject = `Pix da sua renovação Domu Tech (${priceLabel})`;
-    const text = `Olá!\n\nSua assinatura do plano ${input.planTier} (${priceLabel}/mês) da empresa ${
+    const text = `Olá!\n\nSua assinatura do plano ${planName} (${priceLabel}/mês) da empresa ${
       tenant?.name || ''
     } renovou e já tem um Pix aguardando pagamento.\n\nPix copia e cola:\n${pix.payload}\n\nOu pague direto no painel: ${billingUrl}\n\nEquipe Domu Tech${contactFooterText()}`;
     const html = brandedEmailHtml({
       heading: 'Pix da sua renovação está pronto',
       bodyHtml: `<p style="margin:0 0 12px;">Olá!</p>
-        <p style="margin:0 0 12px;">Sua assinatura do plano <strong>${escapeHtml(input.planTier)}</strong> (${priceLabel}/mês) da empresa <strong>${escapeHtml(
+        <p style="margin:0 0 12px;">Sua assinatura do plano <strong>${escapeHtml(planName)}</strong> (${priceLabel}/mês) da empresa <strong>${escapeHtml(
           tenant?.name || ''
         )}</strong> renovou e já tem um Pix aguardando pagamento.</p>
-        ${qrImage ? `<div style="text-align:center;margin:20px 0;"><img src="${qrImage}" alt="QR Code Pix" width="220" style="display:inline-block;border:1px solid #E2E8F0;border-radius:12px;padding:8px;" /></div>` : ''}
+        <p style="margin:0 0 12px;">Copie o código abaixo e cole na opção <strong>Pix copia e cola</strong> do app do seu banco. Se preferir ler o QR Code, ele está no painel.</p>
         <p style="margin:0 0 8px;font-weight:700;color:#0B132B;">Pix copia e cola:</p>
         <p style="margin:0;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;font-family:monospace;font-size:12px;word-break:break-all;color:#334155;">${escapeHtml(pix.payload)}</p>`,
       ctaLabel: 'Pagar no painel',

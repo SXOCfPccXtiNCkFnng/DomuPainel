@@ -3,6 +3,7 @@ import { getPlatformAdminEmails } from '@/lib/platformAdmin';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { sendEmail, appBaseUrl } from '@/lib/email';
 import { logger } from '@/lib/logger';
+import { escapeHtml } from '@/lib/emailTemplates';
 
 export type OpsAlert = {
   id: string;
@@ -29,9 +30,9 @@ async function notifyPlatformAdmins(input: { source: string; message: string; te
   const text = `Origem: ${input.source}\n${
     input.tenantId ? `Tenant: ${input.tenantId}\n` : ''
   }\nMensagem: ${input.message}\n\nVeja detalhes: ${dashboardUrl}`;
-  const html = `<p><strong>Origem:</strong> ${input.source}</p>${
-    input.tenantId ? `<p><strong>Tenant:</strong> ${input.tenantId}</p>` : ''
-  }<p><strong>Mensagem:</strong> ${input.message}</p><p><a href="${dashboardUrl}">Ver painel /interno</a></p>`;
+  const html = `<p><strong>Origem:</strong> ${escapeHtml(input.source)}</p>${
+    input.tenantId ? `<p><strong>Tenant:</strong> ${escapeHtml(input.tenantId)}</p>` : ''
+  }<p><strong>Mensagem:</strong> ${escapeHtml(input.message)}</p><p><a href="${dashboardUrl}">Ver painel /interno</a></p>`;
 
   try {
     await Promise.all(admins.map((to) => sendEmail({ to, subject, text, html })));

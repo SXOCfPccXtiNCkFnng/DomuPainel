@@ -38,6 +38,17 @@ export function normalizePlanTier(planTier: string | null | undefined): PlanTier
   return 'STARTER';
 }
 
+const PLAN_DISPLAY_NAMES: Record<PlanTier, string> = {
+  STARTER: 'Starter',
+  PRO: 'Pro',
+  ENTERPRISE: 'Enterprise',
+};
+
+/** Nome do plano para mostrar ao cliente (e-mails, avisos) — nunca o código "PRO". */
+export function getPlanDisplayName(planTier: string | null | undefined): string {
+  return PLAN_DISPLAY_NAMES[normalizePlanTier(planTier)];
+}
+
 export function getPlanMonthlyLimit(planTier: string | null | undefined): number {
   return PLAN_DISPATCH_LIMITS[normalizePlanTier(planTier)].monthly;
 }
