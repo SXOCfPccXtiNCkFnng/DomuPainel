@@ -187,8 +187,11 @@ async function resolveTenantIdFromMetadata(value: any): Promise<string | null> {
  * importação manual. O tenant vem só do phone_number_id (cada número conectado
  * pertence a uma única conta), então o contato nunca cai em outra conta.
  */
+/** Nomes genéricos que podem ser trocados pelo nome do perfil do WhatsApp. */
+const PLACEHOLDER_LEAD_NAMES = new Set(['', 'contato whatsapp', 'contato importado']);
+
 async function findOrCreateLead(tenantId: string, from: string, profileName: string | null) {
-  const select = 'id, tenant_id, status, opt_in';
+  const select = 'id, tenant_id, status, opt_in, name';
 
   const { data: leads } = await supabaseAdmin
     .from('leads')
@@ -196,7 +199,20 @@ async function findOrCreateLead(tenantId: string, from: string, profileName: str
     .eq('tenant_id', tenantId)
     .in('phone', phoneLookupVariants(from))
     .limit(1);
-  if (leads?.[0]) return leads[0];
+  const existing = leads?.[0];
+  if (existing) {
+    // Criado sem nome (ex.: a primeira mensagem foi a empresa respondendo pelo
+    // celular, que não traz o perfil): assim que o contato escreve, ganha o nome.
+    const cleanProfile = profileName?.trim().slice(0, 255);
+    if (cleanProfile && PLACEHOLDER_LEAD_NAMES.has(String(existing.name || '').trim().toLowerCase())) {
+      await supabaseAdmin
+        .from('leads')
+        .update({ name: cleanProfile, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .eq('tenant_id', tenantId);
+    }
+    return existing;
+  }
 
   // Grava o número como a Meta mandou: é o wa_id que recebe a resposta.
   // Upsert ignorando duplicado porque duas mensagens do mesmo número novo
