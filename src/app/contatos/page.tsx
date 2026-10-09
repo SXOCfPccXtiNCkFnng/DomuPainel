@@ -28,6 +28,7 @@ import {
   LEAD_STATUS_OPTIONS,
   formatBudget,
 } from '@/lib/contactTags';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 interface LeadContact {
   id: string;
@@ -113,9 +114,11 @@ export default function ContatosPage() {
   const [editError, setEditError] = useState('');
   const editBackdropProps = useBackdropClose(() => setEditing(null));
 
-  const fetchContacts = async () => {
-    setIsLoading(true);
-    setError('');
+  const fetchContacts = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setIsLoading(true);
+      setError('');
+    }
     try {
       const tenantId = getAuthItem('domu_tenant_id') || '';
       const params = new URLSearchParams({ tenantId });
@@ -127,7 +130,7 @@ export default function ContatosPage() {
       const json = await res.json();
       if (json.success) {
         setContacts(json.leads || []);
-        setSelectedIds(new Set());
+        if (!opts?.silent) setSelectedIds(new Set());
       } else {
         setError(json.error || 'Não foi possível carregar os contatos.');
       }
@@ -143,6 +146,9 @@ export default function ContatosPage() {
     fetchContacts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterInterest, filterRegion, filterType, filterBudget]);
+
+  // Contato que chega pelo WhatsApp aparece sem recarregar a página.
+  useAutoRefresh(() => fetchContacts({ silent: true }));
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -304,7 +310,7 @@ export default function ContatosPage() {
             </div>
             <button
               type="button"
-              onClick={fetchContacts}
+              onClick={() => fetchContacts()}
               className="px-3 py-2 text-xs font-bold text-domu-blue hover:bg-blue-50 rounded-xl flex items-center gap-1.5"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />

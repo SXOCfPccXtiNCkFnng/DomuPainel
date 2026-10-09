@@ -25,6 +25,7 @@ import {
 import { getAuthItem } from '@/lib/authStorage';
 import FirstStepsChecklist from '@/components/dashboard/FirstStepsChecklist';
 import ComingSoonModal from '@/components/shared/ComingSoonModal';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function DashboardPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -137,6 +138,11 @@ export default function DashboardPage() {
 
   const welcomeMessage = SEGMENT_WELCOME[segment] || SEGMENT_WELCOME.geral;
   const dispatchOnly = isDispatchOnlySegment(segment);
+
+  // Números do painel atualizam sozinhos; o status da Meta só ao voltar para a
+  // aba (consulta direto a Meta, que tem limite de chamadas).
+  useAutoRefresh(fetchDashboardData);
+  useAutoRefresh(fetchMetaStatus, { intervalMs: null });
 
   return (
     <div className="space-y-5 w-full font-sans">

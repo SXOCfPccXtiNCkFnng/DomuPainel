@@ -8,6 +8,7 @@ import { getPageTitle, getSegmentFromStorage } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
 import { clearAuthSession, getAuthItem } from '@/lib/authStorage';
 import { redirectIfDispatchBlocked } from '@/lib/billingGuard';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -62,6 +63,22 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
     }
   };
 
+  // Consulta ao vivo na Graph API da Meta (não só "tem credencial salva") —
+  // reflete o status real do número, igual ao CoexistenceWidget.
+  const fetchMetaConnected = async () => {
+    try {
+      const res = await fetch('/api/whatsapp/stats');
+      const data = await res.json();
+      if (data.success) setMetaConnected(Boolean(data.stats?.isConnected));
+    } catch {
+      /* mantém o último status (ou esconde a pill) em caso de falha */
+    }
+  };
+
+  // Sino atualiza sozinho; status da Meta só ao voltar para a aba (limite de chamadas).
+  useAutoRefresh(fetchNotifications);
+  useAutoRefresh(fetchMetaConnected, { intervalMs: null });
+
   useEffect(() => {
     // Read real user data saved in localStorage
     const savedName = getAuthItem('domu_user_name');
@@ -74,18 +91,7 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
     setShowInterno(getAuthItem('domu_platform_ops') === 'true');
 
     fetchNotifications();
-    const poll = setInterval(fetchNotifications, 60000);
-
-    // Consulta ao vivo na Graph API da Meta (não só "tem credencial salva") —
-    // reflete o status real do número, igual ao CoexistenceWidget.
-    fetch('/api/whatsapp/stats')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) setMetaConnected(Boolean(data.stats?.isConnected));
-      })
-      .catch(() => {
-        /* mantém metaConnected null (esconde a pill) em caso de falha */
-      });
+    fetchMetaConnected();
 
     // Close dropdowns on outside click
     const handleClickOutside = (e: MouseEvent) => {
@@ -100,7 +106,6 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      clearInterval(poll);
     };
   }, []);
 

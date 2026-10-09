@@ -18,6 +18,7 @@ import CampaignWizardModal, {
 } from '@/components/disparos/CampaignWizardModal';
 import CampaignProgress from '@/components/disparos/CampaignProgress';
 import { getAuthItem } from '@/lib/authStorage';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function DisparosPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -34,9 +35,11 @@ export default function DisparosPage() {
     }
   }, []);
 
-  const fetchCampaigns = async () => {
-    setIsLoading(true);
-    setError('');
+  const fetchCampaigns = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setIsLoading(true);
+      setError('');
+    }
     try {
       const storedTenantId = getAuthItem('domu_tenant_id') || '';
       const res = await fetch(`/api/campaigns?tenantId=${storedTenantId}`);
@@ -53,6 +56,8 @@ export default function DisparosPage() {
       setIsLoading(false);
     }
   };
+
+  useAutoRefresh(() => fetchCampaigns({ silent: true }));
 
   const handleStartCampaign = async (payload: CampaignStartPayload) => {
     if (payload.campaignId) setActiveCampaignId(payload.campaignId);
@@ -146,7 +151,7 @@ export default function DisparosPage() {
             Histórico de Disparos Executados e Agendados
           </h3>
           <button
-            onClick={fetchCampaigns}
+            onClick={() => fetchCampaigns()}
             className="text-xs font-bold text-domu-blue hover:underline flex items-center gap-1"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Atualizar

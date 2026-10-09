@@ -14,6 +14,7 @@ import {
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 interface DataPoint {
   date: string;
@@ -49,9 +50,11 @@ export default function RelatoriosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
-  const fetchReports = async () => {
-    setIsLoading(true);
-    setError('');
+  const fetchReports = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setIsLoading(true);
+      setError('');
+    }
     try {
       const storedTenantId = localStorage.getItem('domu_tenant_id') || '';
       const res = await fetch(`/api/reports?tenantId=${storedTenantId}&period=${period}`);
@@ -68,6 +71,8 @@ export default function RelatoriosPage() {
       setIsLoading(false);
     }
   };
+
+  useAutoRefresh(() => fetchReports({ silent: true }));
 
   const chartData: DataPoint[] = reportsData?.series?.length
     ? reportsData.series
@@ -128,7 +133,7 @@ export default function RelatoriosPage() {
           </div>
 
           <button 
-            onClick={fetchReports}
+            onClick={() => fetchReports()}
             className="btn-domu-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />

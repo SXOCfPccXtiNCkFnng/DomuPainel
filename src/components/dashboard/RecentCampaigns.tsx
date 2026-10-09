@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Send, Eye, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 type CampaignRow = {
   id: string;
@@ -19,22 +20,25 @@ export default function RecentCampaigns() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch('/api/campaigns');
-        const json = await res.json();
-        if (json.success) {
-          setCampaigns((json.campaigns || []).slice(0, 5));
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const load = async () => {
+    try {
+      const res = await fetch('/api/campaigns');
+      const json = await res.json();
+      if (json.success) {
+        setCampaigns((json.campaigns || []).slice(0, 5));
       }
-    };
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     load();
   }, []);
+
+  useAutoRefresh(load);
 
   return (
     <div className="bg-white rounded-md border border-slate-200/80 p-5 shadow-sm space-y-4 w-full">

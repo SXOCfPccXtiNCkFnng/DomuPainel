@@ -13,6 +13,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 type Period = 'today' | '7d' | '30d' | '90d';
 
@@ -98,8 +99,8 @@ export default function OverviewStats({
     fetchMetrics();
   }, [period]);
 
-  const fetchMetrics = async () => {
-    setIsLoading(true);
+  const fetchMetrics = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true);
     try {
       const storedTenantId = getAuthItem('domu_tenant_id') || '';
       const res = await fetch(
@@ -116,6 +117,8 @@ export default function OverviewStats({
       setIsLoading(false);
     }
   };
+
+  useAutoRefresh(() => fetchMetrics({ silent: true }));
 
   const periods: { id: Period; label: string }[] = [
     { id: 'today', label: 'Hoje' },

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import WhatsAppPreview from '@/components/shared/WhatsAppPreview';
 import Disclosure from '@/components/shared/Disclosure';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { LEAD_STATUS_OPTIONS } from '@/lib/contactTags';
 import {
   CAMPAIGN_DELAY_OPTIONS,
@@ -305,34 +306,43 @@ export default function FollowUpPage() {
     setSaved(withSuggestions);
   };
 
-  const load = useCallback(async (period: number) => {
-    setIsLoading(true);
+  // silent: atualização automática — só números e lista; nunca mexe no
+  // formulário (não apaga o que a pessoa está editando) nem mostra erro/loading.
+  const load = useCallback(async (period: number, opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) setIsLoading(true);
     try {
       const res = await fetch(`/api/follow-up?days=${period}`);
       const json = await res.json();
       if (!json.success) {
-        setError(json.error || 'Não foi possível carregar o follow-up.');
+        if (!silent) setError(json.error || 'Não foi possível carregar o follow-up.');
         return;
       }
-      applySettings(json.settings);
-      setCampaignStatus(json.campaignMessageStatus || 'NONE');
-      setAiAvailable(Boolean(json.aiAvailable));
-      setCompanyName(json.companyName || '');
       setStats(json.stats);
       setRecent(json.recent || []);
+      setCampaignStatus(json.campaignMessageStatus || 'NONE');
+      if (silent) return;
+      applySettings(json.settings);
+      setAiAvailable(Boolean(json.aiAvailable));
+      setCompanyName(json.companyName || '');
       setCanEdit(Boolean(json.canEdit));
       setError(null);
     } catch {
-      setError('Não foi possível carregar o follow-up.');
+      if (!silent) setError('Não foi possível carregar o follow-up.');
     } finally {
-      setIsLoading(false);
-      setLoadedOnce(true);
+      if (!silent) {
+        setIsLoading(false);
+        setLoadedOnce(true);
+      }
     }
   }, []);
 
   useEffect(() => {
     load(days);
   }, [load, days]);
+
+  // Agendado → enviado → respondeu aparece sem recarregar a página.
+  useAutoRefresh(() => load(days, { silent: true }));
 
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
   const update = (patch: Partial<FollowUpSettings>) => {

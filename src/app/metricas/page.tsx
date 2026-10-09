@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { getAuthItem } from '@/lib/authStorage';
 import { getSegmentFromStorage, isDispatchOnlySegment } from '@/lib/segmentConfig';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 interface RoiMetrics {
   atingidos: number;
@@ -51,9 +52,11 @@ export default function MetricasRoiPage() {
 
   const [error, setError] = useState('');
 
-  const fetchMetrics = async () => {
-    setIsLoading(true);
-    setError('');
+  const fetchMetrics = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setIsLoading(true);
+      setError('');
+    }
     try {
       const tenantId = getAuthItem('domu_tenant_id') || '';
       const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
@@ -102,6 +105,8 @@ export default function MetricasRoiPage() {
   useEffect(() => {
     fetchMetrics();
   }, [period]);
+
+  useAutoRefresh(() => fetchMetrics({ silent: true }));
 
   const cards = isDispatchOnlySegment(getSegmentFromStorage())
     ? [
@@ -205,7 +210,7 @@ export default function MetricasRoiPage() {
           </div>
           <button
             type="button"
-            onClick={fetchMetrics}
+            onClick={() => fetchMetrics()}
             className="px-3 py-2 text-xs font-bold text-domu-blue hover:bg-blue-50 rounded-xl flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
