@@ -11,7 +11,7 @@ import {
   renderFollowUpText,
   validateFollowUpFields,
 } from '../followUpRules';
-import { checkContextByKeywords, type ConversationMessage } from '../followUpContext';
+import { checkContextByKeywords, describeBody, type ConversationMessage } from '../followUpContext';
 
 const window8to20 = { window_start_hour: 8, window_end_hour: 20, skip_weekends: false };
 // Horário de Brasília = UTC-3.
@@ -118,9 +118,8 @@ describe('checkContextByKeywords', () => {
     expect(v && v.ok && v.category).toBe('NEGOCIO_FECHADO');
   });
 
-  it('contato vai retornar barra', () => {
-    const v = checkContextByKeywords(conv(['INBOUND', 'Vou pensar e te falo amanhã'], ['OUTBOUND', 'Perfeito!']));
-    expect(v && v.ok && v.category).toBe('CONTATO_VAI_RETORNAR');
+  it('contato que vai retornar NÃO é barrado por palavras (vira lembrete; a IA decide o momento)', () => {
+    expect(checkContextByKeywords(conv(['INBOUND', 'Vou pensar e te falo amanhã'], ['OUTBOUND', 'Perfeito!']))).toBeNull();
   });
 
   it('empresa ficou de responder barra', () => {
@@ -183,5 +182,46 @@ describe('formatDelay', () => {
     expect(formatDelay(1)).toBe('1 hora');
     expect(formatDelay(24)).toBe('24 horas');
     expect(formatDelay(48)).toBe('2 dias');
+  });
+});
+
+describe('describeBody (mídia para a IA)', () => {
+  it('troca o marcador de mídia por uma descrição explícita', () => {
+    expect(describeBody('[audio]')).toBe('(enviou um áudio — conteúdo desconhecido)');
+    expect(describeBody('[image]')).toBe('(enviou uma foto — conteúdo desconhecido)');
+    expect(describeBody('[algo_novo]')).toBe('(enviou uma mídia — conteúdo desconhecido)');
+  });
+
+  it('texto normal passa igual', () => {
+    expect(describeBody('Qual o valor?')).toBe('Qual o valor?');
+  });
+});
+
+describe('limite por contato', () => {
+  const base = {
+    conversation_delay_hours: 24,
+    campaign_delay_hours: 48,
+    window_start_hour: 8,
+    window_end_hour: 20,
+  };
+
+  it('vem ligado em 24h por padrão', () => {
+    const r = validateFollowUpFields(base);
+    expect(r.ok && [r.fields.contact_limit_enabled, r.fields.contact_limit_hours]).toEqual([true, 24]);
+  });
+
+  it('pode ser desligado e aceita só as opções da tela', () => {
+    const off = validateFollowUpFields({ ...base, contact_limit_enabled: false, contact_limit_hours: 168 });
+    expect(off.ok && off.fields.contact_limit_enabled).toBe(false);
+    expect(validateFollowUpFields({ ...base, contact_limit_hours: 5 }).ok).toBe(false);
+  });
+});
+
+describe('filtro de palavras ignora perguntas', () => {
+  it('"Fechamos?" da empresa não conta como negócio fechado', () => {
+    const msgs: ConversationMessage[] = [
+      { direction: 'OUTBOUND', body: 'O valor fica R$ 1.250. Fechamos?', created_at: new Date(Date.now() - 60000).toISOString() },
+    ];
+    expect(checkContextByKeywords(msgs)).toBeNull();
   });
 });

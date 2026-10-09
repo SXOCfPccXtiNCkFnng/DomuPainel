@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import {
   createFollowUpTemplate,
   FOLLOW_UP_SETTINGS_COLUMNS,
+  selectFollowUpSettingsRow,
   refreshFollowUpTemplateStatus,
   settingsFromRow,
 } from '@/lib/followUp';
@@ -30,11 +31,7 @@ export async function GET(req: NextRequest) {
     const days = PERIODS.includes(requested) ? requested : 30;
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    const settingsRes = await supabaseAdmin
-      .from('follow_up_settings')
-      .select(FOLLOW_UP_SETTINGS_COLUMNS)
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
+    const settingsRes = await selectFollowUpSettingsRow(tenantId);
     if (settingsRes.error?.code === '42P01') {
       return NextResponse.json(
         { success: false, error: 'O follow-up ainda não foi ativado no banco de dados (migration pendente).' },
@@ -49,7 +46,7 @@ export async function GET(req: NextRequest) {
     );
 
     const [freshSettings, tenantRes, statsRes, recentRes] = await Promise.all([
-      supabaseAdmin.from('follow_up_settings').select(FOLLOW_UP_SETTINGS_COLUMNS).eq('tenant_id', tenantId).maybeSingle(),
+      selectFollowUpSettingsRow(tenantId),
       supabaseAdmin.from('tenants').select('name').eq('id', tenantId).maybeSingle(),
       supabaseAdmin
         .from('follow_ups')
@@ -111,11 +108,7 @@ export async function PUT(req: NextRequest) {
     const fields = validateFollowUpFields(body);
     if (!fields.ok) return NextResponse.json({ success: false, error: fields.error }, { status: 400 });
 
-    const { data: current } = await supabaseAdmin
-      .from('follow_up_settings')
-      .select(FOLLOW_UP_SETTINGS_COLUMNS)
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
+    const { data: current } = await selectFollowUpSettingsRow(tenantId);
     const saved = settingsFromRow(current as Record<string, unknown> | null);
 
     // Conversa: texto livre, sem aprovação.

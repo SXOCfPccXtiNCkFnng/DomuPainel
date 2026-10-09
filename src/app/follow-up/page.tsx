@@ -24,6 +24,7 @@ import Disclosure from '@/components/shared/Disclosure';
 import { LEAD_STATUS_OPTIONS } from '@/lib/contactTags';
 import {
   CAMPAIGN_DELAY_OPTIONS,
+  CONTACT_LIMIT_OPTIONS,
   CONVERSATION_DELAY_OPTIONS,
   DEFAULT_FOLLOW_UP_SETTINGS,
   FOLLOW_UP_MESSAGE_MAX,
@@ -67,8 +68,8 @@ const CONTEXT_PROTECTIONS = [
   'Despedida ("obrigado, até mais")',
   'Negócio fechado ou pago',
   'Visita/reunião já combinada',
-  'Contato disse que vai retornar',
   'Você ficou de responder ou enviar algo',
+  'Lembrete cedo demais ("te falo amanhã")',
   'Sem interesse ou pediu para parar',
   'Reclamação ou contato irritado',
   'Dúvida já resolvida',
@@ -699,6 +700,10 @@ export default function FollowUpPage() {
                   Antes de cada follow-up de conversa, a IA lê as últimas mensagens e só envia se a conversa estiver
                   mesmo esperando resposta.
                 </p>
+                <p className="text-[11px] text-slate-500">
+                  A IA entende só <strong>texto</strong>. Áudios, fotos e figurinhas ela vê apenas como &quot;mídia&quot;, sem
+                  saber o conteúdo — quando a mensagem decisiva for uma delas, na dúvida o follow-up não é enviado.
+                </p>
                 {!aiAvailable ? (
                   <p className="text-[11px] text-amber-700">
                     A IA não está configurada no servidor (GEMINI_API_KEY). Por segurança, com ela ligada os follow-ups de
@@ -729,6 +734,41 @@ export default function FollowUpPage() {
                   </div>
                 </div>
               </Disclosure>
+
+              <div className="p-3 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Limite por contato</p>
+                    <p className="text-[11px] text-slate-500">
+                      Evita que a mesma pessoa receba vários follow-ups seguidos numa conversa longa.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={form.contact_limit_enabled}
+                    onChange={() => update({ contact_limit_enabled: !form.contact_limit_enabled })}
+                    disabled={disabled}
+                    label="Limite de follow-up por contato"
+                  />
+                </div>
+                {form.contact_limit_enabled ? (
+                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                    <label htmlFor="fu-contact-limit">No máximo 1 follow-up por contato a cada</label>
+                    <select
+                      id="fu-contact-limit"
+                      value={form.contact_limit_hours}
+                      disabled={disabled}
+                      onChange={(e) => update({ contact_limit_hours: Number(e.target.value) })}
+                      className={`${inputClass} w-auto`}
+                    >
+                      {CONTACT_LIMIT_OPTIONS.map((h) => (
+                        <option key={h} value={h}>
+                          {h === 168 ? '7 dias' : formatDelay(h)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+              </div>
 
               <div>
                 <p className="text-[11px] font-bold text-slate-700 mb-1.5">Não enviar para contatos com status</p>

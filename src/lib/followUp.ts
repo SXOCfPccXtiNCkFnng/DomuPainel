@@ -53,11 +53,30 @@ const HOUR_MS = 60 * 60 * 1000;
 const REPLY_ATTRIBUTION_MS = 7 * 24 * HOUR_MS;
 /** Bloqueio passageiro (Meta/IA fora do ar, mensagem em análise): tenta de novo depois disso. */
 const RETRY_MS = 30 * 60 * 1000;
+/** Lembrete ainda cedo ("te falo amanhã"): confere de novo depois disso. */
+const REMINDER_RETRY_MS = 2 * 60 * 60 * 1000;
 /** Mensagens lidas para a checagem de contexto. */
 const CONTEXT_MESSAGES = 15;
 
-export const FOLLOW_UP_SETTINGS_COLUMNS =
+const BASE_SETTINGS_COLUMNS =
   'conversation_enabled, conversation_message, conversation_delay_hours, campaign_enabled, campaign_message, campaign_delay_hours, template_id, template_params, template_note, ai_check_enabled, excluded_statuses, window_start_hour, window_end_hour, skip_weekends';
+
+export const FOLLOW_UP_SETTINGS_COLUMNS = `${BASE_SETTINGS_COLUMNS}, contact_limit_enabled, contact_limit_hours`;
+
+/**
+ * Linha de configuração do tenant. Se a migration do limite por contato ainda
+ * não rodou (coluna inexistente, 42703), lê sem ela — o follow-up não pode
+ * parar de funcionar só porque o deploy chegou antes da migration.
+ */
+export async function selectFollowUpSettingsRow(tenantId: string) {
+  const full = await supabaseAdmin
+    .from('follow_up_settings')
+    .select(FOLLOW_UP_SETTINGS_COLUMNS)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (full.error?.code !== '42703') return full;
+  return supabaseAdmin.from('follow_up_settings').select(BASE_SETTINGS_COLUMNS).eq('tenant_id', tenantId).maybeSingle();
+}
 
 export function settingsFromRow(row: Record<string, unknown> | null | undefined): FollowUpSettings {
   const d = DEFAULT_FOLLOW_UP_SETTINGS;
@@ -73,6 +92,8 @@ export function settingsFromRow(row: Record<string, unknown> | null | undefined)
     template_params: Array.isArray(row.template_params) ? (row.template_params as TemplateParam[]) : [],
     template_note: (row.template_note as string | null) || null,
     ai_check_enabled: row.ai_check_enabled !== false,
+    contact_limit_enabled: row.contact_limit_enabled !== false,
+    contact_limit_hours: Number(row.contact_limit_hours) || d.contact_limit_hours,
     excluded_statuses: Array.isArray(row.excluded_statuses) ? (row.excluded_statuses as string[]) : d.excluded_statuses,
     window_start_hour: Number(row.window_start_hour ?? d.window_start_hour),
     window_end_hour: Number(row.window_end_hour ?? d.window_end_hour),
@@ -81,11 +102,7 @@ export function settingsFromRow(row: Record<string, unknown> | null | undefined)
 }
 
 export async function loadFollowUpSettings(tenantId: string): Promise<FollowUpSettings> {
-  const { data, error } = await supabaseAdmin
-    .from('follow_up_settings')
-    .select(FOLLOW_UP_SETTINGS_COLUMNS)
-    .eq('tenant_id', tenantId)
-    .maybeSingle();
+  const { data, error } = await selectFollowUpSettingsRow(tenantId);
   // Tabela ainda não migrada = follow-up desligado.
   if (error) return { ...DEFAULT_FOLLOW_UP_SETTINGS };
   return settingsFromRow(data as Record<string, unknown> | null);
@@ -421,8 +438,8 @@ export async function processDueFollowUps(options?: {
     result.skipped += 1;
   };
   /** Tenta de novo mais tarde — se ainda couber antes da janela fechar. */
-  const retryLater = async (row: DueRow, reason: string, windowDeadline: number | null) => {
-    const next = Date.now() + RETRY_MS;
+  const retryLater = async (row: DueRow, reason: string, windowDeadline: number | null, delayMs = RETRY_MS) => {
+    const next = Date.now() + delayMs;
     if (windowDeadline != null && next >= windowDeadline) {
       await skip(row, 'WINDOW_CLOSED', `${reason} A conversa do WhatsApp fecharia antes, então não enviamos.`);
       return;
@@ -531,6 +548,23 @@ export async function processDueFollowUps(options?: {
       await skip(row, 'STATUS', `O contato está com status "${lead.status}", que não recebe follow-up.`);
       continue;
     }
+    if (settings.contact_limit_enabled) {
+      const { count: recentSent } = await supabaseAdmin
+        .from('follow_ups')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', row.tenant_id)
+        .eq('lead_id', row.lead_id)
+        .eq('status', 'SENT')
+        .gte('sent_at', new Date(Date.now() - settings.contact_limit_hours * HOUR_MS).toISOString());
+      if ((recentSent || 0) > 0) {
+        await skip(
+          row,
+          'CONTACT_LIMIT',
+          `Este contato já recebeu um follow-up nas últimas ${settings.contact_limit_hours}h (limite por contato).`
+        );
+        continue;
+      }
+    }
 
     if (ctx.blocked) {
       if (ctx.blocked.transient) await retryLater(row, ctx.blocked.reason, windowDeadline);
@@ -563,6 +597,12 @@ export async function processDueFollowUps(options?: {
             continue;
           }
           if (!verdict.send) {
+            // "Te falo amanhã": ainda é cedo para o lembrete — confere de novo mais tarde
+            // (dentro da janela de 24h), em vez de descartar.
+            if (verdict.category === 'AINDA_CEDO_PARA_LEMBRAR') {
+              await retryLater(row, `Aguardando para lembrar: ${verdict.reason}`, windowDeadline, REMINDER_RETRY_MS);
+              continue;
+            }
             await skip(row, 'CONTEXT', `Evitado: ${verdict.reason}`);
             continue;
           }

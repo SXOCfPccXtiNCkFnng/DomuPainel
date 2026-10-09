@@ -22,6 +22,9 @@ export type FollowUpSettings = {
   template_note: string | null;
 
   ai_check_enabled: boolean;
+  /** No máximo 1 follow-up por contato a cada contact_limit_hours. */
+  contact_limit_enabled: boolean;
+  contact_limit_hours: number;
   excluded_statuses: string[];
   window_start_hour: number;
   window_end_hour: number;
@@ -39,6 +42,8 @@ export const DEFAULT_FOLLOW_UP_SETTINGS: FollowUpSettings = {
   template_params: [],
   template_note: null,
   ai_check_enabled: true,
+  contact_limit_enabled: true,
+  contact_limit_hours: 24,
   excluded_statuses: ['FECHADO'],
   window_start_hour: 8,
   window_end_hour: 20,
@@ -48,6 +53,7 @@ export const DEFAULT_FOLLOW_UP_SETTINGS: FollowUpSettings = {
 /** Conversa: no máximo até a janela fechar (o envio sai antes das 24h de qualquer jeito). */
 export const CONVERSATION_DELAY_OPTIONS = [1, 2, 4, 6, 12, 24] as const;
 export const CAMPAIGN_DELAY_OPTIONS = [12, 24, 48, 72] as const;
+export const CONTACT_LIMIT_OPTIONS = [24, 48, 72, 168] as const;
 
 /** A janela do WhatsApp dura 24h; o follow-up sai até 1h antes de fechar. */
 export const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -69,6 +75,7 @@ export type FollowUpSkipCode =
   | 'PAUSED'
   | 'STATUS'
   | 'NOT_WAITING'
+  | 'CONTACT_LIMIT'
   | 'OTHER';
 
 export const FOLLOW_UP_STATUS_LABELS: Record<FollowUpStatus, string> = {
@@ -208,6 +215,8 @@ export function validateFollowUpFields(input: Record<string, unknown>):
         | 'campaign_enabled'
         | 'campaign_delay_hours'
         | 'ai_check_enabled'
+        | 'contact_limit_enabled'
+        | 'contact_limit_hours'
         | 'excluded_statuses'
         | 'window_start_hour'
         | 'window_end_hour'
@@ -231,6 +240,10 @@ export function validateFollowUpFields(input: Record<string, unknown>):
   if (end - start < 2) {
     return { ok: false, error: 'Deixe pelo menos 2 horas de horário de envio.' };
   }
+  const limitHours = Number(input.contact_limit_hours ?? 24);
+  if (!(CONTACT_LIMIT_OPTIONS as readonly number[]).includes(limitHours)) {
+    return { ok: false, error: 'Escolha um intervalo válido para o limite por contato.' };
+  }
   const statuses = Array.isArray(input.excluded_statuses)
     ? input.excluded_statuses.map((s) => String(s).toUpperCase()).filter((s) => /^[A-Z_]{2,40}$/.test(s))
     : [];
@@ -242,6 +255,8 @@ export function validateFollowUpFields(input: Record<string, unknown>):
       campaign_enabled: Boolean(input.campaign_enabled),
       campaign_delay_hours: campDelay,
       ai_check_enabled: input.ai_check_enabled !== false,
+      contact_limit_enabled: input.contact_limit_enabled !== false,
+      contact_limit_hours: limitHours,
       excluded_statuses: [...new Set(statuses)].slice(0, 20),
       window_start_hour: start,
       window_end_hour: end,
