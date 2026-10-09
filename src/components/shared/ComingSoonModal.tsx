@@ -1,18 +1,16 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { X } from 'lucide-react';
 
-export default function PlanUpgradeModal({
+/** Aviso de recurso ainda em construção — vale para todos os planos. */
+export default function ComingSoonModal({
   open,
   title,
-  detail,
   onClose,
 }: {
   open: boolean;
   title: string;
-  detail: string;
   onClose: () => void;
 }) {
   if (!open) return null;
@@ -27,24 +25,20 @@ export default function PlanUpgradeModal({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-domu-blue">Plano Pro</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Em breve</p>
             <h3 className="text-base font-bold text-slate-900 mt-1">{title}</h3>
           </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700" aria-label="Fechar">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-sm text-slate-600 leading-relaxed">{detail}</p>
+        <p className="text-sm text-slate-600 leading-relaxed">
+          Estamos finalizando esse recurso e ele será liberado em breve. Enquanto isso, você já dispara
+          campanhas, importa contatos e acompanha entrega e resposta.
+        </p>
         <div className="flex flex-wrap gap-2">
-          <Link href="/assinatura" onClick={onClose} className="btn-domu-primary text-sm py-2.5 px-4">
-            Ver plano Pro
-          </Link>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 text-sm font-semibold text-slate-600 border border-slate-200"
-          >
-            Agora não
+          <button type="button" onClick={onClose} className="btn-domu-primary text-sm py-2.5 px-4">
+            Entendi
           </button>
         </div>
       </div>

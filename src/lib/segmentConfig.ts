@@ -99,7 +99,7 @@ export const PLATFORM_NAV: NavItemConfig[] = [
     id: 'imoveis',
     name: 'Imóveis',
     href: '/imoveis',
-    badge: 'Pro',
+    badge: 'Em breve',
     isComingSoon: true,
     segments: ['imobiliario'],
   },
@@ -107,7 +107,7 @@ export const PLATFORM_NAV: NavItemConfig[] = [
     id: 'atendimento',
     name: 'Leads e Respostas',
     href: '/atendimento',
-    badge: 'Pro',
+    badge: 'Em breve',
     isComingSoon: true,
   },
 ];

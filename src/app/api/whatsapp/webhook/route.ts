@@ -5,6 +5,7 @@ import { getMetaAppSecret, getMetaVerifyToken, isProduction } from '@/lib/envSec
 import { isOptOutMessage } from '@/lib/metaClient';
 import { logger } from '@/lib/logger';
 import { recountCampaignLogs } from '@/lib/campaignDispatch';
+import { phoneLookupVariants, toStoredPhone } from '@/lib/phone';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,30 @@ async function bumpCampaignCounter(
     .eq('id', campaignId);
 }
 
+const STATUS_RANK: Record<string, number> = { PENDING: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 9 };
+
+/** Status de mensagem avulsa (chat_messages OUTBOUND). Nunca regride: READ não volta a DELIVERED. */
+async function updateChatMessageStatus(
+  wamid: string,
+  mapped: 'SENT' | 'DELIVERED' | 'READ' | 'FAILED',
+  tenantId: string
+) {
+  const allowedPrev = Object.keys(STATUS_RANK).filter(
+    (s) => mapped === 'FAILED' || STATUS_RANK[s] < STATUS_RANK[mapped]
+  );
+  const { data: changed } = await supabaseAdmin
+    .from('chat_messages')
+    .update({ status: mapped })
+    .eq('tenant_id', tenantId)
+    .eq('wamid', wamid)
+    .eq('direction', 'OUTBOUND')
+    .in('status', allowedPrev)
+    .select('id');
+  if (!changed || changed.length === 0) {
+    logger.info('webhook.status_message_not_found', { wamid });
+  }
+}
+
 async function handleStatusUpdate(status: any, tenantId: string | null) {
   const wamid = status.id;
   const mapped = normalizeStatus(status.status);
@@ -84,7 +109,8 @@ async function handleStatusUpdate(status: any, tenantId: string | null) {
     .maybeSingle();
 
   if (!log) {
-    logger.info('webhook.campaign_log_not_found', { wamid });
+    // Não é de campanha: pode ser envio avulso, registrado no atendimento.
+    await updateChatMessageStatus(wamid, mapped, tenantId);
     return;
   }
 
@@ -103,8 +129,7 @@ async function handleStatusUpdate(status: any, tenantId: string | null) {
     patch.error_code = status.errors?.[0]?.code || null;
   }
 
-  const rank: Record<string, number> = { PENDING: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 9 };
-  if ((rank[mapped] || 0) < (rank[prev] || 0) && mapped !== 'FAILED') return;
+  if ((STATUS_RANK[mapped] || 0) < (STATUS_RANK[prev] || 0) && mapped !== 'FAILED') return;
 
   // Compare-and-set no status anterior: se a Meta reentregar o mesmo evento
   // em paralelo, só um processa e os contadores não contam em dobro.
@@ -154,7 +179,57 @@ async function resolveTenantIdFromMetadata(value: any): Promise<string | null> {
   return owners[0].tenant_id;
 }
 
-async function handleInboundMessage(message: any, tenantId: string | null, metadataPhone?: string) {
+/**
+ * Contato do próprio tenant para quem mandou a mensagem. Se o número ainda não
+ * está nos contatos, cria — a pessoa mandou "oi", já vira contato sem
+ * importação manual. O tenant vem só do phone_number_id (cada número conectado
+ * pertence a uma única conta), então o contato nunca cai em outra conta.
+ */
+async function findOrCreateLead(tenantId: string, from: string, profileName: string | null) {
+  const select = 'id, tenant_id, status, opt_in';
+
+  const { data: leads } = await supabaseAdmin
+    .from('leads')
+    .select(select)
+    .eq('tenant_id', tenantId)
+    .in('phone', phoneLookupVariants(from))
+    .limit(1);
+  if (leads?.[0]) return leads[0];
+
+  // Grava o número como a Meta mandou: é o wa_id que recebe a resposta.
+  // Upsert ignorando duplicado porque duas mensagens do mesmo número novo
+  // podem chegar juntas — a segunda só lê o contato criado pela primeira.
+  const phone = toStoredPhone(from);
+  const { error } = await supabaseAdmin.from('leads').upsert(
+    {
+      tenant_id: tenantId,
+      name: profileName?.trim().slice(0, 255) || 'Contato WhatsApp',
+      phone,
+      source: 'WHATSAPP',
+    },
+    { onConflict: 'tenant_id,phone', ignoreDuplicates: true }
+  );
+  if (error) {
+    logger.error('webhook.lead_auto_create_failed', { tenantId, message: error.message });
+    return null;
+  }
+
+  const { data: created } = await supabaseAdmin
+    .from('leads')
+    .select(select)
+    .eq('tenant_id', tenantId)
+    .eq('phone', phone)
+    .maybeSingle();
+  if (created) logger.info('webhook.lead_auto_created', { tenantId, leadId: created.id });
+  return created;
+}
+
+async function handleInboundMessage(
+  message: any,
+  tenantId: string | null,
+  profileName: string | null,
+  metadataPhone?: string
+) {
   const from = String(message.from || '').replace(/\D/g, '');
   if (!from) return;
 
@@ -169,37 +244,14 @@ async function handleInboundMessage(message: any, tenantId: string | null, metad
     message.interactive?.button_reply?.title ||
     `[${message.type || 'media'}]`;
 
-  const phones = [from];
-  if (from.startsWith('55') && from.length > 11) phones.push(from.slice(2));
-  else if (from.length <= 11) phones.push(`55${from}`);
+  const lead = await findOrCreateLead(tenantId, from, profileName);
+  if (!lead) return;
 
-  const { data: leads } = await supabaseAdmin
-      .from('leads')
-      .select('id, tenant_id, status, opt_in')
-      .eq('tenant_id', tenantId)
-      .in('phone', phones)
-      .limit(1);
-
-  const lead = leads?.[0];
-  if (!lead) {
-    logger.info('webhook.lead_not_found', { from, tenantId });
-    return;
-  }
-
-  // A Meta reentrega o webhook quando não recebe 200 a tempo: sem isso a
-  // mesma mensagem aparecia duplicada no atendimento.
-  if (message.id) {
-    const { data: existing } = await supabaseAdmin
-      .from('chat_messages')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('wamid', message.id)
-      .limit(1);
-    if (existing && existing.length > 0) return;
-  }
-
-  await supabaseAdmin.from('chat_messages').insert({
-    tenant_id: lead.tenant_id,
+  // A Meta reentrega o webhook quando não recebe 200 a tempo. O índice único
+  // (tenant_id, wamid) faz o banco recusar a cópia mesmo com as duas entregas
+  // chegando juntas; se nada foi inserido, a mensagem já tinha sido processada.
+  const row = {
+    tenant_id: tenantId,
     lead_id: lead.id,
     direction: 'INBOUND',
     sender_type: 'CUSTOMER',
@@ -207,7 +259,17 @@ async function handleInboundMessage(message: any, tenantId: string | null, metad
     body: bodyText,
     wamid: message.id || null,
     status: 'DELIVERED',
-  });
+  };
+  if (row.wamid) {
+    const { data: inserted, error } = await supabaseAdmin
+      .from('chat_messages')
+      .upsert(row, { onConflict: 'tenant_id,wamid', ignoreDuplicates: true })
+      .select('id');
+    if (error) throw error;
+    if (!inserted || inserted.length === 0) return;
+  } else {
+    await supabaseAdmin.from('chat_messages').insert(row);
+  }
 
   const optedOut = isOptOutMessage(bodyText);
   const nextStatus =
@@ -306,8 +368,15 @@ export async function POST(req: NextRequest) {
 
         if (value.messages) {
           const metaPhone = value.metadata?.display_phone_number;
+          // Nome do perfil do WhatsApp de quem mandou (usado ao criar o contato).
+          const profileNames = new Map<string, string>();
+          for (const c of value.contacts || []) {
+            const waId = String(c?.wa_id || '').replace(/\D/g, '');
+            if (waId && c?.profile?.name) profileNames.set(waId, String(c.profile.name));
+          }
           for (const message of value.messages) {
-            await handleInboundMessage(message, tenantId, metaPhone);
+            const from = String(message.from || '').replace(/\D/g, '');
+            await handleInboundMessage(message, tenantId, profileNames.get(from) || null, metaPhone);
           }
         }
       }

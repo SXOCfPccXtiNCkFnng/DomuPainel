@@ -3,21 +3,13 @@ import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { chunk } from '@/lib/batch';
+import { toStoredPhone } from '@/lib/phone';
 
 export const dynamic = 'force-dynamic';
 
 const LEADS_PAGE_SIZE = 1000;
 const MAX_LEADS_LISTED = 50_000;
 const MAX_IMPORT_BATCH = 10_000;
-
-function formatWhatsAppPhone(rawPhone: string): string {
-  if (!rawPhone) return '';
-  let digits = rawPhone.replace(/\D/g, '');
-  if (digits.length === 10 || digits.length === 11) {
-    digits = `55${digits}`;
-  }
-  return digits;
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -116,7 +108,7 @@ export async function POST(req: NextRequest) {
         const item: Record<string, unknown> = {
           tenant_id: tenantId,
           name: String(c.name || '').trim() || 'Contato Importado',
-          phone: formatWhatsAppPhone(String(c.phone || '')),
+          phone: toStoredPhone(String(c.phone || '')),
           updated_at: new Date().toISOString(),
         };
         if (c.status) item.status = c.status;

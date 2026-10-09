@@ -5,6 +5,33 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
+import { phoneLookupVariants } from '@/lib/phone';
+import { logger } from '@/lib/logger';
+
+/**
+ * Registra no atendimento o que foi enviado — antes só a resposta do cliente
+ * aparecia no histórico. A mensagem já saiu pela Meta: falha ao gravar não
+ * pode virar erro para o usuário (ele reenviaria), só log.
+ */
+async function recordOutbound(
+  tenantId: string,
+  leadId: string,
+  messageType: 'TEXT' | 'TEMPLATE',
+  body: string,
+  wamid?: string | null
+) {
+  const { error } = await supabaseAdmin.from('chat_messages').insert({
+    tenant_id: tenantId,
+    lead_id: leadId,
+    direction: 'OUTBOUND',
+    sender_type: 'AGENT',
+    message_type: messageType,
+    body,
+    wamid: wamid || null,
+    status: 'SENT',
+  });
+  if (error) logger.error('send.record_outbound_failed', { tenantId, leadId, message: error.message });
+}
 
 /**
  * Envio avulso para um contato do próprio tenant.
@@ -54,18 +81,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const phoneDigits = String(to).replace(/\D/g, '');
-    const phones = [phoneDigits];
-    if (phoneDigits.startsWith('55') && phoneDigits.length > 11) phones.push(phoneDigits.slice(2));
-    else if (phoneDigits.length <= 11) phones.push(`55${phoneDigits}`);
-
     // Sem .maybeSingle(): com 2 cadastros do mesmo número ele dá erro, `lead`
     // vira null e o opt-out era ignorado. Qualquer cadastro com opt-out bloqueia.
     const { data: leads, error: leadError } = await supabaseAdmin
       .from('leads')
       .select('id, opt_in')
       .eq('tenant_id', tenantId)
-      .in('phone', phones);
+      .in('phone', phoneLookupVariants(String(to)));
     if (leadError) throw leadError;
 
     if (!leads || leads.length === 0) {
@@ -115,6 +137,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(result, { status: result.status || 500 });
       }
 
+      await recordOutbound(tenantId, leads[0].id, 'TEMPLATE', `[template: ${templateName}]`, result.messageId);
+
       return NextResponse.json({
         success: true,
         message: 'Mensagem de template disparada com sucesso via Meta Cloud API!',
@@ -136,6 +160,8 @@ export async function POST(req: NextRequest) {
       if (!result.success) {
         return NextResponse.json(result, { status: result.status || 500 });
       }
+
+      await recordOutbound(tenantId, leads[0].id, 'TEXT', textBody, result.messageId);
 
       return NextResponse.json({
         success: true,

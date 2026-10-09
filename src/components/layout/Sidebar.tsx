@@ -13,7 +13,7 @@ import {
 } from '@/lib/segmentConfig';
 import { NavIcon, DomuShieldIcon } from '@/components/icons/DomuIcons';
 import { getAuthItem } from '@/lib/authStorage';
-import PlanUpgradeModal from '@/components/shared/PlanUpgradeModal';
+import ComingSoonModal from '@/components/shared/ComingSoonModal';
 
 interface SidebarProps {
   open: boolean;
@@ -24,7 +24,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [companyName, setCompanyName] = useState('DOMU Empresa');
   const [segment, setSegment] = useState<TenantSegment>('geral');
-  const [upgradeTitle, setUpgradeTitle] = useState<string | null>(null);
+  const [comingSoonTitle, setComingSoonTitle] = useState<string | null>(null);
 
   useEffect(() => {
     const savedCompany = getAuthItem('domu_company_name');
@@ -100,7 +100,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setUpgradeTitle(item.name)}
+                    onClick={() => setComingSoonTitle(item.name)}
                     className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-blue-50 hover:text-domu-blue text-left"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -108,7 +108,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                       <span className="truncate">{item.name}</span>
                     </div>
                     <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-blue-50 text-domu-blue border border-blue-100 shrink-0">
-                      {item.badge || 'Pro'}
+                      {item.badge || 'Em breve'}
                     </span>
                   </button>
                 );
@@ -175,11 +175,10 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </div>
         </div>
       </aside>
-      <PlanUpgradeModal
-        open={Boolean(upgradeTitle)}
-        title={upgradeTitle || ''}
-        detail="Esse recurso faz parte do plano Pro. No seu plano atual você dispara, importa contatos e acompanha entrega e resposta. No Pro entram imóveis, quem respondeu e o atendimento da equipe."
-        onClose={() => setUpgradeTitle(null)}
+      <ComingSoonModal
+        open={Boolean(comingSoonTitle)}
+        title={comingSoonTitle || ''}
+        onClose={() => setComingSoonTitle(null)}
       />
     </>
   );

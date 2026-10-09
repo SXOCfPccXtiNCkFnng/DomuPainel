@@ -24,7 +24,7 @@ import {
 } from '@/lib/segmentConfig';
 import { getAuthItem } from '@/lib/authStorage';
 import FirstStepsChecklist from '@/components/dashboard/FirstStepsChecklist';
-import PlanUpgradeModal from '@/components/shared/PlanUpgradeModal';
+import ComingSoonModal from '@/components/shared/ComingSoonModal';
 
 export default function DashboardPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const [contactCount, setContactCount] = useState(0);
   const [templateCount, setTemplateCount] = useState(0);
   const [campaignCount, setCampaignCount] = useState(0);
-  const [upgradeTitle, setUpgradeTitle] = useState<string | null>(null);
+  const [comingSoonTitle, setComingSoonTitle] = useState<string | null>(null);
   const [roiMetrics, setRoiMetrics] = useState([
     { label: 'Contatos atingidos', value: '0', hint: 'Entregas no período' },
     { label: 'Taxa de resposta', value: '0%', hint: 'Quem engajou' },
@@ -230,7 +230,7 @@ export default function DashboardPage() {
             </Link>
             <button
               type="button"
-              onClick={() => setUpgradeTitle('Leads e Respostas')}
+              onClick={() => setComingSoonTitle('Leads e Respostas')}
               className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center justify-between gap-2 text-left"
             >
               <span className="inline-flex items-center gap-2">
@@ -238,12 +238,12 @@ export default function DashboardPage() {
                 Ver quem respondeu
               </span>
               <span className="text-[10px] font-bold uppercase tracking-wide text-domu-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5">
-                Pro
+                Em breve
               </span>
             </button>
             <button
               type="button"
-              onClick={() => setUpgradeTitle('Imóveis')}
+              onClick={() => setComingSoonTitle('Imóveis')}
               className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center justify-between gap-2 text-left"
             >
               <span className="inline-flex items-center gap-2">
@@ -251,7 +251,7 @@ export default function DashboardPage() {
                 Cadastrar imóvel
               </span>
               <span className="text-[10px] font-bold uppercase tracking-wide text-domu-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5">
-                Pro
+                Em breve
               </span>
             </button>
             {dispatchOnly && (
@@ -360,11 +360,10 @@ export default function DashboardPage() {
         onClose={() => setIsWizardOpen(false)}
         onStartCampaign={handleStartCampaign}
       />
-      <PlanUpgradeModal
-        open={Boolean(upgradeTitle)}
-        title={upgradeTitle || ''}
-        detail="Esse recurso faz parte do plano Pro. No plano atual você já dispara campanhas, importa contatos e vê entrega e resposta. No Pro entram imóveis, quem respondeu e o atendimento da equipe."
-        onClose={() => setUpgradeTitle(null)}
+      <ComingSoonModal
+        open={Boolean(comingSoonTitle)}
+        title={comingSoonTitle || ''}
+        onClose={() => setComingSoonTitle(null)}
       />
     </div>
   );

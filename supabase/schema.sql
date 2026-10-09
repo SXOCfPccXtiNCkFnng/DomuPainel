@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS public.leads (
     opt_in BOOLEAN DEFAULT TRUE, -- Rastreamento de Opt-In Anti-Ban
     opt_in_updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_contact_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    source VARCHAR(30), -- 'WHATSAPP' = criado sozinho ao receber mensagem
     status VARCHAR(40) DEFAULT 'NOVO', -- 'NOVO', 'EM_ATENDIMENTO', 'VISITA_AGENDADA', 'PROPOSTA', 'FECHADO'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -253,6 +254,7 @@ CREATE INDEX IF NOT EXISTS idx_campaigns_tenant ON public.campaigns(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_logs_campaign ON public.campaign_logs(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_logs_wamid ON public.campaign_logs(wamid);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_lead ON public.chat_messages(lead_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_chat_messages_tenant_wamid ON public.chat_messages(tenant_id, wamid);
 CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON public.notifications(tenant_id);
 
 -- ==============================================================================
