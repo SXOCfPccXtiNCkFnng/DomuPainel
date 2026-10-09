@@ -345,9 +345,47 @@ export default function ConfiguracoesPage() {
                     ) : null}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500">
-                    Preencha as credenciais manualmente no formulário &ldquo;Credenciais da API&rdquo; abaixo.
-                  </p>
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <Phone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900">Número novo, só na plataforma</h4>
+                        <p className="text-xs text-slate-500">
+                          Adicione o número e confirme com o código que a Meta envia por SMS ou ligação.
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 leading-relaxed">
+                      Use um número que <strong>não</strong> esteja no app do WhatsApp (de preferência um chip novo).
+                      Depois de conectado, ele funciona só pela plataforma — o app do celular deixa de usar esse
+                      número.
+                    </p>
+                    <MetaConnectButton
+                      mode="DEDICATED"
+                      whatsappPhone={whatsappPhone}
+                      label="Conectar número dedicado"
+                      onConnected={(result: MetaConnectResult) => {
+                        if (result.whatsappPhone) {
+                          setWhatsappPhone(result.whatsappPhone);
+                          setAuthItem('domu_whatsapp_phone', result.whatsappPhone);
+                        }
+                        setWabaId(result.wabaId);
+                        setPhoneNumberId(result.phoneNumberId);
+                        setHasToken(true);
+                        setIsMetaConnected(true);
+                      }}
+                      className="btn-domu-primary text-sm py-3 px-6"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowManualCredentials((v) => !v)}
+                      className="block text-[11px] font-bold text-slate-500 hover:text-domu-blue"
+                    >
+                      {showManualCredentials ? 'Ocultar conexão por token' : 'Avançado: conectar com token da Meta'}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -471,7 +509,7 @@ export default function ConfiguracoesPage() {
             )}
 
             {/* Número dedicado: credenciais coladas à mão — único caso em que o formulário aparece. */}
-            {isMetaConnected === false && (connectionMode === 'DIRECT_API' || showManualCredentials) && (
+            {isMetaConnected === false && showManualCredentials && (
               <form
                 onSubmit={handleSave}
                 className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden"

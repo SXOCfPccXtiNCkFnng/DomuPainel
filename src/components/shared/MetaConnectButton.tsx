@@ -72,6 +72,7 @@ export function MetaConnectButton({
   onConnected,
   label = 'Conectar com Meta',
   className = 'btn-domu-primary text-sm py-3 justify-center disabled:opacity-50',
+  mode = 'COEXISTENCE',
 }: {
   whatsappPhone?: string;
   companyName?: string;
@@ -81,7 +82,11 @@ export function MetaConnectButton({
   onConnected: (result: MetaConnectResult) => void;
   label?: string;
   className?: string;
+  /** COEXISTENCE: número que já está no app do celular (QR code). DEDICATED:
+   * número novo só na API (código por SMS/ligação) — o app no celular não usa ele. */
+  mode?: 'COEXISTENCE' | 'DEDICATED';
 }) {
+  const isDedicated = mode === 'DEDICATED';
   const [fbSdkReady, setFbSdkReady] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -267,11 +272,14 @@ export function MetaConnectButton({
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        extras: {
-          setup: {},
-          featureType: 'whatsapp_business_app_onboarding',
-          sessionInfoVersion: '3',
-        },
+        // Sem featureType a Meta abre o fluxo padrão (adicionar número novo).
+        extras: isDedicated
+          ? { setup: {}, sessionInfoVersion: '3' }
+          : {
+              setup: {},
+              featureType: 'whatsapp_business_app_onboarding',
+              sessionInfoVersion: '3',
+            },
       }
     );
   };
@@ -297,7 +305,9 @@ export function MetaConnectButton({
     const code = response.authResponse?.code;
     if (!code) {
       setError(
-        'Conexão cancelada ou incompleta na Meta. No popup, escolha conectar o WhatsApp Business que já está no celular (coexistência) — não “criar número novo”.'
+        isDedicated
+          ? 'Conexão cancelada ou incompleta na Meta. No popup, adicione o número novo e confirme o código enviado por SMS ou ligação.'
+          : 'Conexão cancelada ou incompleta na Meta. No popup, escolha conectar o WhatsApp Business que já está no celular (coexistência) — não “criar número novo”.'
       );
       setIsConnecting(false);
       return;
@@ -419,7 +429,7 @@ export function MetaConnectButton({
                 <div className="flex items-center gap-2 text-xs font-semibold">
                   <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold inline-flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Conexão Oficial com Coexistência
+                    {isDedicated ? 'Conexão Oficial · Número dedicado' : 'Conexão Oficial com Coexistência'}
                   </span>
                 </div>
 
@@ -429,11 +439,20 @@ export function MetaConnectButton({
                   </div>
                 )}
 
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  No popup oficial da Meta, entre com a conta do seu negócio e selecione{' '}
-                  <strong>o WhatsApp Business que já está no seu celular</strong> para ativar a coexistência.
-                  Seu WhatsApp continuará funcionando no aparelho e no Portal Domu ao mesmo tempo.
-                </p>
+                {isDedicated ? (
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    No popup oficial da Meta, entre com a conta do seu negócio, escolha{' '}
+                    <strong>adicionar um novo número</strong> e confirme com o código que chega por SMS ou
+                    ligação. Esse número passa a funcionar <strong>só pela plataforma</strong> — não pelo app
+                    do WhatsApp no celular.
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    No popup oficial da Meta, entre com a conta do seu negócio e selecione{' '}
+                    <strong>o WhatsApp Business que já está no seu celular</strong> para ativar a coexistência.
+                    Seu WhatsApp continuará funcionando no aparelho e no Portal Domu ao mesmo tempo.
+                  </p>
+                )}
 
                 <button
                   type="button"
@@ -447,7 +466,7 @@ export function MetaConnectButton({
                       Conectando...
                     </>
                   ) : (
-                    'Conectar WhatsApp Business'
+                    isDedicated ? 'Conectar número dedicado' : 'Conectar WhatsApp Business'
                   )}
                 </button>
 
