@@ -559,7 +559,7 @@ export async function processDueFollowUps(options?: {
         if (settings.ai_check_enabled) {
           const verdict = await checkContextWithAI(messages, sentBody, ctx.companyName);
           if (!verdict.ok) {
-            await retryLater(row, 'Checagem de contexto indisponível no momento.', windowDeadline);
+            await retryLater(row, `Checagem de contexto indisponível: ${verdict.error}.`, windowDeadline);
             continue;
           }
           if (!verdict.send) {

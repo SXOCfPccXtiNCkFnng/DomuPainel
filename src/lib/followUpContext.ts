@@ -127,7 +127,7 @@ export async function checkContextWithAI(
   companyName: string
 ): Promise<ContextVerdict> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return { ok: false, error: 'GEMINI_API_KEY ausente.' };
+  if (!apiKey) return { ok: false, error: 'chave da IA (GEMINI_API_KEY) não configurada no servidor' };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
@@ -149,7 +149,18 @@ export async function checkContextWithAI(
         }),
       }
     );
-    if (!res.ok) return { ok: false, error: `Gemini respondeu ${res.status}.` };
+    if (!res.ok) {
+      const reason =
+        res.status === 429
+          ? 'cota da IA (Gemini) esgotada'
+          : res.status === 400 || res.status === 403
+            ? 'chave da IA (GEMINI_API_KEY) inválida'
+            : res.status === 404
+              ? 'modelo da IA não encontrado'
+              : `IA respondeu erro ${res.status}`;
+      logger.error('followup.ai_check_http_error', { status: res.status, model: GEMINI_MODEL });
+      return { ok: false, error: reason };
+    }
 
     const data = await res.json();
     const raw: string =
@@ -168,7 +179,8 @@ export async function checkContextWithAI(
     return { ok: true, send, category, reason, source: 'ai' };
   } catch (err) {
     logger.error('followup.ai_check_failed', { message: err instanceof Error ? err.message : String(err) });
-    return { ok: false, error: 'Falha na checagem de contexto.' };
+    const timedOut = err instanceof Error && err.name === 'AbortError';
+    return { ok: false, error: timedOut ? 'IA demorou demais para responder' : 'resposta da IA não pôde ser lida' };
   } finally {
     clearTimeout(timer);
   }
