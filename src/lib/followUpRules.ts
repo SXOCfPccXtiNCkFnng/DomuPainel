@@ -89,6 +89,16 @@ export const FOLLOW_UP_TOKENS = [
 
 export const FOLLOW_UP_MESSAGE_MAX = 1024;
 
+/** Mensagens sugeridas que já vêm preenchidas na tela (o cliente pode editar). */
+export const SUGGESTED_CONVERSATION_MESSAGE =
+  'Oi {{nome}}, tudo bem? Vi que você não respondeu minha última mensagem. Ficou com alguma dúvida? Estou à disposição para te ajudar!';
+export const SUGGESTED_CAMPAIGN_MESSAGE =
+  'Oi {{nome}}, tudo bem? Aqui é da {{empresa}}. Vi que você recebeu nossa mensagem. Posso te ajudar com alguma dúvida?';
+
+export function hasNameToken(message: string): boolean {
+  return /\{\{\s*nome\s*\}\}/i.test(message);
+}
+
 /** Nome dos templates criados pelo follow-up (ficam fora da tela de Templates). */
 export const FOLLOW_UP_TEMPLATE_PREFIX = 'domu_followup_';
 

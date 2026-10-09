@@ -29,8 +29,11 @@ import {
   FOLLOW_UP_STATUS_LABELS,
   FOLLOW_UP_TOKENS,
   formatDelay,
+  hasNameToken,
   parseFollowUpMessage,
   renderFollowUpText,
+  SUGGESTED_CAMPAIGN_MESSAGE,
+  SUGGESTED_CONVERSATION_MESSAGE,
   type FollowUpSettings,
   type FollowUpStatus,
 } from '@/lib/followUpRules';
@@ -247,10 +250,21 @@ function MessageEditor({
           {value.length}/{FOLLOW_UP_MESSAGE_MAX}
         </span>
       </div>
+      <p className="text-[11px] text-slate-500 leading-relaxed">
+        Para a mensagem chegar com o nome da pessoa, inclua <strong className="font-mono text-slate-700">{'{{nome}}'}</strong>{' '}
+        onde o nome deve aparecer (use o botão &quot;+ Nome do contato&quot;). Ex.: &quot;Oi {'{{nome}}'}, tudo bem?&quot; chega
+        como &quot;Oi Carlos, tudo bem?&quot;.
+      </p>
       {error ? (
         <p className="text-[11px] text-amber-700 flex items-start gap-1.5">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
           {error}
+        </p>
+      ) : value.trim() && !hasNameToken(value) ? (
+        <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          Sua mensagem está sem {'{{nome}}'}, então vai chegar sem o nome do contato. Mensagens com o nome costumam ter mais
+          resposta.
         </p>
       ) : null}
     </div>
@@ -275,9 +289,15 @@ export default function FollowUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Sem mensagem salva ainda: já vem uma sugestão pronta para o cliente só ajustar.
   const applySettings = (settings: FollowUpSettings) => {
-    setForm(settings);
-    setSaved(settings);
+    const withSuggestions = {
+      ...settings,
+      conversation_message: settings.conversation_message || SUGGESTED_CONVERSATION_MESSAGE,
+      campaign_message: settings.campaign_message || SUGGESTED_CAMPAIGN_MESSAGE,
+    };
+    setForm(withSuggestions);
+    setSaved(withSuggestions);
   };
 
   const load = useCallback(async (period: number) => {

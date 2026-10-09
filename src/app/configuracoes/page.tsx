@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Check,
   CreditCard,
+  Loader2,
+  Unplug,
 } from 'lucide-react';
 import CoexistenceWidget from '@/components/dashboard/CoexistenceWidget';
 import TeamSettingsPanel from '@/components/configuracoes/TeamSettingsPanel';
@@ -39,6 +41,10 @@ export default function ConfiguracoesPage() {
   const [activeSection, setActiveSection] = useState<'profile' | 'meta' | 'team'>('profile');
   const [isMetaConnected, setIsMetaConnected] = useState<boolean | null>(null);
   const [connectionMode, setConnectionMode] = useState<'COEXISTENCE' | 'DIRECT_API'>('COEXISTENCE');
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [disconnectError, setDisconnectError] = useState('');
+  const [statusWidgetKey, setStatusWidgetKey] = useState(0);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -106,6 +112,33 @@ export default function ConfiguracoesPage() {
       setErrorMsg('Erro de conexão ao salvar.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    setDisconnectError('');
+    try {
+      const res = await fetch('/api/settings/whatsapp', { method: 'DELETE' });
+      const json = await res.json().catch(() => ({}));
+      if (!json.success) {
+        setDisconnectError(json.error || 'Não foi possível desconectar.');
+        return;
+      }
+      setAuthItem('domu_whatsapp_phone', '');
+      setWhatsappPhone('');
+      setPhoneNumberId('');
+      setWabaId('');
+      setAccessToken('');
+      setHasToken(false);
+      setConfirmDisconnect(false);
+      setIsMetaConnected(false);
+      // Remonta o quadro de status para ele buscar a situação nova.
+      setStatusWidgetKey((k) => k + 1);
+    } catch {
+      setDisconnectError('Erro de conexão ao desconectar.');
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -211,7 +244,7 @@ export default function ConfiguracoesPage() {
             </div>
 
             {/* Coexistence widget (só renderiza quando conectado) */}
-            <CoexistenceWidget onStatusChange={setIsMetaConnected} />
+            <CoexistenceWidget key={statusWidgetKey} onStatusChange={setIsMetaConnected} />
 
             {isMetaConnected === false && (
               <div className="space-y-5">
@@ -294,6 +327,69 @@ export default function ConfiguracoesPage() {
                   <p className="text-xs text-slate-500">
                     Preencha as credenciais manualmente no formulário &ldquo;Credenciais da API&rdquo; abaixo.
                   </p>
+                )}
+              </div>
+            )}
+
+            {/* Já conectado: desconectar libera o fluxo de conexão (trocar de número,
+                renovar acesso ou voltar a receber mensagens). */}
+            {isMetaConnected && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+                      <Unplug className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">Desconectar WhatsApp</h4>
+                      <p className="text-xs text-slate-500 leading-relaxed max-w-xl">
+                        Para trocar de número ou conectar de novo (por exemplo, se as mensagens dos clientes pararam de
+                        chegar). Seus contatos, campanhas e configurações continuam salvos.
+                      </p>
+                    </div>
+                  </div>
+                  {!confirmDisconnect && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDisconnect(true)}
+                      className="px-4 py-2.5 text-xs font-bold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 shrink-0"
+                    >
+                      Desconectar
+                    </button>
+                  )}
+                </div>
+
+                {confirmDisconnect && (
+                  <div className="p-4 bg-red-50 border border-red-100 rounded-xl space-y-3">
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      <strong>Tem certeza?</strong> Até você conectar de novo, a plataforma não envia campanhas
+                      (inclusive as agendadas), follow-ups nem mensagens, e não recebe as respostas dos clientes. O app
+                      no seu celular continua funcionando normalmente.
+                    </p>
+                    {disconnectError ? <p className="text-xs text-red-600">{disconnectError}</p> : null}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDisconnect}
+                        disabled={isDisconnecting}
+                        className="px-4 py-2 text-xs font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+                      >
+                        {isDisconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Sim, desconectar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmDisconnect(false);
+                          setDisconnectError('');
+                        }}
+                        disabled={isDisconnecting}
+                        className="px-4 py-2 text-xs font-bold text-slate-600 border border-slate-200 bg-white rounded-xl"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

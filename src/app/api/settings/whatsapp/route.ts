@@ -185,3 +185,41 @@ export async function POST(req: NextRequest) {
     return internalErrorResponse('api.settings.whatsapp', error);
   }
 }
+
+/**
+ * Desconecta o WhatsApp da conta (só administrador). Apaga as credenciais
+ * só na Domu, de propósito sem chamar a Meta: cancelar a inscrição lá com o
+ * token salvo tiraria do ar o app DONO do token, que pode ser outro sistema
+ * do cliente usando o mesmo número. Contatos, campanhas e histórico ficam.
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = await requireAdmin(req);
+    if ('error' in auth) return auth.error;
+    const tenantId = auth.session.tenantId;
+    const nowIso = new Date().toISOString();
+
+    const { error: credError } = await supabaseAdmin
+      .from('tenant_credentials')
+      .delete()
+      .eq('tenant_id', tenantId);
+    if (credError) throw credError;
+
+    const { error: tenantError } = await supabaseAdmin
+      .from('tenants')
+      .update({ whatsapp_number: null, coexistence_status: 'DISCONNECTED', updated_at: nowIso })
+      .eq('id', tenantId);
+    if (tenantError) throw tenantError;
+
+    // Sem número conectado nada sai: o que estava agendado não fica preso na fila.
+    await supabaseAdmin
+      .from('follow_ups')
+      .update({ status: 'CANCELLED', error_message: 'WhatsApp desconectado.', updated_at: nowIso })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'PENDING');
+
+    return NextResponse.json({ success: true, message: 'WhatsApp desconectado.' });
+  } catch (error: unknown) {
+    return internalErrorResponse('api.settings.whatsapp.delete', error);
+  }
+}
