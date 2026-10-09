@@ -18,6 +18,7 @@ const PUBLIC_API_PREFIXES = [
   '/api/auth/accept-invite',
   '/api/whatsapp/webhook',
   '/api/campaigns/run-due',
+  '/api/follow-up/run-due',
   '/api/billing/webhook',
   '/api/billing/expiry-check',
   '/api/billing/apply-price-changes',

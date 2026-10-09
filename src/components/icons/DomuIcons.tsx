@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, Settings } from 'lucide-react';
+import { Repeat, Send, Settings } from 'lucide-react';
 import { NavItemId } from '@/lib/segmentConfig';
 import { TenantSegment } from '@/types';
 
@@ -44,6 +44,17 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
         aria-hidden
       >
         <Send size={16} color={lucideColor} strokeWidth={1.75} />
+      </span>
+    );
+  }
+
+  if (id === 'followup') {
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 ${className || ''}`}
+        aria-hidden
+      >
+        <Repeat size={16} color={lucideColor} strokeWidth={1.75} />
       </span>
     );
   }

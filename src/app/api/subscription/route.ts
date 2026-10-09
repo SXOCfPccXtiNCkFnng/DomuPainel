@@ -5,15 +5,9 @@ import { getPlanMonthlyLimit, PLAN_DISPATCH_LIMITS, PlanTier } from '@/lib/planL
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
 import { syncTenantSubscriptionFromAsaas } from '@/lib/billing';
 import { getLivePlanPrice } from '@/lib/planPricing';
+import { countDispatchesSince, startOfUtcMonthIso } from '@/lib/dispatchUsage';
 
 export const dynamic = 'force-dynamic';
-
-function startOfUtcMonthIso(): string {
-  const d = new Date();
-  d.setUTCDate(1);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString();
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,16 +34,7 @@ export async function GET(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    const { data: camps } = await supabaseAdmin
-      .from('campaigns')
-      .select('sent_count')
-      .eq('tenant_id', tenantId)
-      .gte('created_at', startOfUtcMonthIso());
-
-    const dispatchesUsed = (camps || []).reduce(
-      (sum, row: { sent_count?: number | null }) => sum + Number(row.sent_count || 0),
-      0
-    );
+    const dispatchesUsed = await countDispatchesSince(tenantId, startOfUtcMonthIso());
 
     const { count: usersCount } = await supabaseAdmin
       .from('users')

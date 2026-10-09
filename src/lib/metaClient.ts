@@ -516,3 +516,73 @@ export async function fetchMetaMessageTemplates(tenantId?: string): Promise<{
     };
   }
 }
+
+/** Erro da Meta traduzido para algo que o cliente entende e consegue resolver. */
+export function formatMetaError(err: unknown): string {
+  if (!err) return 'Falha no envio via Meta Cloud API.';
+  let raw = '';
+  if (typeof err === 'string') raw = err;
+  else if (typeof err === 'object' && err !== null && 'message' in err) {
+    raw = String((err as { message: unknown }).message);
+  } else {
+    try {
+      raw = JSON.stringify(err);
+    } catch {
+      raw = 'Falha no envio via Meta Cloud API.';
+    }
+  }
+
+  const lower = raw.toLowerCase();
+  if (lower.includes('131058') || lower.includes('public test numbers')) {
+    return 'Os modelos de exemplo da Meta (como "hello_world" e "jaspers_market_*") possuem uma trava da Meta e só podem ser enviados pelo número de testes fictício da Meta. Como sua conta conectou um número real (+55...), a Meta exige o envio através de um modelo próprio aprovado da sua empresa. Acesse o menu Templates para cadastrar e aprovar seu modelo.';
+  }
+  if (lower.includes('132001') || lower.includes('does not exist in the translation')) {
+    return 'Template não encontrado ou não aprovado na sua conta da Meta (WABA). Acesse "Templates" para criar e aguardar aprovação oficial da Meta antes de disparar.';
+  }
+  if (lower.includes('131030') || lower.includes('not in allowed list')) {
+    return 'O telefone de destino não está na lista de números de teste autorizados na sua conta de desenvolvedor da Meta.';
+  }
+  if (lower.includes('131047') || lower.includes('24 hours')) {
+    return 'Janela de 24 horas encerrada. Para iniciar uma nova conversa comercial, é necessário usar um template oficial aprovado pela Meta.';
+  }
+  if (lower.includes('131026') || lower.includes('undeliverable')) {
+    return 'Número de telefone inválido ou sem conta do WhatsApp ativa.';
+  }
+  if (lower.includes('130429') || lower.includes('rate limit')) {
+    return 'Limite temporário de requisições atingido na Meta. Aguarde alguns minutos e tente novamente.';
+  }
+  if (lower.includes('190') || lower.includes('session') || lower.includes('expired') || lower.includes('access token')) {
+    return 'As credenciais de acesso da Meta expiraram. Reconecte seu WhatsApp em Configurações.';
+  }
+  return raw;
+}
+
+/**
+ * Status de UM template na Meta (aprovação do follow-up). Consulta direto pelo
+ * id — a listagem paginada pode não trazer o template recém-criado.
+ */
+export async function fetchMetaTemplateStatus(
+  tenantId: string,
+  metaTemplateId: string
+): Promise<{ ok: true; status: 'APPROVED' | 'PENDING' | 'REJECTED'; reason: string | null } | { ok: false; error: string }> {
+  let creds: MetaCredentials;
+  try {
+    creds = await resolveMetaCredentials(tenantId);
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'WhatsApp não conectado.' };
+  }
+
+  try {
+    const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${encodeURIComponent(metaTemplateId)}?fields=status,rejected_reason`;
+    const response = await metaFetch(url, { headers: { Authorization: `Bearer ${creds.accessToken}` } });
+    const data = await response.json();
+    if (!response.ok) return { ok: false, error: data?.error?.message || 'Falha ao consultar o template na Meta.' };
+
+    const raw = String(data.status || 'PENDING').toUpperCase();
+    const status = raw === 'APPROVED' || raw === 'ACTIVE' ? 'APPROVED' : raw === 'REJECTED' || raw === 'DISABLED' ? 'REJECTED' : 'PENDING';
+    const reason = data.rejected_reason && data.rejected_reason !== 'NONE' ? String(data.rejected_reason) : null;
+    return { ok: true, status, reason };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Erro de conexão com a Meta.' };
+  }
+}

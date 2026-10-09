@@ -71,7 +71,15 @@ export async function assertMetaDispatchAllowed(
         .in('status', ['PENDING', 'SENDING']);
       ownQueued = queued || 0;
     }
-    const used = Math.max(0, (count || 0) - ownQueued);
+    // Follow-ups automáticos também abrem conversa e gastam a mesma cota.
+    const followUps = await supabaseAdmin
+      .from('follow_ups')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'SENT')
+      .gte('sent_at', since);
+    const followUpsSent = followUps.error ? 0 : followUps.count || 0;
+    const used = Math.max(0, (count || 0) - ownQueued) + followUpsSent;
     const remaining = Math.max(0, tierLimit - used);
     if (batchSize > remaining) {
       return {

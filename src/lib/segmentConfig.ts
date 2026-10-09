@@ -58,6 +58,7 @@ export type NavItemId =
   | 'disparos'
   | 'templates'
   | 'contatos'
+  | 'followup'
   | 'metricas'
   | 'atendimento'
   | 'imoveis'
@@ -80,6 +81,12 @@ export const PLATFORM_NAV: NavItemConfig[] = [
     id: 'disparos',
     name: 'Disparo de Campanha',
     href: '/disparos',
+    isComingSoon: false,
+  },
+  {
+    id: 'followup',
+    name: 'Follow-up Automático',
+    href: '/follow-up',
     isComingSoon: false,
   },
   {
@@ -155,6 +162,10 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   '/templates': {
     title: 'Templates de Mensagens',
     subtitle: 'Gerencie modelos aprovados pela Meta para seus disparos',
+  },
+  '/follow-up': {
+    title: 'Follow-up Automático',
+    subtitle: 'Mensagem automática para quem não respondeu',
   },
   '/atendimento': {
     title: 'Leads e Respostas',

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { createMetaMessageTemplate, fetchMetaMessageTemplates } from '@/lib/metaClient';
 import { GLOBAL_SYSTEM_TEMPLATES, seedGenericTemplatesForTenant } from '@/lib/globalTemplates';
+import { FOLLOW_UP_TEMPLATE_PREFIX } from '@/lib/followUpRules';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,7 +92,8 @@ export async function GET(req: NextRequest) {
     const genericNames = new Set(GLOBAL_SYSTEM_TEMPLATES.map((g) => g.name.toLowerCase()));
 
     if (!error && data) {
-      customTemplates = data.map((t) => {
+      // Mensagens do follow-up automático são gerenciadas na tela de Follow-up.
+      customTemplates = data.filter((t) => !t.name.startsWith(FOLLOW_UP_TEMPLATE_PREFIX)).map((t) => {
         const isGeneric = genericNames.has(t.name.toLowerCase());
         return {
           ...t,

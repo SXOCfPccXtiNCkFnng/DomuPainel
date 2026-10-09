@@ -1,10 +1,11 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { sendMetaTemplate, type MetaCredentials } from '@/lib/metaClient';
+import { formatMetaError, sendMetaTemplate, type MetaCredentials } from '@/lib/metaClient';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 import { logOpsAlert } from '@/lib/opsAlert';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { GLOBAL_SYSTEM_TEMPLATES } from '@/lib/globalTemplates';
+import { loadFollowUpSettings, scheduleCampaignFollowUp } from '@/lib/followUp';
 import {
   buildBodyComponent,
   defaultParams,
@@ -31,45 +32,6 @@ const DEFAULT_TIME_BUDGET_MS = 40_000;
  * no meio do envio. Não reenviamos (a Meta pode ter aceitado), marcamos falha.
  */
 const STALE_SENDING_MS = 5 * 60 * 1000;
-
-function formatMetaError(err: unknown): string {
-  if (!err) return 'Falha no envio via Meta Cloud API.';
-  let raw = '';
-  if (typeof err === 'string') raw = err;
-  else if (typeof err === 'object' && err !== null && 'message' in err) {
-    raw = String((err as { message: unknown }).message);
-  } else {
-    try {
-      raw = JSON.stringify(err);
-    } catch {
-      raw = 'Falha no envio via Meta Cloud API.';
-    }
-  }
-
-  const lower = raw.toLowerCase();
-  if (lower.includes('131058') || lower.includes('public test numbers')) {
-    return 'Os modelos de exemplo da Meta (como "hello_world" e "jaspers_market_*") possuem uma trava da Meta e só podem ser enviados pelo número de testes fictício da Meta. Como sua conta conectou um número real (+55...), a Meta exige o envio através de um modelo próprio aprovado da sua empresa. Acesse o menu Templates para cadastrar e aprovar seu modelo.';
-  }
-  if (lower.includes('132001') || lower.includes('does not exist in the translation')) {
-    return 'Template não encontrado ou não aprovado na sua conta da Meta (WABA). Acesse "Templates" para criar e aguardar aprovação oficial da Meta antes de disparar.';
-  }
-  if (lower.includes('131030') || lower.includes('not in allowed list')) {
-    return 'O telefone de destino não está na lista de números de teste autorizados na sua conta de desenvolvedor da Meta.';
-  }
-  if (lower.includes('131047') || lower.includes('24 hours')) {
-    return 'Janela de 24 horas encerrada. Para iniciar uma nova conversa comercial, é necessário usar um template oficial aprovado pela Meta.';
-  }
-  if (lower.includes('131026') || lower.includes('undeliverable')) {
-    return 'Número de telefone inválido ou sem conta do WhatsApp ativa.';
-  }
-  if (lower.includes('130429') || lower.includes('rate limit')) {
-    return 'Limite temporário de requisições atingido na Meta. Aguarde alguns minutos e tente novamente.';
-  }
-  if (lower.includes('190') || lower.includes('session') || lower.includes('expired') || lower.includes('access token')) {
-    return 'As credenciais de acesso da Meta expiraram. Reconecte seu WhatsApp em Configurações.';
-  }
-  return raw;
-}
 
 /**
  * Envia logs PENDING de uma campanha via Meta e atualiza contadores.
@@ -367,6 +329,8 @@ export async function dispatchCampaignPending(
 
   // Sem credenciais verificadas não sai nada (ex.: fila apareceu depois da verificação).
   const logs = credentials ? pendingLogs || [] : [];
+  // Lido uma vez por lote: cada envio com sucesso agenda o follow-up do contato.
+  const followUpSettings = await loadFollowUpSettings(campaign.tenant_id);
   let sent = 0;
   let failed = 0;
   let skippedOptOut = 0;
@@ -448,6 +412,12 @@ export async function dispatchCampaignPending(
           patch.sent_at = new Date().toISOString();
           patch.error_message = null;
           sent += 1;
+          await scheduleCampaignFollowUp(followUpSettings, {
+            tenantId: campaign.tenant_id,
+            leadId: log.lead_id,
+            campaignId,
+            wamid: result.messageId,
+          });
         } else {
           patch.status = 'FAILED';
           patch.error_message = formatMetaError(result.error);

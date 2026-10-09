@@ -7,10 +7,11 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 import { phoneLookupVariants } from '@/lib/phone';
 import { logger } from '@/lib/logger';
+import { loadFollowUpSettings, scheduleConversationFollowUp } from '@/lib/followUp';
 
 /**
- * Registra no atendimento o que foi enviado — antes só a resposta do cliente
- * aparecia no histórico. A mensagem já saiu pela Meta: falha ao gravar não
+ * Registra no atendimento o que foi enviado e agenda o follow-up automático
+ * (se o cliente ligou). Antes só a resposta do cliente aparecia no histórico. A mensagem já saiu pela Meta: falha ao gravar não
  * pode virar erro para o usuário (ele reenviaria), só log.
  */
 async function recordOutbound(
@@ -31,6 +32,12 @@ async function recordOutbound(
     status: 'SENT',
   });
   if (error) logger.error('send.record_outbound_failed', { tenantId, leadId, message: error.message });
+
+  await scheduleConversationFollowUp(await loadFollowUpSettings(tenantId), {
+    tenantId,
+    leadId,
+    wamid,
+  });
 }
 
 /**

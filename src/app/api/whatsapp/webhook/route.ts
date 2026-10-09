@@ -6,6 +6,8 @@ import { isOptOutMessage } from '@/lib/metaClient';
 import { logger } from '@/lib/logger';
 import { recountCampaignLogs } from '@/lib/campaignDispatch';
 import { phoneLookupVariants, toStoredPhone } from '@/lib/phone';
+import { handleFollowUpReply, loadFollowUpSettings, scheduleConversationFollowUp } from '@/lib/followUp';
+import type { FollowUpSettings } from '@/lib/followUpRules';
 
 export const dynamic = 'force-dynamic';
 
@@ -271,6 +273,9 @@ async function handleInboundMessage(
     await supabaseAdmin.from('chat_messages').insert(row);
   }
 
+  // Respondeu: cancela o follow-up agendado (e conta como recuperado, se veio depois de um).
+  await handleFollowUpReply(tenantId, lead.id);
+
   const optedOut = isOptOutMessage(bodyText);
   const nextStatus =
     lead.status === 'NOVO' || lead.status === 'QUALIFIED'
@@ -292,6 +297,52 @@ async function handleInboundMessage(
     .update(leadPatch)
     .eq('id', lead.id)
     .eq('tenant_id', tenantId);
+}
+
+/**
+ * Mensagem que a empresa mandou pelo WhatsApp Business do celular
+ * (coexistência, campo smb_message_echoes). Sem isso o sistema não sabia o
+ * que foi respondido pelo celular — o histórico ficava só com o lado do
+ * contato e o follow-up de conversa não tinha como começar.
+ */
+async function handlePhoneEcho(echo: any, tenantId: string, settings: FollowUpSettings) {
+  const to = String(echo?.to || '').replace(/\D/g, '');
+  if (!to || !echo?.id) return;
+
+  const lead = await findOrCreateLead(tenantId, to, null);
+  if (!lead) return;
+
+  const sentAtSec = Number(echo.timestamp);
+  const sentAt = Number.isFinite(sentAtSec) && sentAtSec > 0 ? new Date(sentAtSec * 1000) : new Date();
+  const body =
+    echo.text?.body ||
+    echo.image?.caption ||
+    echo.video?.caption ||
+    echo.document?.caption ||
+    `[${echo.type || 'mensagem'}]`;
+
+  const { data: inserted, error } = await supabaseAdmin
+    .from('chat_messages')
+    .upsert(
+      {
+        tenant_id: tenantId,
+        lead_id: lead.id,
+        direction: 'OUTBOUND',
+        sender_type: 'AGENT_PHONE',
+        message_type: String(echo.type || 'TEXT').toUpperCase().slice(0, 20),
+        body,
+        wamid: echo.id,
+        status: 'SENT',
+        created_at: sentAt.toISOString(),
+      },
+      { onConflict: 'tenant_id,wamid', ignoreDuplicates: true }
+    )
+    .select('id');
+  if (error) throw error;
+  // Reentrega da Meta: já registrada e agendada.
+  if (!inserted || inserted.length === 0) return;
+
+  await scheduleConversationFollowUp(settings, { tenantId, leadId: lead.id, wamid: echo.id, sentAt });
 }
 
 export async function GET(req: NextRequest) {
@@ -356,13 +407,21 @@ export async function POST(req: NextRequest) {
         const value = change.value;
         if (!value) continue;
 
-        if (!value.statuses && !value.messages) continue;
+        if (!value.statuses && !value.messages && !value.message_echoes) continue;
         // Uma resolução por evento, só pelo número conectado (phone_number_id).
         const tenantId = await resolveTenantIdFromMetadata(value);
 
         if (value.statuses) {
           for (const status of value.statuses) {
             await handleStatusUpdate(status, tenantId);
+          }
+        }
+
+        // Coexistência: mensagens que o cliente mandou pelo app do celular.
+        if (value.message_echoes && tenantId) {
+          const settings = await loadFollowUpSettings(tenantId);
+          for (const echo of value.message_echoes) {
+            await handlePhoneEcho(echo, tenantId, settings);
           }
         }
 

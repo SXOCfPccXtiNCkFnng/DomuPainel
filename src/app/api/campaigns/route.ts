@@ -13,6 +13,7 @@ import { dispatchCampaignPending } from '@/lib/campaignDispatch';
 import { ensureTemplateIdForTenant } from '@/lib/globalTemplates';
 import { assertMetaDispatchAllowed } from '@/lib/metaDispatchGuard';
 import { chunk } from '@/lib/batch';
+import { countDispatchesSince, startOfUtcDayIso, startOfUtcMonthIso } from '@/lib/dispatchUsage';
 import {
   defaultParams,
   extractTemplateVariables,
@@ -23,28 +24,7 @@ export const dynamic = 'force-dynamic';
 /** O disparo imediato roda o primeiro lote (~40s) dentro do POST. */
 export const maxDuration = 60;
 
-function startOfUtcDayIso(): string {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
-function startOfUtcMonthIso(): string {
-  const d = new Date();
-  d.setUTCDate(1);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
-async function countSentInPeriod(tenantId: string, sinceIso: string): Promise<number> {
-  const { data } = await supabaseAdmin
-    .from('campaigns')
-    .select('sent_count')
-    .eq('tenant_id', tenantId)
-    .gte('created_at', sinceIso);
-
-  return (data || []).reduce((sum, row: any) => sum + Number(row.sent_count || 0), 0);
-}
+const countSentInPeriod = countDispatchesSince;
 
 export async function GET(req: NextRequest) {
   try {
