@@ -6,6 +6,7 @@ import { applySessionCookie } from '@/lib/requireAuth';
 import { hashToken } from '@/lib/email';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import { notifyTenantAdmins } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const ip = clientIpFromRequest(req);
-    const limit = checkRateLimit(`accept-invite:ip:${ip}`, 15, 60 * 60 * 1000);
+    const limit = await checkRateLimitDurable(`accept-invite:ip:${ip}`, 15, 60 * 60 * 1000);
     if (!limit.ok) {
       return NextResponse.json({ success: false, error: 'Muitas tentativas.' }, { status: 429 });
     }

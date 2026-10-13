@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 /**
  * Resposta 500 para o cliente sem vazar detalhe interno (nome de tabela,
@@ -9,7 +10,8 @@ export function internalErrorResponse(
   error: unknown,
   message = 'Erro interno. Tente novamente em instantes.'
 ) {
-  console.error(`[${scope}]`, describeError(error));
+  // logger.error também registra no painel /interno (aba Erros).
+  logger.error(`api.${scope.replace(/^api\./, '')}`, { message: describeError(error) });
   return NextResponse.json({ success: false, error: message }, { status: 500 });
 }
 

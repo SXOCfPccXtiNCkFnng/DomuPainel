@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isPasswordStrong, hashPassword } from '@/lib/authHelpers';
 import { clearSessionCookie } from '@/lib/requireAuth';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import {
   validateEmail,
   validateFullName,
@@ -20,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const ip = clientIpFromRequest(req);
-    const ipLimit = checkRateLimit(`register:ip:${ip}`, 8, 60 * 60 * 1000);
+    const ipLimit = await checkRateLimitDurable(`register:ip:${ip}`, 8, 60 * 60 * 1000);
     if (!ipLimit.ok) {
       return NextResponse.json(
         { success: false, error: 'Muitos cadastros deste IP. Aguarde e tente novamente.' },

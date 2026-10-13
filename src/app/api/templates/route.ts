@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { createMetaMessageTemplate, fetchMetaMessageTemplates } from '@/lib/metaClient';
@@ -113,8 +114,7 @@ export async function GET(req: NextRequest) {
       templates: [...customTemplates, ...unseededGlobals],
     });
   } catch (error: any) {
-    console.error('[Templates API GET Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.templates.get', error);
   }
 }
 
@@ -201,7 +201,6 @@ export async function POST(req: NextRequest) {
       message: 'Template enviado para a Meta. Aguarde a análise.',
     });
   } catch (error: any) {
-    console.error('[Templates API POST Error]', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return internalErrorResponse('api.templates.post', error);
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { hashPassword, isPasswordStrong } from '@/lib/authHelpers';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import { hashToken } from '@/lib/email';
 import { logger } from '@/lib/logger';
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const ip = clientIpFromRequest(req);
-    const limit = checkRateLimit(`reset:ip:${ip}`, 15, 60 * 60 * 1000);
+    const limit = await checkRateLimitDurable(`reset:ip:${ip}`, 15, 60 * 60 * 1000);
     if (!limit.ok) {
       return NextResponse.json(
         { success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' },

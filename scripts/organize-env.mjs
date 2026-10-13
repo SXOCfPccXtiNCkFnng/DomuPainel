@@ -51,7 +51,7 @@ const lines = [
   `DOMU_SESSION_SECRET=${session}`,
   `ENCRYPTION_SECRET_KEY=${encryption}`,
   `CRON_SECRET=${cron}`,
-  '# Só se for usar /api/db/seed ou /api/db/test',
+  '# (não usado: as rotas /api/db foram removidas)',
   `DOMU_ADMIN_SECRET=${admin}`,
   '',
   '# E-mails com acesso a /interno (separados por vírgula). Sem isto, a página responde 404.',

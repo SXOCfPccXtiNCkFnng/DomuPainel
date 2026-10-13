@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import {
   appBaseUrl,
   contactFooterText,
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const ip = clientIpFromRequest(req);
-    const limit = checkRateLimit(`forgot:ip:${ip}`, 8, 60 * 60 * 1000);
+    const limit = await checkRateLimitDurable(`forgot:ip:${ip}`, 8, 60 * 60 * 1000);
     if (!limit.ok) {
       return NextResponse.json(
         { success: false, error: 'Muitas solicitações. Aguarde e tente novamente.' },
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(generic);
     }
 
-    const emailLimit = checkRateLimit(`forgot:email:${email}`, 5, 60 * 60 * 1000);
+    const emailLimit = await checkRateLimitDurable(`forgot:email:${email}`, 5, 60 * 60 * 1000);
     if (!emailLimit.ok) {
       return NextResponse.json(generic);
     }

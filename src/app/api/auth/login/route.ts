@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword } from '@/lib/authHelpers';
 import { isTenantOnboarded } from '@/lib/sessionHelpers';
 import { applySessionCookie } from '@/lib/requireAuth';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import { TenantSegment } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const ip = clientIpFromRequest(req);
-    const ipLimit = checkRateLimit(`login:ip:${ip}`, 20, 15 * 60 * 1000);
+    const ipLimit = await checkRateLimitDurable(`login:ip:${ip}`, 20, 15 * 60 * 1000);
     if (!ipLimit.ok) {
       return NextResponse.json(
         { success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' },
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const emailLimit = checkRateLimit(`login:email:${cleanEmail}`, 10, 15 * 60 * 1000);
+    const emailLimit = await checkRateLimitDurable(`login:email:${cleanEmail}`, 10, 15 * 60 * 1000);
     if (!emailLimit.ok) {
       return NextResponse.json(
         { success: false, error: 'Muitas tentativas para este e-mail. Aguarde e tente novamente.' },
