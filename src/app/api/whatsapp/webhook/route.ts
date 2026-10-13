@@ -8,6 +8,7 @@ import { recountCampaignLogs } from '@/lib/campaignDispatch';
 import { phoneLookupVariants, toStoredPhone } from '@/lib/phone';
 import { handleFollowUpReply, loadFollowUpSettings, scheduleConversationFollowUp } from '@/lib/followUp';
 import type { FollowUpSettings } from '@/lib/followUpRules';
+import { recordHeartbeat } from '@/lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 
@@ -463,8 +464,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    await recordHeartbeat('webhook.meta', { ok: true, throttle: true });
     return NextResponse.json({ status: 'EVENT_RECEIVED' }, { status: 200 });
   } catch (error: any) {
+    await recordHeartbeat('webhook.meta', { ok: false, error: error?.message || 'Erro ao processar evento' });
+    logger.error('webhook.meta_processing_failed', { message: error?.message || String(error) });
     console.error('[Meta Webhook Handler Error]', error);
     return NextResponse.json({ status: 'ERROR_HANDLED' }, { status: 200 });
   }

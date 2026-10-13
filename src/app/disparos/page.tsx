@@ -90,7 +90,7 @@ export default function DisparosPage() {
     }
     return (
       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
-        {s || 'CONCLUÍDO'}
+        {s === 'COMPLETED' || !s ? 'CONCLUÍDA' : s === 'DRAFT' ? 'RASCUNHO' : s === 'PAUSED' ? 'PAUSADA' : s}
       </span>
     );
   };

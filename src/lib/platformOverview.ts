@@ -22,6 +22,9 @@ export type TenantOpsRow = {
   paymentMethod: string | null;
   monthlyPrice: number | null;
   periodEnd: string | null;
+  whatsappConnected: boolean;
+  sent7d: number;
+  lastActivityAt: string | null;
 };
 
 export type OverdueCampaign = {
@@ -45,6 +48,7 @@ export type ErrorSourceStat = {
   source: string;
   count24h: number;
   count7d: number;
+  open: number;
 };
 
 export type WhatsappQualityRow = {
@@ -96,6 +100,11 @@ export type PlatformOverview = {
   whatsappQuality: WhatsappQualityRow[];
   tenants: TenantOpsRow[];
   alerts: OpsAlert[];
+  errors: { open: number; openErrors: number; last24h: number };
+  messaging7d: { received: number; sentFromPhone: number; automation: number; newContactsFromWhatsapp: number };
+  followUp7d: { sent: number; replied: number; avoided: number; failed: number; repliedBefore: number };
+  topTenants7d: { tenantId: string; name: string; sent: number }[];
+  failureReasons7d: { reason: string; count: number }[];
 };
 
 function statusOf(raw: string | null | undefined): SubscriptionStatus {
@@ -168,6 +177,9 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
       paymentMethod: sub?.payment_method || null,
       monthlyPrice: sub?.monthly_price_brl != null ? Number(sub.monthly_price_brl) : null,
       periodEnd: sub?.current_period_end || null,
+      whatsappConnected: false,
+      sent7d: 0,
+      lastActivityAt: null,
     };
   });
 
@@ -251,7 +263,7 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
     }))
     .sort((a, b) => new Date(a.periodEnd).getTime() - new Date(b.periodEnd).getTime());
 
-  const alerts = await loadOpsAlerts(40);
+  const alerts = await loadOpsAlerts({ status: 'open', limit: 300 });
 
   const errorStatsBySource = new Map<string, ErrorSourceStat>();
   const since24hMs = Date.now() - 24 * 60 * 60 * 1000;
@@ -259,16 +271,24 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
   for (const a of alerts) {
     const key = a.source || 'outro';
     if (!errorStatsBySource.has(key)) {
-      errorStatsBySource.set(key, { source: key, count24h: 0, count7d: 0 });
+      errorStatsBySource.set(key, { source: key, count24h: 0, count7d: 0, open: 0 });
     }
     const stat = errorStatsBySource.get(key)!;
-    const t = new Date(a.createdAt).getTime();
-    if (t >= since7dMs) stat.count7d += 1;
-    if (t >= since24hMs) stat.count24h += 1;
+    const t = new Date(a.lastSeenAt).getTime();
+    if (t >= since7dMs) stat.count7d += a.occurrences;
+    if (t >= since24hMs) stat.count24h += a.occurrences;
+    stat.open += 1;
   }
   const errorsBySource = Array.from(errorStatsBySource.values()).sort((a, b) => b.count7d - a.count7d);
 
   const whatsappQuality = await loadWhatsappQuality(tenantNameById);
+  const activity = await loadActivity7d(tenantNameById);
+
+  for (const row of rows) {
+    row.whatsappConnected = activity.connected.has(row.tenantId);
+    row.sent7d = activity.sentByTenant.get(row.tenantId) || 0;
+    row.lastActivityAt = activity.lastActivity.get(row.tenantId) || null;
+  }
 
   return {
     generatedAt: new Date().toISOString(),
@@ -282,7 +302,80 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
     errorsBySource,
     whatsappQuality,
     tenants: rows,
-    alerts,
+    alerts: alerts.slice(0, 8),
+    errors: {
+      open: alerts.length,
+      openErrors: alerts.filter((a) => a.level === 'error').length,
+      last24h: alerts.filter((a) => new Date(a.lastSeenAt).getTime() >= since24hMs).reduce((n, a) => n + a.occurrences, 0),
+    },
+    messaging7d: activity.messaging,
+    followUp7d: activity.followUp,
+    topTenants7d: activity.topTenants,
+    failureReasons7d: activity.failureReasons,
+  };
+}
+
+/** Uso da plataforma nos últimos 7 dias: mensagens, follow-up, quem mais envia e por que falha. */
+async function loadActivity7d(tenantNameById: Map<string, string>) {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [creds, inbound, phone, automation, newContacts, followUps, camps, failed, recentMsgs] = await Promise.all([
+    supabaseAdmin.from('tenant_credentials').select('tenant_id'),
+    supabaseAdmin.from('chat_messages').select('id', { count: 'exact', head: true }).eq('direction', 'INBOUND').gte('created_at', since),
+    supabaseAdmin.from('chat_messages').select('id', { count: 'exact', head: true }).eq('sender_type', 'AGENT_PHONE').gte('created_at', since),
+    supabaseAdmin.from('chat_messages').select('id', { count: 'exact', head: true }).eq('sender_type', 'AUTOMATION').gte('created_at', since),
+    supabaseAdmin.from('leads').select('id', { count: 'exact', head: true }).eq('source', 'WHATSAPP').gte('created_at', since),
+    supabaseAdmin.from('follow_ups').select('status, replied_at').gte('created_at', since).limit(20000),
+    supabaseAdmin.from('campaigns').select('tenant_id, sent_count, created_at').gte('created_at', since).limit(5000),
+    supabaseAdmin.from('campaign_logs').select('error_message').eq('status', 'FAILED').gte('created_at', since).limit(5000),
+    supabaseAdmin.from('chat_messages').select('tenant_id, created_at').order('created_at', { ascending: false }).limit(3000),
+  ]);
+
+  const followUp = { sent: 0, replied: 0, avoided: 0, failed: 0, repliedBefore: 0 };
+  for (const f of (followUps.data || []) as { status: string; replied_at: string | null }[]) {
+    if (f.status === 'SENT') {
+      followUp.sent += 1;
+      if (f.replied_at) followUp.replied += 1;
+    } else if (f.status === 'SKIPPED') followUp.avoided += 1;
+    else if (f.status === 'FAILED') followUp.failed += 1;
+    else if (f.status === 'REPLIED') followUp.repliedBefore += 1;
+  }
+
+  const sentByTenant = new Map<string, number>();
+  const lastActivity = new Map<string, string>();
+  for (const c of (camps.data || []) as { tenant_id: string; sent_count: number | null; created_at: string }[]) {
+    sentByTenant.set(c.tenant_id, (sentByTenant.get(c.tenant_id) || 0) + Number(c.sent_count || 0));
+    if (!lastActivity.has(c.tenant_id) || lastActivity.get(c.tenant_id)! < c.created_at) lastActivity.set(c.tenant_id, c.created_at);
+  }
+  for (const m of (recentMsgs.data || []) as { tenant_id: string; created_at: string }[]) {
+    if (!lastActivity.has(m.tenant_id) || lastActivity.get(m.tenant_id)! < m.created_at) lastActivity.set(m.tenant_id, m.created_at);
+  }
+
+  const reasons = new Map<string, number>();
+  for (const r of (failed.data || []) as { error_message: string | null }[]) {
+    const key = String(r.error_message || 'Falha sem detalhe').slice(0, 160);
+    reasons.set(key, (reasons.get(key) || 0) + 1);
+  }
+
+  return {
+    connected: new Set(((creds.data || []) as { tenant_id: string }[]).map((c) => c.tenant_id)),
+    sentByTenant,
+    lastActivity,
+    messaging: {
+      received: inbound.count || 0,
+      sentFromPhone: phone.count || 0,
+      automation: automation.count || 0,
+      newContactsFromWhatsapp: newContacts.count || 0,
+    },
+    followUp,
+    topTenants: [...sentByTenant.entries()]
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([tenantId, sent]) => ({ tenantId, name: tenantNameById.get(tenantId) || tenantId.slice(0, 8), sent })),
+    failureReasons: [...reasons.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([reason, count]) => ({ reason, count })),
   };
 }
 

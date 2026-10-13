@@ -211,6 +211,7 @@ Mensagem enviada só pelo app, antes de conectar a API, não abre essa janela da
 
 • **Dashboard** — visão de disparos e respostas.
 • **Disparo de Campanha** — criar e acompanhar envios.
+• **Follow-up Automático** — mensagem automática para quem parou de responder.
 • **Métricas de ROI** — alcance e respostas.
 • **Templates de Mensagens** — modelos enviados à Meta.
 • **Contatos e Segmentação** — base e importação.
@@ -230,7 +231,9 @@ Mensagem enviada só pelo app, antes de conectar a API, não abre essa janela da
 • **Enviado:** a Meta aceitou a mensagem.
 • **Entregue:** chegou no celular do contato.
 • **Lido:** o contato abriu (só aparece se ele não desativou a confirmação de leitura).
-• **Falhou:** não saiu — o motivo aparece em **Exibir detalhes**.
+• **Falhou:** não saiu — o motivo aparece na própria lista de destinatários e no quadro **"Por que algumas mensagens falharam"**.
+
+Na tela de progresso dá para filtrar a lista (Lidos, Entregues, Falhas, Na fila), buscar por nome ou telefone e clicar nos números do topo para filtrar.
 
 Campanhas grandes saem em lotes: a barra avança aos poucos, e o envio continua mesmo com a tela fechada.`,
   },
@@ -252,7 +255,7 @@ Comece conferindo o cartão em **WhatsApp Manager → Configurações de pagamen
     question: 'O que significam os erros da Meta numa campanha que falhou?',
     shortLabel: 'Campanha falhou: e agora?',
     keywords: ['erro', 'falha', 'falhou', 'deu erro', '131058', '132001', '131030', '131047', '131026', '130429', 'expirou', 'token'],
-    answer: `Erros mais comuns (o texto aparece em **Exibir detalhes** na campanha):
+    answer: `Erros mais comuns (o motivo aparece na lista de destinatários da campanha — filtre por **Falhas**):
 
 • **Template não encontrado ou não aprovado (132001):** o modelo não está aprovado nesse número. Confira em **Templates**.
 • **Modelos de exemplo da Meta (131058):** "hello_world" e similares só funcionam no número de teste. Crie seu próprio template.
@@ -339,6 +342,70 @@ Dica: termine o template com algo como "Responda SAIR para não receber mais".`,
 • **Quer trocar:** em **Configurações → Meu Perfil**, informe a senha atual e a nova.
 
 Ao trocar a senha, os outros aparelhos conectados saem da conta por segurança.`,
+  },
+  {
+    id: 'follow_up_como_funciona',
+    question: 'Como funciona o Follow-up Automático?',
+    shortLabel: 'Como funciona o follow-up',
+    keywords: ['follow-up', 'follow up', 'followup', 'nao respondeu', 'não respondeu', 'parou de responder', 'mensagem automatica', 'mensagem automática', 'lembrete', 'cobrar resposta'],
+    answer: `O **Follow-up Automático** manda uma mensagem sua para quem parou de responder. Fica no menu **Follow-up Automático** e tem dois tipos, ligados separadamente:
+
+• **Conversa:** você respondeu um contato (pelo celular ou pela plataforma) e ele sumiu. Depois do tempo escolhido (1h a 24h), sai a sua mensagem — texto livre, sem aprovação da Meta. Ela sempre sai antes de a conversa do WhatsApp fechar (24h depois da última mensagem do contato).
+• **Campanha (opcional):** para quem recebeu uma campanha e nunca respondeu. Como essa pessoa não abriu conversa, a Meta exige aprovar a mensagem — a Domu envia para aprovação sozinha quando você salva.
+
+Use **+ Nome do contato** na mensagem para ela chegar com o primeiro nome da pessoa ({{nome}}).
+
+É **um follow-up por mensagem sua**: se o contato não responder o follow-up, nada mais é enviado. Se ele responder, conta em **"Responderam"**.`,
+  },
+  {
+    id: 'follow_up_protecoes',
+    question: 'Por que um follow-up não foi enviado (Evitado)?',
+    shortLabel: 'Follow-up evitado / não enviado',
+    keywords: ['evitado', 'nao enviou', 'não enviou', 'nao foi enviado', 'não foi enviado', 'nao saiu', 'não saiu', 'follow up nao', 'follow up não', 'follow-up nao enviou', 'follow-up não enviou', 'nao mandou follow', 'não mandou follow', 'protecao', 'proteção', 'ia barrou', 'barrado'],
+    answer: `O follow-up só sai quando faz sentido na conversa — na dúvida, ele **não** é enviado. O motivo de cada um aparece na lista **Últimos follow-ups**. Os mais comuns:
+
+• **O contato respondeu antes** do prazo ("Nem precisou").
+• **A IA percebeu que a conversa terminou:** despedida, negócio fechado ou pago, visita combinada, dúvida já resolvida, sem interesse, reclamação, assunto delicado, ou **você** ficou de responder/enviar algo.
+• **"Te falo amanhã" / "vou pensar":** vira **lembrete**, mas só depois de algumas horas ou do prazo que o contato deu.
+• **Limite por contato:** a pessoa já recebeu um follow-up nas últimas 24h (configurável em Proteções).
+• **Status bloqueado** (ex.: Fechado), **contato pausado** ou **opt-out**.
+• **A conversa do WhatsApp fechou** (passaram 24h desde a última mensagem do contato).
+
+A IA lê só **texto**: áudio, foto e figurinha ela vê como "mídia", sem saber o conteúdo — se for a mensagem decisiva, ela prefere não enviar.`,
+  },
+  {
+    id: 'follow_up_custo',
+    question: 'O follow-up conta no limite do plano? A Meta cobra?',
+    shortLabel: 'Follow-up: limite e custo',
+    keywords: ['follow-up conta', 'follow up conta', 'follow up limite', 'follow up plano', 'follow up custo', 'follow up cobra', 'follow-up limite', 'follow-up custo', 'follow-up cobra', 'follow-up plano', 'follow-up gasta'],
+    answer: `• **Não conta** no limite de disparos do seu plano Domu.
+• **Conversa:** é uma mensagem dentro da conversa aberta do WhatsApp — pela tabela atual da Meta, não tem custo de template.
+• **Campanha:** usa um template aprovado, que a Meta cobra como mensagem de marketing.
+• Ele conta, sim, no **limite diário da Meta** do seu número (o mesmo das campanhas), para o número não ser bloqueado.`,
+  },
+  {
+    id: 'contatos_automaticos',
+    question: 'Os contatos que me mandam mensagem são salvos sozinhos?',
+    shortLabel: 'Contatos salvos automaticamente',
+    keywords: ['salvar contato', 'contato automatico', 'contato automático', 'gravar numero', 'gravar número', 'novo contato', 'contato whatsapp', 'sem nome', 'nome do contato'],
+    answer: `Sim. Quando alguém manda mensagem para o seu número conectado, o contato é criado sozinho em **Contatos e Segmentação**, com o nome do perfil do WhatsApp — sem precisar importar. Cada conta só vê os próprios contatos.
+
+Se aparecer **"Contato WhatsApp"**, a Meta não mandou o nome: acontece quando a pessoa não tem nome no perfil, quando a primeira mensagem foi sua (pelo celular) ou com mensagens que a API não suporta (enquete, visualização única). O nome entra sozinho na próxima mensagem de texto dela — ou edite em **Tags**.
+
+O botão **WhatsApp** na lista de contatos abre a conversa com o número.`,
+  },
+  {
+    id: 'desconectar_whatsapp',
+    question: 'Como desconectar ou trocar o número do WhatsApp?',
+    shortLabel: 'Desconectar / trocar número',
+    keywords: ['desconectar', 'trocar numero', 'trocar número', 'reconectar', 'mudar numero', 'mudar número', 'numero dedicado', 'número dedicado'],
+    answer: `Em **Configurações → Integração Meta**, use **Desconectar** (só administradores). Contatos, campanhas e histórico continuam salvos; até conectar de novo, nada é enviado nem recebido pela plataforma — o app do celular segue funcionando.
+
+Depois aparecem as opções de conexão:
+• **Continuar com seu WhatsApp atual (coexistência):** login da Meta + QR code; o app do celular continua funcionando.
+• **Número dedicado:** um número novo, só na plataforma, confirmado por SMS ou ligação — o app do celular deixa de usar esse número.
+
+Para reconectar, entre com um perfil do Facebook que tenha acesso à empresa dona do número na Meta.`,
   },
   {
     id: 'segmento',

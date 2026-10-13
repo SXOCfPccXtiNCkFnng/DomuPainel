@@ -12,6 +12,7 @@ import {
   normalizePlanTier,
 } from '@/lib/planLimits';
 import { SEGMENT_LABELS } from '@/lib/segmentConfig';
+import { loadFollowUpSettings } from '@/lib/followUp';
 import { TenantSegment } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,7 @@ type ChatReply = { answer: string; offerHuman: boolean; suggestions: string[] };
 const PAGE_NAMES: Record<string, string> = {
   '/': 'Dashboard',
   '/disparos': 'Disparo de Campanha',
+  '/follow-up': 'Follow-up Automático',
   '/templates': 'Templates de Mensagens',
   '/contatos': 'Contatos e Segmentação',
   '/metricas': 'Métricas',
@@ -225,6 +227,25 @@ async function loadAccountContext(
         .join('\n')
     : '  • nenhuma campanha criada ainda';
 
+  // Follow-up: configuração e resultado dos últimos 30 dias, para o chat
+  // responder "por que não mandou?" com base na conta real.
+  let followUpLine = 'Follow-up automático: não configurado.';
+  try {
+    const fu = await loadFollowUpSettings(tenantId);
+    const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: fuRows } = await supabaseAdmin
+      .from('follow_ups')
+      .select('status')
+      .eq('tenant_id', tenantId)
+      .gte('created_at', since30)
+      .limit(5000);
+    const by: Record<string, number> = {};
+    for (const r of fuRows || []) by[r.status] = (by[r.status] || 0) + 1;
+    followUpLine = `Follow-up automático: conversa ${fu.conversation_enabled ? `LIGADO (espera ${fu.conversation_delay_hours}h)` : 'desligado'}, campanha ${fu.campaign_enabled ? `LIGADO (espera ${fu.campaign_delay_hours}h)` : 'desligado'}; checagem por IA ${fu.ai_check_enabled ? 'ligada' : 'desligada'}; limite por contato ${fu.contact_limit_enabled ? `1 a cada ${fu.contact_limit_hours}h` : 'desligado'}; horário ${fu.window_start_hour}h–${fu.window_end_hour}h${fu.skip_weekends ? ', sem fim de semana' : ''}. Últimos 30 dias: ${by.SENT || 0} enviados, ${by.PENDING || 0} aguardando, ${by.REPLIED || 0} responderam antes, ${by.SKIPPED || 0} evitados, ${by.FAILED || 0} falharam.`;
+  } catch {
+    /* sem a tabela de follow-up: segue sem essa linha */
+  }
+
   const segment = (tenant?.segment || 'geral') as TenantSegment;
 
   return [
@@ -235,6 +256,7 @@ async function loadAccountContext(
     `Uso do plano Domu: ${usedMonth} disparos este mês de ${isUnlimitedPlanLimit(monthlyLimit) ? 'ilimitado' : monthlyLimit}${dailyLimit != null ? `; hoje ${usedDay} de ${dailyLimit} (trava diária)` : ''}. Usuários: ${teamCount || 0} de ${getPlanUserLimit(planTier)}.`,
     whatsapp,
     `Contatos: ${contacts || 0} no total; ${optedOut || 0} pediram para não receber (opt-out).`,
+    followUpLine,
     `Templates (mais recentes):\n${templateLines}`,
     `Campanhas recentes:\n${campaignLines}`,
   ].join('\n');

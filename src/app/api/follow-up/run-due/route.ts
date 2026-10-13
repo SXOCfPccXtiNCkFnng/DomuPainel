@@ -3,6 +3,7 @@ import { isCronRequest } from '@/lib/cronAuth';
 import { failStuckFollowUps, processDueFollowUps } from '@/lib/followUp';
 import { describeError, withTransientRetry } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { recordHeartbeat } from '@/lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -20,9 +21,11 @@ export async function GET(req: NextRequest) {
     await failStuckFollowUps();
     const result = await withTransientRetry(() => processDueFollowUps({ limit: 50, deadlineMs: 45_000 }));
     if (result.checked > 0) logger.info('followup.run_due', result);
+    await recordHeartbeat('cron.follow-up', { ok: true, result });
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     const message = describeError(error);
+    await recordHeartbeat('cron.follow-up', { ok: false, error: message });
     logger.error('followup.run_due_error', { message });
     const { logOpsAlert } = await import('@/lib/opsAlert');
     await logOpsAlert({ source: 'cron.follow-up', message });

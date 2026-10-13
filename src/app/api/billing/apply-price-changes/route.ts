@@ -5,6 +5,7 @@ import { isBillingMockEnabled, asaasUpdateSubscriptionValue } from '@/lib/asaasC
 import { logger } from '@/lib/logger';
 import { logOpsAlert } from '@/lib/opsAlert';
 import { describeError, withTransientRetry } from '@/lib/errors';
+import { recordHeartbeat } from '@/lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,9 +67,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    await recordHeartbeat('cron.apply-price-changes', { ok: failed === 0, result: { checked: (due || []).length, applied, failed }, error: failed > 0 ? `${failed} reajuste(s) falharam` : null });
     return NextResponse.json({ success: true, checked: (due || []).length, applied, failed });
   } catch (error: unknown) {
     const message = describeError(error);
+    await recordHeartbeat('cron.apply-price-changes', { ok: false, error: message });
     logger.error('billing.apply_price_changes_error', { message });
     await logOpsAlert({ source: 'cron.apply-price-changes', message });
     return NextResponse.json({ success: false, error: message }, { status: 500 });

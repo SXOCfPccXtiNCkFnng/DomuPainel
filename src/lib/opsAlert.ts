@@ -1,8 +1,8 @@
+import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getPlatformAdminEmails } from '@/lib/platformAdmin';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { sendEmail, appBaseUrl } from '@/lib/email';
-import { logger } from '@/lib/logger';
 import { escapeHtml } from '@/lib/emailTemplates';
 
 export type OpsAlert = {
@@ -13,10 +13,125 @@ export type OpsAlert = {
   tenantId: string | null;
   tenantName?: string | null;
   createdAt: string;
+  lastSeenAt: string;
+  occurrences: number;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  meta: Record<string, unknown>;
 };
 
 /** No máx. 1 e-mail por origem a cada 30 min — evita spam quando um erro se repete. */
 const ALERT_EMAIL_WINDOW_MS = 30 * 60 * 1000;
+/** Mesmo erro aberto dentro desse intervalo soma no contador em vez de criar linha nova. */
+const GROUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SENSITIVE_KEY = /token|secret|password|senha|authorization|api[_-]?key|cookie|pin/i;
+
+/**
+ * Identidade do erro para agrupar: origem + mensagem sem as partes que mudam a
+ * cada ocorrência (ids, números, wamids), para "falhou para o tenant X" e
+ * "falhou para o tenant Y" virarem a mesma linha.
+ */
+export function fingerprintOf(source: string, message: string): string {
+  const normalized = message
+    .toLowerCase()
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '<id>')
+    .replace(/wamid\.[a-z0-9=_-]+/g, '<wamid>')
+    .replace(/\d+/g, '<n>')
+    .slice(0, 300);
+  return crypto.createHash('sha1').update(`${source}|${normalized}`).digest('hex').slice(0, 40);
+}
+
+/** Tira tokens/senhas e corta textos longos antes de gravar os detalhes. */
+export function sanitizeMeta(meta: Record<string, unknown> | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!meta) return out;
+  for (const [key, value] of Object.entries(meta).slice(0, 25)) {
+    if (SENSITIVE_KEY.test(key)) {
+      out[key] = '[oculto]';
+      continue;
+    }
+    if (typeof value === 'string') out[key] = value.slice(0, 800);
+    else if (typeof value === 'number' || typeof value === 'boolean' || value == null) out[key] = value;
+    else {
+      try {
+        out[key] = JSON.parse(JSON.stringify(value, (_k, v) => (typeof v === 'string' ? v.slice(0, 300) : v)));
+      } catch {
+        out[key] = String(value).slice(0, 300);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Grava um erro/aviso no painel /interno, agrupando repetições. Nunca lança:
+ * registrar erro não pode virar outro erro no fluxo principal.
+ */
+export async function recordOpsEvent(input: {
+  source: string;
+  message: string;
+  level?: 'error' | 'warn';
+  tenantId?: string | null;
+  meta?: Record<string, unknown>;
+  count?: number;
+}): Promise<void> {
+  try {
+    const source = input.source.slice(0, 80);
+    const message = String(input.message || 'Erro').slice(0, 2000);
+    const level = input.level || 'error';
+    const tenantId = input.tenantId && UUID_RE.test(input.tenantId) ? input.tenantId : null;
+    const meta = sanitizeMeta(input.meta);
+    const count = Math.max(1, input.count || 1);
+    const fingerprint = fingerprintOf(source, message);
+    const nowIso = new Date().toISOString();
+
+    const { data: open, error: findError } = await supabaseAdmin
+      .from('ops_alerts')
+      .select('id, occurrences')
+      .eq('fingerprint', fingerprint)
+      .is('resolved_at', null)
+      .gte('last_seen_at', new Date(Date.now() - GROUP_WINDOW_MS).toISOString())
+      .order('last_seen_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Migration de observabilidade ainda não aplicada: grava no formato antigo.
+    if (findError?.code === '42703') {
+      await supabaseAdmin.from('ops_alerts').insert({ source, level, message, tenant_id: tenantId, meta });
+      return;
+    }
+
+    if (open) {
+      await supabaseAdmin
+        .from('ops_alerts')
+        .update({
+          occurrences: Number(open.occurrences || 1) + count,
+          last_seen_at: nowIso,
+          message,
+          meta,
+          level,
+          ...(tenantId ? { tenant_id: tenantId } : {}),
+        })
+        .eq('id', open.id);
+      return;
+    }
+
+    await supabaseAdmin.from('ops_alerts').insert({
+      source,
+      level,
+      message,
+      tenant_id: tenantId,
+      meta,
+      fingerprint,
+      occurrences: count,
+      last_seen_at: nowIso,
+    });
+  } catch (err) {
+    // console direto (não logger): o logger grava aqui, e isso viraria um laço.
+    console.error('[opsAlert] falha ao gravar alerta', err instanceof Error ? err.message : err);
+  }
+}
 
 async function notifyPlatformAdmins(input: { source: string; message: string; tenantId?: string | null }) {
   const admins = getPlatformAdminEmails();
@@ -37,10 +152,11 @@ async function notifyPlatformAdmins(input: { source: string; message: string; te
   try {
     await Promise.all(admins.map((to) => sendEmail({ to, subject, text, html })));
   } catch (err) {
-    logger.error('opsalert.email_failed', { message: err instanceof Error ? err.message : String(err) });
+    console.error('[opsAlert] e-mail de alerta falhou', err instanceof Error ? err.message : err);
   }
 }
 
+/** Erro que merece atenção da equipe: grava no painel e (se for erro) avisa por e-mail. */
 export async function logOpsAlert(input: {
   source: string;
   message: string;
@@ -48,18 +164,7 @@ export async function logOpsAlert(input: {
   tenantId?: string | null;
   meta?: Record<string, unknown>;
 }): Promise<void> {
-  try {
-    await supabaseAdmin.from('ops_alerts').insert({
-      source: input.source.slice(0, 80),
-      level: input.level || 'error',
-      message: String(input.message || 'Erro').slice(0, 2000),
-      tenant_id: input.tenantId || null,
-      meta: input.meta || {},
-    });
-  } catch {
-    // Tabela ainda não migrada — não quebrar o fluxo principal.
-  }
-
+  await recordOpsEvent(input);
   if ((input.level || 'error') === 'error') {
     await notifyPlatformAdmins({
       source: input.source,
@@ -69,90 +174,78 @@ export async function logOpsAlert(input: {
   }
 }
 
-export async function loadOpsAlerts(limit = 40): Promise<OpsAlert[]> {
-  const alerts: OpsAlert[] = [];
-
-  const stored = await supabaseAdmin
+export async function resolveOpsAlert(id: string, by: string, resolved = true): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
     .from('ops_alerts')
-    .select('id, source, level, message, tenant_id, created_at')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .update(resolved ? { resolved_at: new Date().toISOString(), resolved_by: by } : { resolved_at: null, resolved_by: null })
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  return (data?.length || 0) > 0;
+}
 
-  if (!stored.error && stored.data) {
-    for (const row of stored.data) {
-      alerts.push({
-        id: row.id,
-        source: row.source,
-        level: row.level === 'warn' ? 'warn' : 'error',
-        message: row.message,
-        tenantId: row.tenant_id,
-        createdAt: row.created_at,
-      });
-    }
-  }
+/** Resolve de uma vez todos os abertos de uma origem (ex.: depois de corrigir o bug). */
+export async function resolveOpsAlertsBySource(source: string, by: string): Promise<number> {
+  const { data, error } = await supabaseAdmin
+    .from('ops_alerts')
+    .update({ resolved_at: new Date().toISOString(), resolved_by: by })
+    .eq('source', source)
+    .is('resolved_at', null)
+    .select('id');
+  if (error) throw error;
+  return data?.length || 0;
+}
 
-  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-  const [{ data: failedCamps }, { data: failedLogs }] = await Promise.all([
-    supabaseAdmin
-      .from('campaigns')
-      .select('id, name, tenant_id, updated_at')
-      .eq('status', 'FAILED')
-      .gte('updated_at', since)
-      .order('updated_at', { ascending: false })
-      .limit(20),
-    supabaseAdmin
-      .from('campaign_logs')
-      .select('id, error_message, tenant_id, created_at, campaigns(name)')
-      .eq('status', 'FAILED')
-      .not('error_message', 'is', null)
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(20),
-  ]);
+export async function loadOpsAlerts(options?: {
+  limit?: number;
+  status?: 'open' | 'resolved' | 'all';
+  level?: 'error' | 'warn' | 'all';
+  source?: string | null;
+  tenantId?: string | null;
+}): Promise<OpsAlert[]> {
+  const limit = options?.limit ?? 100;
+  const build = (withGrouping: boolean) => {
+    let query = supabaseAdmin
+      .from('ops_alerts')
+      .select(
+        withGrouping
+          ? 'id, source, level, message, tenant_id, created_at, last_seen_at, occurrences, resolved_at, resolved_by, meta'
+          : 'id, source, level, message, tenant_id, created_at, meta'
+      )
+      .order(withGrouping ? 'last_seen_at' : 'created_at', { ascending: false })
+      .limit(limit);
+    if (withGrouping && options?.status === 'open') query = query.is('resolved_at', null);
+    if (withGrouping && options?.status === 'resolved') query = query.not('resolved_at', 'is', null);
+    if (options?.level && options.level !== 'all') query = query.eq('level', options.level);
+    if (options?.source) query = query.eq('source', options.source);
+    if (options?.tenantId) query = query.eq('tenant_id', options.tenantId);
+    return query;
+  };
 
-  for (const camp of failedCamps || []) {
-    alerts.push({
-      id: `camp:${camp.id}`,
-      source: 'campanha',
-      level: 'error',
-      message: `Campanha falhou: ${camp.name || camp.id}`,
-      tenantId: camp.tenant_id,
-      createdAt: camp.updated_at,
-    });
-  }
+  let res = await build(true);
+  if (res.error?.code === '42703') res = await build(false);
+  if (res.error) return [];
 
-  for (const log of failedLogs || []) {
-    const campName = (log as { campaigns?: { name?: string } | null }).campaigns?.name;
-    alerts.push({
-      id: `log:${log.id}`,
-      source: 'envio',
-      level: 'error',
-      message: `${campName ? `[${campName}] ` : ''}${log.error_message}`,
-      tenantId: log.tenant_id,
-      createdAt: log.created_at,
-    });
-  }
-
-  alerts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const seen = new Set<string>();
-  const unique: OpsAlert[] = [];
-  for (const a of alerts) {
-    const key = `${a.source}|${a.message}|${a.tenantId || ''}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(a);
-    if (unique.length >= limit) break;
-  }
-
-  const tenantIds = [...new Set(unique.map((a) => a.tenantId).filter(Boolean))] as string[];
+  const rows = (res.data || []) as any[];
+  const tenantIds = [...new Set(rows.map((r) => r.tenant_id).filter(Boolean))] as string[];
+  const names = new Map<string, string>();
   if (tenantIds.length > 0) {
     const { data: tenants } = await supabaseAdmin.from('tenants').select('id, name').in('id', tenantIds);
-    const names = new Map((tenants || []).map((t) => [t.id, t.name]));
-    for (const a of unique) {
-      if (a.tenantId) a.tenantName = names.get(a.tenantId) || null;
-    }
+    for (const t of tenants || []) names.set(t.id, t.name);
   }
 
-  return unique;
+  return rows.map((row) => ({
+    id: row.id,
+    source: row.source,
+    level: row.level === 'warn' ? 'warn' : 'error',
+    message: row.message,
+    tenantId: row.tenant_id,
+    tenantName: row.tenant_id ? names.get(row.tenant_id) || null : null,
+    createdAt: row.created_at,
+    lastSeenAt: row.last_seen_at || row.created_at,
+    occurrences: Number(row.occurrences || 1),
+    resolvedAt: row.resolved_at || null,
+    resolvedBy: row.resolved_by || null,
+    meta: (row.meta as Record<string, unknown>) || {},
+  }));
 }

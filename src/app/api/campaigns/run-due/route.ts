@@ -6,6 +6,7 @@ import {
 } from '@/lib/campaignDispatch';
 import { isCronRequest } from '@/lib/cronAuth';
 import { describeError, withTransientRetry } from '@/lib/errors';
+import { recordHeartbeat } from '@/lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 /** Disparo sequencial pode passar de 10s — Pro/Enterprise na Vercel. */
@@ -58,9 +59,12 @@ export async function GET(req: NextRequest) {
     if (!allowCron(req)) {
       return NextResponse.json({ success: false, error: 'Unauthorized cron.' }, { status: 401 });
     }
-    return await withTransientRetry(() => handleRunDue(req, {}));
+    const response = await withTransientRetry(() => handleRunDue(req, {}));
+    await recordHeartbeat('cron.campaigns', { ok: true });
+    return response;
   } catch (error: unknown) {
     const message = describeError(error);
+    await recordHeartbeat('cron.campaigns', { ok: false, error: message });
     console.error('[Campaigns run-due GET]', error);
     const { logOpsAlert } = await import('@/lib/opsAlert');
     await logOpsAlert({ source: 'cron.run-due', message });

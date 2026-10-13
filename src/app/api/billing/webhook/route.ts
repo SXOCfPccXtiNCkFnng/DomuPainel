@@ -19,6 +19,7 @@ import { isProduction } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
 import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
 import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
+import { recordHeartbeat } from '@/lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 
@@ -294,8 +295,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    await recordHeartbeat('webhook.asaas', { ok: true, throttle: true });
     return NextResponse.json({ success: true, received: true });
   } catch (error: unknown) {
+    await recordHeartbeat('webhook.asaas', { ok: false, error: error instanceof Error ? error.message : 'Erro no webhook Asaas' });
     console.error('[Asaas Webhook Error]', error);
     const { logOpsAlert } = await import('@/lib/opsAlert');
     await logOpsAlert({

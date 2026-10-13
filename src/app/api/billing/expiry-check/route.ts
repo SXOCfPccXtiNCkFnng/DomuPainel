@@ -7,6 +7,7 @@ import { notifyTenantAdmins } from '@/lib/notify';
 import { logger } from '@/lib/logger';
 import { getPlanDisplayName } from '@/lib/planLimits';
 import { describeError, withTransientRetry } from '@/lib/errors';
+import { recordHeartbeat } from '@/lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,9 +118,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    await recordHeartbeat('cron.expiry-check', { ok: true, result: { checked: (expiring || []).length, notified } });
     return NextResponse.json({ success: true, checked: (expiring || []).length, notified });
   } catch (error: unknown) {
     const message = describeError(error);
+    await recordHeartbeat('cron.expiry-check', { ok: false, error: message });
     logger.error('billing.expiry_check_error', { message });
     const { logOpsAlert } = await import('@/lib/opsAlert');
     await logOpsAlert({ source: 'cron.expiry-check', message });
