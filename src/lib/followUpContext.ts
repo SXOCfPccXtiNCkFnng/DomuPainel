@@ -106,6 +106,7 @@ const MEDIA_LABELS: Record<string, string> = {
   location: 'uma localização',
   contacts: 'um contato',
   reaction: 'uma reação',
+  unsupported: 'uma mensagem que a API não mostra (enquete, visualização única…)',
 };
 
 /**

@@ -174,7 +174,10 @@ CREATE TABLE IF NOT EXISTS public.campaign_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
     campaign_id UUID NOT NULL REFERENCES public.campaigns(id) ON DELETE CASCADE,
-    lead_id UUID NOT NULL REFERENCES public.leads(id) ON DELETE CASCADE,
+    -- SET NULL: excluir o contato não apaga o histórico da campanha.
+    lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL,
+    recipient_name VARCHAR(255), -- quem recebeu (foto no momento do envio)
+    recipient_phone VARCHAR(30),
     wamid VARCHAR(150), -- Message ID retornado pela Meta
     status VARCHAR(30) DEFAULT 'PENDING', -- 'PENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED'
     error_code INT,

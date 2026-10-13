@@ -260,7 +260,10 @@ async function handleInboundMessage(
     message.text?.body ||
     message.button?.text ||
     message.interactive?.button_reply?.title ||
-    `[${message.type || 'media'}]`;
+    // "unsupported": enquete, visualização única etc. — a API não entrega o conteúdo.
+    (message.type === 'unsupported'
+      ? '[mensagem não suportada pela API — veja no celular]'
+      : `[${message.type || 'media'}]`);
 
   const lead = await findOrCreateLead(tenantId, from, profileName);
   if (!lead) return;
@@ -451,7 +454,10 @@ export async function POST(req: NextRequest) {
           }
           for (const message of value.messages) {
             const from = String(message.from || '').replace(/\D/g, '');
-            await handleInboundMessage(message, tenantId, profileNames.get(from) || null, metaPhone);
+            const profileName = profileNames.get(from) || null;
+            // Sem nome, a Meta não deixa consultar depois: registra para saber quando acontece.
+            if (!profileName) logger.info('webhook.inbound_without_profile_name', { tenantId, type: message.type });
+            await handleInboundMessage(message, tenantId, profileName, metaPhone);
           }
         }
       }

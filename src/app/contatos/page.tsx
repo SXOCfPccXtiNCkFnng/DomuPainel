@@ -16,6 +16,7 @@ import {
   X,
   Tags,
   AlertCircle,
+  MessageCircle,
 } from 'lucide-react';
 import ImportContactsModal from '@/components/disparos/ImportContactsModal';
 import { getAuthItem } from '@/lib/authStorage';
@@ -457,7 +458,18 @@ export default function ContatosPage() {
                             'NOVO'}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right space-x-1">
+                      <td className="py-3 px-3 text-right space-x-1 whitespace-nowrap">
+                        {/* Abre a conversa no WhatsApp (app ou web) com esse número. */}
+                        <a
+                          href={`https://wa.me/${(contact.phone || '').replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abrir conversa no WhatsApp"
+                          className="inline-flex items-center gap-1 text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded-lg font-bold"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          WhatsApp
+                        </a>
                         <button
                           type="button"
                           onClick={() => openEdit(contact)}

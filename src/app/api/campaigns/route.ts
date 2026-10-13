@@ -162,11 +162,11 @@ export async function POST(req: NextRequest) {
     // Em lotes: `.in()` com centenas de IDs estoura o tamanho da URL e cada
     // consulta para em 1000 linhas — campanhas grandes falhavam ou saíam pela metade.
     const uniqueLeadIds = [...new Set(leadIds.map((id: unknown) => String(id)))];
-    const selectedLeads: { id: string; opt_in: boolean | null }[] = [];
+    const selectedLeads: { id: string; opt_in: boolean | null; name: string | null; phone: string | null }[] = [];
     for (const ids of chunk(uniqueLeadIds)) {
       const { data, error: leadsError } = await supabaseAdmin
         .from('leads')
-        .select('id, opt_in')
+        .select('id, opt_in, name, phone')
         .eq('tenant_id', tenantId)
         .in('id', ids);
       if (leadsError) throw leadsError;
@@ -308,12 +308,21 @@ export async function POST(req: NextRequest) {
       tenant_id: tenantId,
       campaign_id: campaign.id,
       lead_id: lead.id,
+      // Quem recebeu fica registrado mesmo se o contato for excluído depois.
+      recipient_name: lead.name || null,
+      recipient_phone: lead.phone || null,
       status: lead.opt_in === false ? 'FAILED' : 'PENDING',
       error_message: lead.opt_in === false ? 'Opt-out: contato pediu para não receber.' : null,
     }));
 
     for (const part of chunk(logs, 1000)) {
-      const { error: logError } = await supabaseAdmin.from('campaign_logs').insert(part);
+      let { error: logError } = await supabaseAdmin.from('campaign_logs').insert(part);
+      // Migration do histórico ainda não aplicada: grava sem o nome/telefone.
+      if (logError && (logError.code === 'PGRST204' || logError.code === '42703')) {
+        ({ error: logError } = await supabaseAdmin
+          .from('campaign_logs')
+          .insert(part.map(({ recipient_name: _n, recipient_phone: _p, ...rest }) => rest)));
+      }
       if (logError) {
         // Sem a fila de envio a campanha "concluiria" com zero envios: marca falha e avisa.
         console.error('[Campaign logs insert]', logError);

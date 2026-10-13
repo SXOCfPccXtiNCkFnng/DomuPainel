@@ -357,7 +357,12 @@ export async function dispatchCampaignPending(
     const optIn = lead?.opt_in;
     const patch: Record<string, unknown> = {};
 
-    if (!lead || lead.tenant_id !== campaign.tenant_id) {
+    if (!lead) {
+      // Contato excluído depois de a campanha ser criada.
+      patch.status = 'FAILED';
+      patch.error_message = 'Contato excluído antes do envio.';
+      failed += 1;
+    } else if (lead.tenant_id !== campaign.tenant_id) {
       // Defesa extra: nunca enviar para contato de outra conta, mesmo com dado inconsistente.
       patch.status = 'FAILED';
       patch.error_message = 'Contato não pertence a esta conta.';
