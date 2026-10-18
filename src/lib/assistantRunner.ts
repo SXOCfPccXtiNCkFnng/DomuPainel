@@ -227,10 +227,10 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
           .eq('id', leadId)
           .eq('tenant_id', tenantId);
         await notifyTenantAdmins(tenantId, {
-          title: 'Assistente pausada em uma conversa',
-          message: `A conversa com ${lead.name} passou do limite de mensagens por hora. A assistente parou de responder esse contato por 12 horas.`,
+          title: 'Atendente pausada em uma conversa',
+          message: `A conversa com ${lead.name} passou do limite de mensagens por hora. A atendente parou de responder esse contato por 12 horas.`,
           type: 'WARNING',
-          url: '/atendimento',
+          url: '/atendente',
         });
       }
       return;
@@ -272,10 +272,10 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     if (!bubbles.length) {
       logger.error('assistant.no_reply', { tenantId, leadId });
       await notifyTenantAdmins(tenantId, {
-        title: 'Assistente não conseguiu responder',
-        message: `${lead.name} mandou mensagem e a assistente não conseguiu responder. Responda pelo WhatsApp Business.`,
+        title: 'Atendente não conseguiu responder',
+        message: `${lead.name} mandou mensagem e a atendente não conseguiu responder. Responda pelo WhatsApp Business.`,
         type: 'WARNING',
-        url: '/atendimento',
+        url: '/atendente',
       });
       return;
     }

@@ -60,7 +60,7 @@ export async function PUT(req: NextRequest) {
       if (countError) throw countError;
       if (!count) {
         return NextResponse.json(
-          { success: false, error: 'Cadastre pelo menos um serviço ativo antes de ligar a assistente.' },
+          { success: false, error: 'Cadastre pelo menos um serviço ativo antes de ligar a atendente.' },
           { status: 400 }
         );
       }

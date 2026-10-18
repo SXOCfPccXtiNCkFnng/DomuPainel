@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarDays, Repeat, Send, Settings } from 'lucide-react';
+import { CalendarDays, Headset, Repeat, Send, Settings } from 'lucide-react';
 import { NavItemId } from '@/lib/segmentConfig';
 import { TenantSegment } from '@/types';
 
@@ -66,6 +66,17 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
         aria-hidden
       >
         <CalendarDays size={16} color={lucideColor} strokeWidth={1.75} />
+      </span>
+    );
+  }
+
+  if (id === 'atendente') {
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 ${className || ''}`}
+        aria-hidden
+      >
+        <Headset size={16} color={lucideColor} strokeWidth={1.75} />
       </span>
     );
   }

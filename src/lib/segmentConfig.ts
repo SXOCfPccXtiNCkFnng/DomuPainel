@@ -70,6 +70,7 @@ export function getSegmentFromStorage(): TenantSegment {
 export type NavItemId =
   | 'dashboard'
   | 'agenda'
+  | 'atendente'
   | 'disparos'
   | 'templates'
   | 'contatos'
@@ -96,6 +97,13 @@ export const PLATFORM_NAV: NavItemConfig[] = [
     id: 'agenda',
     name: 'Agenda',
     href: '/agenda',
+    isComingSoon: false,
+    segments: ['automotivo'],
+  },
+  {
+    id: 'atendente',
+    name: 'Atendente e Serviços',
+    href: '/atendente',
     isComingSoon: false,
     segments: ['automotivo'],
   },
@@ -153,6 +161,8 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
   return PLATFORM_NAV.filter((item) => {
     if (item.segments && !item.segments.includes(segment)) return false;
     if (item.id === 'followup' && !hasFollowUp(segment)) return false;
+    // No automotivo, a atendente do WhatsApp já funciona (página Atendente e Serviços).
+    if (item.id === 'atendimento' && isAutomotiveSegment(segment)) return false;
     return true;
   }).map((item) => {
     if (dispatchOnly && item.id === 'metricas') {
@@ -160,9 +170,6 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
     }
     if (dispatchOnly && item.id === 'contatos') {
       return { ...item, name: 'Contatos' };
-    }
-    if (isAutomotiveSegment(segment) && item.id === 'atendimento') {
-      return { ...item, name: 'Atendimento e Agendamentos' };
     }
     return item;
   });
@@ -199,7 +206,11 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   },
   '/agenda': {
     title: 'Agenda',
-    subtitle: 'Serviços, horário de funcionamento e agendamentos do dia',
+    subtitle: 'Agendamentos do dia',
+  },
+  '/atendente': {
+    title: 'Atendente e Serviços',
+    subtitle: 'Atendente do WhatsApp, serviços e horário de funcionamento',
   },
   '/imoveis': {
     title: 'Imóveis',
@@ -262,10 +273,6 @@ const AUTOMOTIVE_PAGE_TITLES: Record<string, { title: string; subtitle: string }
   '/disparos': {
     title: 'Disparo de Campanha',
     subtitle: 'Promoção → segmento → agendar → enviar com status Meta',
-  },
-  '/atendimento': {
-    title: 'Atendimento e Agendamentos',
-    subtitle: 'Conversas do WhatsApp e horários marcados',
   },
 };
 

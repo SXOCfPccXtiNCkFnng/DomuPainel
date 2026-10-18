@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Bot, CheckCircle2, Circle, Info, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Circle, Headset, Info, Loader2 } from 'lucide-react';
 import WhatsAppPreview from '@/components/shared/WhatsAppPreview';
 import {
   ABOUT_MAX,
@@ -34,7 +34,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-export default function AssistantTab({ services }: { services: ServiceItem[] }) {
+export default function AssistantTab({
+  services,
+  onGoToServices,
+}: {
+  services: ServiceItem[];
+  onGoToServices?: () => void;
+}) {
   const [form, setForm] = useState<AssistantSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [saved, setSaved] = useState<AssistantSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [companyName, setCompanyName] = useState('');
@@ -51,7 +57,7 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
         const res = await fetch('/api/assistant/settings');
         const json = await res.json();
         if (!json.success) {
-          setError(json.error || 'Não foi possível carregar o assistente.');
+          setError(json.error || 'Não foi possível carregar a atendente.');
           return;
         }
         setForm(json.settings);
@@ -60,7 +66,7 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
         setAiAvailable(Boolean(json.aiAvailable));
         setCanEdit(Boolean(json.canEdit));
       } catch {
-        setError('Não foi possível carregar o assistente.');
+        setError('Não foi possível carregar a atendente.');
       } finally {
         setIsLoading(false);
       }
@@ -96,7 +102,7 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
       }
       setForm(json.settings);
       setSaved(json.settings);
-      setNotice('Assistente salvo.');
+      setNotice('Atendente salva.');
     } catch {
       setError('Não foi possível salvar.');
     } finally {
@@ -107,7 +113,7 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-xs text-slate-500 p-5">
-        <Loader2 className="w-4 h-4 animate-spin" /> Carregando assistente...
+        <Loader2 className="w-4 h-4 animate-spin" /> Carregando atendente...
       </div>
     );
   }
@@ -141,13 +147,13 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
       <p className="text-[11px] text-slate-600 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 flex items-start gap-2">
         <Info className="w-4 h-4 shrink-0 text-domu-blue" />
         <span>
-          A assistente responde seus clientes no WhatsApp como alguém da equipe, focada no lava rápido. Você ajusta o
+          A atendente responde seus clientes no WhatsApp como alguém da equipe, focada no lava rápido. Você ajusta o
           jeito dela e o que ela sabe; as regras de atendimento (não inventar preço, só oferecer horário livre,
           confirmar antes de marcar) ficam sempre ligadas.
-          {!aiAvailable && ' A chave da IA ainda não está configurada no servidor (GEMINI_API_KEY).'}
+          {!aiAvailable && ' A atendente ainda não foi liberada no servidor (falta a GEMINI_API_KEY).'}
         </span>
       </p>
-      {!canEdit && <p className="text-[11px] text-slate-500">Só administradores podem alterar o assistente.</p>}
+      {!canEdit && <p className="text-[11px] text-slate-500">Só administradores podem alterar a atendente.</p>}
 
       <section
         className={`rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center gap-3 ${
@@ -156,7 +162,7 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
       >
         <div className="flex-1 space-y-1">
           <h2 className="text-sm font-black text-slate-900">
-            {form.enabled ? 'Assistente ligada no WhatsApp' : 'Assistente desligada'}
+            {form.enabled ? 'Atendente ligada no WhatsApp' : 'Atendente desligada'}
           </h2>
           <p className="text-[11px] text-slate-600 leading-relaxed">
             {form.enabled
@@ -164,7 +170,14 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
               : 'Ligue para ela começar a responder as mensagens que chegarem no WhatsApp conectado.'}
           </p>
           {!form.enabled && activeServices === 0 && (
-            <p className="text-[11px] text-amber-700">Cadastre pelo menos um serviço antes de ligar.</p>
+            <p className="text-[11px] text-amber-700">
+              Cadastre pelo menos um serviço antes de ligar.{' '}
+              {onGoToServices && (
+                <button type="button" onClick={onGoToServices} className="font-bold underline">
+                  Cadastrar serviços
+                </button>
+              )}
+            </p>
           )}
         </div>
         <button
@@ -185,14 +198,14 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
         </button>
       </section>
       {form.enabled !== saved.enabled && (
-        <p className="text-[11px] text-amber-700">Clique em “Salvar assistente” para aplicar.</p>
+        <p className="text-[11px] text-amber-700">Clique em “Salvar atendente” para aplicar.</p>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 space-y-4">
           <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-domu-blue" />
+              <Headset className="w-4 h-4 text-domu-blue" />
               <h2 className="text-sm font-black text-slate-900">Jeito de conversar</h2>
             </div>
             <div className="space-y-1.5">
@@ -341,7 +354,7 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
                 className="btn-domu-primary text-xs py-2.5 px-5 flex items-center gap-2 disabled:opacity-50"
               >
                 {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Salvar assistente
+                Salvar atendente
               </button>
             </div>
           )}
@@ -357,7 +370,7 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
               companyLabel={form.assistant_name ? `Atendimento · ${form.assistant_name}` : 'Atendimento'}
             />
             <p className="text-[10.5px] text-slate-400">
-              Exemplo de saudação. Na conversa real, a IA escreve cada resposta de acordo com o que o cliente disser.
+              Exemplo de saudação. Na conversa real, a atendente escreve cada resposta de acordo com o que o cliente disser.
             </p>
           </section>
           <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-2">

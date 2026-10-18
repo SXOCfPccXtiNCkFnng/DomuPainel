@@ -262,8 +262,8 @@ async function chamarEquipe(args: Record<string, unknown>, ctx: AssistantToolCon
 
   const phone = formatPhoneBR(ctx.leadPhone) || ctx.leadPhone;
   const title = `${ctx.leadName} precisa de atendimento`;
-  const message = `${reason}. WhatsApp: ${phone}. A assistente parou de responder essa conversa por 12 horas; responda pelo WhatsApp Business.`;
-  await notifyTenantAdmins(ctx.tenantId, { title, message, type: 'WARNING', url: '/atendimento' });
+  const message = `${reason}. WhatsApp: ${phone}. A atendente parou de responder essa conversa por 12 horas; responda pelo WhatsApp Business.`;
+  await notifyTenantAdmins(ctx.tenantId, { title, message, type: 'WARNING', url: '/atendente' });
 
   const { data: admins } = await supabaseAdmin
     .from('users')
@@ -273,7 +273,7 @@ async function chamarEquipe(args: Record<string, unknown>, ctx: AssistantToolCon
   const bodyHtml = `<p><strong>${escapeHtml(ctx.leadName)}</strong> (${escapeHtml(phone)}) precisa de alguém da equipe.</p>
 <p><strong>Motivo:</strong> ${escapeHtml(reason)}</p>
 <p><strong>Última mensagem:</strong> “${escapeHtml(ctx.lastCustomerMessage.slice(0, 300))}”</p>
-<p>A assistente parou de responder essa conversa por 12 horas. Responda pelo WhatsApp Business do celular.</p>`;
+<p>A atendente parou de responder essa conversa por 12 horas. Responda pelo WhatsApp Business do celular.</p>`;
   await Promise.all(
     (admins || [])
       .filter((a) => a.email)
@@ -282,7 +282,7 @@ async function chamarEquipe(args: Record<string, unknown>, ctx: AssistantToolCon
           to: a.email,
           subject: `${ctx.companyName}: ${title}`,
           html: brandedEmailHtml({ heading: title, bodyHtml, ctaLabel: 'Abrir o painel', ctaUrl: appBaseUrl() }),
-          text: `${title}\n\nMotivo: ${reason}\nWhatsApp: ${phone}\nÚltima mensagem: "${ctx.lastCustomerMessage.slice(0, 300)}"\n\nA assistente parou de responder essa conversa por 12 horas. Responda pelo WhatsApp Business do celular.`,
+          text: `${title}\n\nMotivo: ${reason}\nWhatsApp: ${phone}\nÚltima mensagem: "${ctx.lastCustomerMessage.slice(0, 300)}"\n\nA atendente parou de responder essa conversa por 12 horas. Responda pelo WhatsApp Business do celular.`,
         })
       )
   );
