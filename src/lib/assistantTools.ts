@@ -104,6 +104,12 @@ type ToolResult = Record<string, unknown>;
 
 const timeOf = (iso: string | Date) => formatMinutes(brtMinutesOfDay(new Date(iso)));
 const weekdayOf = (dateKey: string) => WEEKDAY_LABELS[brtWeekday(dateKey)].toLowerCase();
+/** "sábado 24/10 às 09:00" — para as notificações da equipe. */
+const whenOf = (iso: string) => {
+  const key = brtDateKey(new Date(iso));
+  const [, month, day] = key.split('-');
+  return `${weekdayOf(key)} ${day}/${month} às ${timeOf(iso)}`;
+};
 
 async function freeSlots(ctx: AssistantToolContext, service: ServiceItem, dateKey: string): Promise<Date[]> {
   const { start, end } = brtDayRange(dateKey);
@@ -170,6 +176,12 @@ async function agendar(args: Record<string, unknown>, ctx: AssistantToolContext)
   if (!result.ok) return { ok: false, erro: result.error };
 
   const a = result.appointment;
+  await notifyTenantAdmins(ctx.tenantId, {
+    title: 'Novo agendamento pelo WhatsApp',
+    message: `${a.customer_name} · ${a.service_name} · ${whenOf(a.starts_at)}${a.vehicle ? ` · ${a.vehicle}` : ''}`,
+    type: 'SUCCESS',
+    url: '/agenda',
+  });
   return {
     ok: true,
     agendamento: {
@@ -221,13 +233,20 @@ async function cancelarAgendamento(args: Record<string, unknown>, ctx: Assistant
     .eq('lead_id', ctx.leadId)
     .eq('status', 'CONFIRMED')
     .gte('starts_at', ctx.now.toISOString())
-    .select('id');
+    .select('id, customer_name, service_name, starts_at');
   if (error) {
     if (error.code === '22P02') return { ok: false, erro: 'Agendamento não encontrado.' };
     throw error;
   }
   if (!data?.length) return { ok: false, erro: 'Agendamento não encontrado ou já passou.' };
   logger.info('assistant.appointment_cancelled', { tenantId: ctx.tenantId, appointmentId: id });
+  const c = data[0];
+  await notifyTenantAdmins(ctx.tenantId, {
+    title: 'Agendamento cancelado pelo WhatsApp',
+    message: `${c.customer_name} · ${c.service_name} · ${whenOf(c.starts_at)}`,
+    type: 'INFO',
+    url: '/agenda',
+  });
   return { ok: true };
 }
 
@@ -244,7 +263,7 @@ async function chamarEquipe(args: Record<string, unknown>, ctx: AssistantToolCon
   const phone = formatPhoneBR(ctx.leadPhone) || ctx.leadPhone;
   const title = `${ctx.leadName} precisa de atendimento`;
   const message = `${reason}. WhatsApp: ${phone}. A assistente parou de responder essa conversa por 12 horas; responda pelo WhatsApp Business.`;
-  await notifyTenantAdmins(ctx.tenantId, { title, message, type: 'WARNING' });
+  await notifyTenantAdmins(ctx.tenantId, { title, message, type: 'WARNING', url: '/atendimento' });
 
   const { data: admins } = await supabaseAdmin
     .from('users')

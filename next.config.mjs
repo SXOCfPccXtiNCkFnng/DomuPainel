@@ -37,6 +37,11 @@ const nextConfig = {
 
     return [
       {
+        // Sem cache: versão nova do service worker chega no próximo acesso.
+        source: '/sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }],
+      },
+      {
         source: '/:path*',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },

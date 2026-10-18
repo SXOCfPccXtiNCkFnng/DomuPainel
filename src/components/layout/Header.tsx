@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown, Menu, LineChart } from 'lucide-react';
 import { getPageTitle, getSegmentFromStorage } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
+import PushNotificationsToggle from '@/components/layout/PushNotificationsToggle';
 import { clearAuthSession, getAuthItem } from '@/lib/authStorage';
 import { redirectIfDispatchBlocked } from '@/lib/billingGuard';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
@@ -265,6 +266,7 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
                     </button>
                   </div>
                 )}
+                <PushNotificationsToggle />
               </div>
             )}
           </div>

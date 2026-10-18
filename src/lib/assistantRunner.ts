@@ -230,6 +230,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
           title: 'Assistente pausada em uma conversa',
           message: `A conversa com ${lead.name} passou do limite de mensagens por hora. A assistente parou de responder esse contato por 12 horas.`,
           type: 'WARNING',
+          url: '/atendimento',
         });
       }
       return;
@@ -274,6 +275,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
         title: 'Assistente não conseguiu responder',
         message: `${lead.name} mandou mensagem e a assistente não conseguiu responder. Responda pelo WhatsApp Business.`,
         type: 'WARNING',
+        url: '/atendimento',
       });
       return;
     }
