@@ -85,6 +85,8 @@ export type CreateAppointmentInput = {
   customerPhone?: unknown;
   vehicle?: unknown;
   notes?: unknown;
+  /** Contato já conhecido (conversa do WhatsApp): dispensa a busca por telefone. */
+  leadId?: string;
 };
 
 export type CreateAppointmentResult =
@@ -104,7 +106,10 @@ export async function createAppointment(
   if (customerName.length < 2) return { ok: false, status: 400, error: 'Informe o nome do cliente.' };
 
   const rawPhone = String(input.customerPhone ?? '').trim();
-  if (!isValidBrazilianPhone(rawPhone)) {
+  // Pelo WhatsApp o número é o wa_id da Meta (pode vir sem o 9 ou de fora do Brasil).
+  const phoneOk =
+    source === 'WHATSAPP' ? rawPhone.replace(/\D/g, '').length >= 8 : isValidBrazilianPhone(rawPhone);
+  if (!phoneOk) {
     return { ok: false, status: 400, error: 'Informe um WhatsApp válido com DDD.' };
   }
 
@@ -137,7 +142,7 @@ export async function createAppointment(
     }
   }
 
-  const leadId = await findOrCreateLeadId(tenantId, customerName, rawPhone);
+  const leadId = input.leadId ?? (await findOrCreateLeadId(tenantId, customerName, rawPhone));
 
   const { data, error } = await supabaseAdmin
     .from('appointments')

@@ -51,6 +51,20 @@ export async function PUT(req: NextRequest) {
     if (!parsed.ok) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
 
     const { settings } = parsed;
+    if (settings.enabled) {
+      const { count, error: countError } = await supabaseAdmin
+        .from('services')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', auth.session.tenantId)
+        .eq('active', true);
+      if (countError) throw countError;
+      if (!count) {
+        return NextResponse.json(
+          { success: false, error: 'Cadastre pelo menos um serviço ativo antes de ligar a assistente.' },
+          { status: 400 }
+        );
+      }
+    }
     const { error } = await supabaseAdmin.from('assistant_settings').upsert(
       {
         tenant_id: auth.session.tenantId,

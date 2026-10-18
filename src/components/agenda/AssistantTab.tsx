@@ -7,6 +7,7 @@ import {
   ABOUT_MAX,
   ADDRESS_MAX,
   ASSISTANT_NAME_MAX,
+  ASSISTANT_NAME_SUGGESTIONS,
   DEFAULT_ASSISTANT_SETTINGS,
   EXTRA_INFO_MAX,
   PAYMENT_OPTIONS,
@@ -148,6 +149,45 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
       </p>
       {!canEdit && <p className="text-[11px] text-slate-500">Só administradores podem alterar o assistente.</p>}
 
+      <section
+        className={`rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center gap-3 ${
+          form.enabled ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white border-slate-200/80'
+        }`}
+      >
+        <div className="flex-1 space-y-1">
+          <h2 className="text-sm font-black text-slate-900">
+            {form.enabled ? 'Assistente ligada no WhatsApp' : 'Assistente desligada'}
+          </h2>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            {form.enabled
+              ? 'Ela responde a qualquer hora e marca horários sozinha. Quando alguém da equipe responde pelo celular, ela fica quieta naquela conversa por 12 horas. Se o cliente reclamar ou pedir uma pessoa, ela avisa você aqui no painel e por e-mail.'
+              : 'Ligue para ela começar a responder as mensagens que chegarem no WhatsApp conectado.'}
+          </p>
+          {!form.enabled && activeServices === 0 && (
+            <p className="text-[11px] text-amber-700">Cadastre pelo menos um serviço antes de ligar.</p>
+          )}
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={form.enabled}
+          disabled={disabled || !aiAvailable || (!form.enabled && activeServices === 0)}
+          onClick={() => update({ enabled: !form.enabled })}
+          className={`relative w-12 h-7 rounded-full transition-colors shrink-0 disabled:opacity-50 ${
+            form.enabled ? 'bg-emerald-500' : 'bg-slate-300'
+          }`}
+        >
+          <span
+            className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+              form.enabled ? 'translate-x-5' : ''
+            }`}
+          />
+        </button>
+      </section>
+      {form.enabled !== saved.enabled && (
+        <p className="text-[11px] text-amber-700">Clique em “Salvar assistente” para aplicar.</p>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 space-y-4">
           <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
@@ -155,15 +195,34 @@ export default function AssistantTab({ services }: { services: ServiceItem[] }) 
               <Bot className="w-4 h-4 text-domu-blue" />
               <h2 className="text-sm font-black text-slate-900">Jeito de conversar</h2>
             </div>
-            <Field label="Nome da atendente" hint="Opcional. Ex.: Bia, Carol, Rafa.">
-              <input
-                value={form.assistant_name}
-                maxLength={ASSISTANT_NAME_MAX}
-                disabled={disabled}
-                onChange={(e) => update({ assistant_name: e.target.value })}
-                className={agendaInputClass}
-              />
-            </Field>
+            <div className="space-y-1.5">
+              <Field label="Nome da atendente" hint="Escolha uma sugestão ou escreva outro nome. Pode deixar vazio.">
+                <input
+                  value={form.assistant_name}
+                  maxLength={ASSISTANT_NAME_MAX}
+                  disabled={disabled}
+                  onChange={(e) => update({ assistant_name: e.target.value })}
+                  className={agendaInputClass}
+                />
+              </Field>
+              <div className="flex flex-wrap gap-1.5">
+                {ASSISTANT_NAME_SUGGESTIONS.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => update({ assistant_name: name })}
+                    className={`px-2.5 py-1 rounded-lg border text-xs font-bold disabled:opacity-60 ${
+                      form.assistant_name === name
+                        ? 'bg-domu-blue text-white border-domu-blue'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="space-y-1.5">
               <span className="block text-[11px] font-bold text-slate-600">Tom</span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

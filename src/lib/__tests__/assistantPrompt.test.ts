@@ -66,7 +66,9 @@ describe('buildAssistantSystemPrompt', () => {
     const prompt = build();
     expect(prompt).toContain('seja honesta: diga que é a assistente virtual');
     expect(prompt).toContain('Nunca invente serviço, preço');
-    expect(prompt).toContain('Só ofereça horários que a ferramenta de agenda retornar');
+    expect(prompt).toContain('Use consultar_horarios_livres antes de oferecer qualquer horário');
+    expect(prompt).toContain('chamar_equipe');
+    expect(prompt).toContain('Calendário dos próximos dias');
   });
 
   it('texto do dono não consegue fechar o bloco de dados', () => {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getMetaAppSecret, getMetaVerifyToken, isProduction } from '@/lib/envSecrets';
@@ -9,8 +9,10 @@ import { phoneLookupVariants, toStoredPhone } from '@/lib/phone';
 import { handleFollowUpReply, loadFollowUpSettings, scheduleConversationFollowUp } from '@/lib/followUp';
 import type { FollowUpSettings } from '@/lib/followUpRules';
 import { recordHeartbeat } from '@/lib/heartbeat';
+import { runAssistantForTrigger, type AssistantTrigger } from '@/lib/assistantRunner';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function normalizeStatus(raw: string): 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | null {
   const s = (raw || '').toLowerCase();
@@ -282,6 +284,7 @@ async function handleInboundMessage(
     wamid: message.id || null,
     status: 'DELIVERED',
   };
+  let messageId: string | null = null;
   if (row.wamid) {
     const { data: inserted, error } = await supabaseAdmin
       .from('chat_messages')
@@ -289,8 +292,10 @@ async function handleInboundMessage(
       .select('id');
     if (error) throw error;
     if (!inserted || inserted.length === 0) return;
+    messageId = inserted[0].id;
   } else {
-    await supabaseAdmin.from('chat_messages').insert(row);
+    const { data: inserted } = await supabaseAdmin.from('chat_messages').insert(row).select('id');
+    messageId = inserted?.[0]?.id ?? null;
   }
 
   // Respondeu: cancela o follow-up agendado (e conta como recuperado, se veio depois de um).
@@ -317,6 +322,8 @@ async function handleInboundMessage(
     .update(leadPatch)
     .eq('id', lead.id)
     .eq('tenant_id', tenantId);
+
+  return messageId ? { tenantId, leadId: lead.id as string, messageId } : undefined;
 }
 
 /**
@@ -421,6 +428,7 @@ export async function POST(req: NextRequest) {
 
     const body = JSON.parse(rawBody || '{}');
     const entries = body.entry || [];
+    const assistantTriggers: AssistantTrigger[] = [];
 
     for (const entry of entries) {
       for (const change of entry.changes || []) {
@@ -458,10 +466,16 @@ export async function POST(req: NextRequest) {
             const profileName = profileNames.get(from) || null;
             // Sem nome, a Meta não deixa consultar depois: registra para saber quando acontece.
             if (!profileName) logger.info('webhook.inbound_without_profile_name', { tenantId, type: message.type });
-            await handleInboundMessage(message, tenantId, profileName, metaPhone);
+            const trigger = await handleInboundMessage(message, tenantId, profileName, metaPhone);
+            if (trigger) assistantTriggers.push(trigger);
           }
         }
       }
+    }
+
+    // A Meta precisa do 200 em poucos segundos; a IA responde depois, fora do caminho da resposta.
+    if (assistantTriggers.length) {
+      after(() => Promise.all(assistantTriggers.map(runAssistantForTrigger)));
     }
 
     await recordHeartbeat('webhook.meta', { ok: true, throttle: true });
