@@ -3,6 +3,7 @@ export type TenantSegment =
   | 'ecommerce'
   | 'saude'
   | 'alimentacao'
+  | 'automotivo'
   | 'juridico'
   | 'marketing_apenas'
   | 'geral';

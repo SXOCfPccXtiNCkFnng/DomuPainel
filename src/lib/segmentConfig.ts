@@ -6,6 +6,7 @@ export const SEGMENT_LABELS: Record<TenantSegment, string> = {
   ecommerce: 'E-commerce',
   saude: 'Saúde e Beleza',
   alimentacao: 'Alimentação',
+  automotivo: 'Lava Rápido e Estética Automotiva',
   juridico: 'Jurídico',
   marketing_apenas: 'Somente Disparos',
   geral: 'Geral',
@@ -16,6 +17,7 @@ export const SEGMENT_WELCOME: Record<TenantSegment, string> = {
   ecommerce: 'Recupere carrinhos, envie ofertas e notifique seus clientes.',
   saude: 'Confirme consultas, horários e retornos com mensagens automáticas.',
   alimentacao: 'Receba pedidos, confirme entregas e fidelize clientes no WhatsApp.',
+  automotivo: 'Agende lavagens, avise quando o carro estiver pronto e traga o cliente de volta.',
   juridico: 'Gerencie prazos, cobranças e comunicação com clientes.',
   marketing_apenas: 'Foque em campanhas e disparos em massa no WhatsApp.',
   geral: 'Automatize comunicação e engajamento com seus clientes.',
@@ -30,6 +32,7 @@ export const BUSINESS_SEGMENT_OPTIONS: { id: TenantSegment; label: string }[] = 
   { id: 'imobiliario', label: 'Imobiliário (imobiliárias e corretores)' },
   { id: 'saude', label: 'Saúde e Beleza (barbearia, salão, clínica)' },
   { id: 'alimentacao', label: 'Alimentação (pizzaria, restaurante, delivery)' },
+  { id: 'automotivo', label: 'Automotivo (lava rápido, estética automotiva)' },
   { id: 'ecommerce', label: 'E-commerce e Varejo' },
   { id: 'geral', label: 'Serviços, Jurídico e Outros' },
 ];
@@ -47,6 +50,17 @@ export function isDispatchOnlySegment(segment: TenantSegment | string | null): b
   return segment === 'marketing_apenas';
 }
 
+export function isAutomotiveSegment(segment: TenantSegment | string | null): boolean {
+  return segment === 'automotivo';
+}
+
+/** Ramos onde o Follow-up Automático não faz sentido (ex.: lava rápido). */
+const SEGMENTS_WITHOUT_FOLLOW_UP: TenantSegment[] = ['automotivo'];
+
+export function hasFollowUp(segment: TenantSegment | string | null): boolean {
+  return !SEGMENTS_WITHOUT_FOLLOW_UP.includes(segment as TenantSegment);
+}
+
 export function getSegmentFromStorage(): TenantSegment {
   if (typeof window === 'undefined') return 'geral';
   const saved = getAuthItem('domu_selected_segment') as TenantSegment | null;
@@ -55,6 +69,7 @@ export function getSegmentFromStorage(): TenantSegment {
 
 export type NavItemId =
   | 'dashboard'
+  | 'agenda'
   | 'disparos'
   | 'templates'
   | 'contatos'
@@ -77,6 +92,13 @@ export interface NavItemConfig {
 
 export const PLATFORM_NAV: NavItemConfig[] = [
   { id: 'dashboard', name: 'Dashboard', href: '/', isComingSoon: false },
+  {
+    id: 'agenda',
+    name: 'Agenda',
+    href: '/agenda',
+    isComingSoon: false,
+    segments: ['automotivo'],
+  },
   {
     id: 'disparos',
     name: 'Disparo de Campanha',
@@ -130,6 +152,7 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
 
   return PLATFORM_NAV.filter((item) => {
     if (item.segments && !item.segments.includes(segment)) return false;
+    if (item.id === 'followup' && !hasFollowUp(segment)) return false;
     return true;
   }).map((item) => {
     if (dispatchOnly && item.id === 'metricas') {
@@ -137,6 +160,9 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
     }
     if (dispatchOnly && item.id === 'contatos') {
       return { ...item, name: 'Contatos' };
+    }
+    if (isAutomotiveSegment(segment) && item.id === 'atendimento') {
+      return { ...item, name: 'Atendimento e Agendamentos' };
     }
     return item;
   });
@@ -170,6 +196,10 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   '/atendimento': {
     title: 'Leads e Respostas',
     subtitle: 'Quem respondeu às campanhas e em que etapa está',
+  },
+  '/agenda': {
+    title: 'Agenda',
+    subtitle: 'Serviços, horário de funcionamento e agendamentos do dia',
   },
   '/imoveis': {
     title: 'Imóveis',
@@ -216,14 +246,40 @@ const DISPATCH_ONLY_PAGE_TITLES: Record<string, { title: string; subtitle: strin
   },
 };
 
+const AUTOMOTIVE_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  '/': {
+    title: 'Dashboard',
+    subtitle: 'Disparos, respostas, clientes e lavagens agendadas',
+  },
+  '/metricas': {
+    title: 'Métricas de ROI',
+    subtitle: 'Atingidos, taxa de resposta, clientes que voltaram e agendamentos',
+  },
+  '/contatos': {
+    title: 'Contatos e Segmentação',
+    subtitle: 'Importação e tags por serviço, veículo e frequência de visita',
+  },
+  '/disparos': {
+    title: 'Disparo de Campanha',
+    subtitle: 'Promoção → segmento → agendar → enviar com status Meta',
+  },
+  '/atendimento': {
+    title: 'Atendimento e Agendamentos',
+    subtitle: 'Conversas do WhatsApp e horários marcados',
+  },
+};
+
 export function getPageTitle(
   pathname: string,
   segment?: TenantSegment | string | null
 ): { title: string; subtitle: string } {
+  const override = isDispatchOnlySegment(segment || null)
+    ? DISPATCH_ONLY_PAGE_TITLES
+    : isAutomotiveSegment(segment || null)
+      ? AUTOMOTIVE_PAGE_TITLES
+      : null;
   const titles =
-    isDispatchOnlySegment(segment || null) && DISPATCH_ONLY_PAGE_TITLES[pathname]
-      ? { ...PAGE_TITLES, ...DISPATCH_ONLY_PAGE_TITLES }
-      : PAGE_TITLES;
+    override && override[pathname] ? { ...PAGE_TITLES, ...override } : PAGE_TITLES;
 
   if (titles[pathname]) return titles[pathname];
   const match = Object.keys(titles).find(

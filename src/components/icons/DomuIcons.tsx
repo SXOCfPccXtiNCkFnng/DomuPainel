@@ -1,5 +1,5 @@
 import React from 'react';
-import { Repeat, Send, Settings } from 'lucide-react';
+import { CalendarDays, Repeat, Send, Settings } from 'lucide-react';
 import { NavItemId } from '@/lib/segmentConfig';
 import { TenantSegment } from '@/types';
 
@@ -55,6 +55,17 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
         aria-hidden
       >
         <Repeat size={16} color={lucideColor} strokeWidth={1.75} />
+      </span>
+    );
+  }
+
+  if (id === 'agenda') {
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 ${className || ''}`}
+        aria-hidden
+      >
+        <CalendarDays size={16} color={lucideColor} strokeWidth={1.75} />
       </span>
     );
   }
@@ -174,6 +185,19 @@ export function SegmentIcon({ segment, className = '' }: { segment: TenantSegmen
           <path d="M4 10C4 7 7.5 5 12 5C16.5 5 20 7 20 10V11H4V10Z" stroke="#EA580C" strokeWidth="1.7" strokeLinejoin="round" />
           <path d="M5 11H19V14C19 16.2 15.9 18 12 18C8.1 18 5 16.2 5 14V11Z" stroke="#EA580C" strokeWidth="1.7" strokeLinejoin="round" />
           <path d="M9 18V20M15 18V20" stroke="#EA580C" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    automotivo: {
+      bg: 'bg-cyan-50 border-cyan-100',
+      content: (
+        <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+          <path d="M5 13L6.6 8.2C6.85 7.48 7.53 7 8.29 7H15.71C16.47 7 17.15 7.48 17.4 8.2L19 13" stroke="#0891B2" strokeWidth="1.7" strokeLinejoin="round" />
+          <rect x="3.5" y="13" width="17" height="4.5" rx="1.5" stroke="#0891B2" strokeWidth="1.7" />
+          <path d="M6 17.5V19.5M18 17.5V19.5" stroke="#0891B2" strokeWidth="1.7" strokeLinecap="round" />
+          <circle cx="7.5" cy="15.25" r="0.9" fill="#0891B2" />
+          <circle cx="16.5" cy="15.25" r="0.9" fill="#0891B2" />
+          <path d="M12 2.5C12 2.5 10.5 4.2 10.5 5C10.5 5.83 11.17 6.2 12 6.2C12.83 6.2 13.5 5.83 13.5 5C13.5 4.2 12 2.5 12 2.5Z" fill="#0891B2" />
         </svg>
       ),
     },

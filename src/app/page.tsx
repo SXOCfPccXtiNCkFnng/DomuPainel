@@ -9,6 +9,7 @@ import CampaignProgress from '@/components/disparos/CampaignProgress';
 import Link from 'next/link';
 import {
   Send,
+  CalendarDays,
   PlusCircle,
   Smartphone,
   Users,
@@ -21,6 +22,7 @@ import {
   getSegmentFromStorage,
   SEGMENT_WELCOME,
   isDispatchOnlySegment,
+  isAutomotiveSegment,
 } from '@/lib/segmentConfig';
 import { getAuthItem } from '@/lib/authStorage';
 import FirstStepsChecklist from '@/components/dashboard/FirstStepsChecklist';
@@ -138,6 +140,7 @@ export default function DashboardPage() {
 
   const welcomeMessage = SEGMENT_WELCOME[segment] || SEGMENT_WELCOME.geral;
   const dispatchOnly = isDispatchOnlySegment(segment);
+  const automotive = isAutomotiveSegment(segment);
 
   // Números do painel atualizam sozinhos; o status da Meta só ao voltar para a
   // aba (consulta direto a Meta, que tem limite de chamadas).
@@ -234,6 +237,15 @@ export default function DashboardPage() {
               <FileText className="w-4 h-4" />
               Templates
             </Link>
+            {automotive ? (
+              <Link
+                href="/agenda"
+                className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
+              >
+                <CalendarDays className="w-4 h-4" />
+                Ver agendamentos
+              </Link>
+            ) : (
             <button
               type="button"
               onClick={() => setComingSoonTitle('Leads e Respostas')}
@@ -247,6 +259,8 @@ export default function DashboardPage() {
                 Em breve
               </span>
             </button>
+            )}
+            {!automotive && (
             <button
               type="button"
               onClick={() => setComingSoonTitle('Imóveis')}
@@ -260,6 +274,7 @@ export default function DashboardPage() {
                 Em breve
               </span>
             </button>
+            )}
             {dispatchOnly && (
               <Link
                 href="/disparos"

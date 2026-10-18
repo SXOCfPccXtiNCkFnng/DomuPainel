@@ -5,7 +5,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
-import { isRealEstateSegment, isDispatchOnlySegment, getSegmentFromStorage } from '@/lib/segmentConfig';
+import {
+  isRealEstateSegment,
+  isDispatchOnlySegment,
+  isAutomotiveSegment,
+  hasFollowUp,
+  getSegmentFromStorage,
+} from '@/lib/segmentConfig';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
 import SupportChatbot from '@/components/shared/SupportChatbot';
@@ -126,6 +132,14 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
 
       const segment = getSegmentFromStorage();
       if (pathname === '/imoveis' && !isRealEstateSegment(segment)) {
+        router.replace('/');
+        return;
+      }
+      if (pathname === '/agenda' && !isAutomotiveSegment(segment)) {
+        router.replace('/');
+        return;
+      }
+      if (pathname === '/follow-up' && !hasFollowUp(segment)) {
         router.replace('/');
         return;
       }

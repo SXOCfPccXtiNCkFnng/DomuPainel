@@ -317,6 +317,21 @@ export default function OnboardingPage() {
       available: true,
     },
     {
+      id: 'automotivo',
+      title: 'Lava Rápido e Estética Automotiva',
+      badge: 'Agenda e Fidelização',
+      description:
+        'Agendamento de lavagens pelo WhatsApp, aviso de carro pronto e campanhas para o cliente voltar.',
+      features: [
+        'Agendamento automático pelo WhatsApp',
+        'Aviso de veículo pronto para retirada',
+        'Promoções e pacotes para clientes recorrentes',
+      ],
+      color: 'text-cyan-600',
+      borderColor: 'border-cyan-500',
+      available: true,
+    },
+    {
       id: 'ecommerce',
       title: 'E-commerce e Varejo',
       badge: 'Vendas Online',
