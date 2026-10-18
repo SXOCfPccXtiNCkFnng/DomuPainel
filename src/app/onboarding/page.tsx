@@ -31,6 +31,7 @@ import { getAuthItem, setAuthItem, syncSessionToActiveStorage } from '@/lib/auth
 import { BUSINESS_SEGMENT_OPTIONS, SEGMENT_LABELS } from '@/lib/segmentConfig';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 import { CityStateSelect } from '@/components/shared/CityStateSelect';
+import { TEST_ONBOARDING_KEY, TEST_STEP_EVENT } from '@/components/layout/TestModePanel';
 import {
   formatWhatsAppMask,
   validateCityState,
@@ -242,7 +243,8 @@ export default function OnboardingPage() {
         const data = await res.json();
         if (data.success) {
           syncSessionToStorage(data);
-          if (data.isOnboarded) {
+          const testing = data.isPlatformAdmin && getAuthItem(TEST_ONBOARDING_KEY) === 'true';
+          if (data.isOnboarded && !testing) {
             router.replace('/');
             return;
           }
@@ -256,6 +258,16 @@ export default function OnboardingPage() {
 
     verifyOnboardingStatus();
   }, [router]);
+
+  // Modo teste (só aparece para a operação): pula direto para uma etapa.
+  useEffect(() => {
+    const onStep = (e: Event) => {
+      const step = Number((e as CustomEvent).detail);
+      if (step >= 1 && step <= 5) setCurrentStep(step as 1 | 2 | 3 | 4 | 5);
+    };
+    window.addEventListener(TEST_STEP_EVENT, onStep);
+    return () => window.removeEventListener(TEST_STEP_EVENT, onStep);
+  }, []);
 
   useEffect(() => {
     fetch('/api/plans')
@@ -456,6 +468,7 @@ export default function OnboardingPage() {
   };
 
   const finishAndEnter = (tenantId: string) => {
+    setAuthItem(TEST_ONBOARDING_KEY, 'false');
     if (billingCpfCnpj.trim()) {
       setAuthItem('domu_billing_cpf_cnpj', billingCpfCnpj.trim());
     }

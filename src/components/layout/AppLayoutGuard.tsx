@@ -15,6 +15,7 @@ import {
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
 import SupportChatbot from '@/components/shared/SupportChatbot';
+import TestModePanel, { TEST_ONBOARDING_KEY } from '@/components/layout/TestModePanel';
 
 export default function AppLayoutGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -57,6 +58,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
 
       const loggedIn = isLoggedIn();
       let isOnboarded = getAuthItem('domu_is_onboarded') === 'true';
+      let platformOps = false;
 
       // Confia no cookie HttpOnly via /api/auth/session (não no tenantId da URL)
       try {
@@ -71,6 +73,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
               setAuthItem('domu_is_logged_in', 'true');
             }
             if (data.isPlatformAdmin) {
+              platformOps = true;
               setAuthItem('domu_platform_ops', 'true');
               setIsPlatformOps(true);
             } else {
@@ -108,6 +111,12 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
       }
 
       if (cancelled) return;
+
+      // Modo teste da operação: deixa reabrir o onboarding mesmo com a conta pronta.
+      if (pathname === '/onboarding' && platformOps && getAuthItem(TEST_ONBOARDING_KEY) === 'true') {
+        setIsAuthChecked(true);
+        return;
+      }
 
       if (!isOnboarded) {
         // Painel interno: não exige onboarding da empresa.
@@ -187,7 +196,12 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
   }
 
   if (isAuthPage) {
-    return <div className="min-h-screen bg-slate-50 w-full">{children}</div>;
+    return (
+      <div className="min-h-screen bg-slate-50 w-full">
+        {children}
+        {isPlatformOps && pathname === '/onboarding' && <TestModePanel />}
+      </div>
+    );
   }
 
   if (isInternoPage) {
@@ -217,6 +231,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         </main>
       </div>
       <SupportChatbot />
+      {isPlatformOps && <TestModePanel besideSidebar />}
     </div>
   );
 }
