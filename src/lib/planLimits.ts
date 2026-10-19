@@ -1,9 +1,9 @@
 export type PlanTier = 'STARTER' | 'PRO' | 'ENTERPRISE';
 
 export const PLAN_PRICES_BRL: Record<PlanTier, number> = {
-  STARTER: 197,
-  PRO: 497,
-  ENTERPRISE: 997,
+  STARTER: 150,
+  PRO: 297,
+  ENTERPRISE: 597,
 };
 
 /** Soft limits enforced by DOMU (independent from Meta Cloud API tiers). */
@@ -12,21 +12,21 @@ export const PLAN_DISPATCH_LIMITS: Record<
   { monthly: number; daily: number | null; labelMonthly: string; labelDaily: string | null }
 > = {
   STARTER: {
-    monthly: 1500,
+    monthly: 500,
     daily: 200,
-    labelMonthly: 'Até 1.500 disparos/mês (limite DOMU)',
+    labelMonthly: 'Até 500 disparos/mês (limite DOMU)',
     labelDaily: 'Até 200 disparos/dia (trava de segurança)',
   },
   PRO: {
-    monthly: 6000,
+    monthly: 2000,
     daily: null,
-    labelMonthly: 'Até 6.000 disparos/mês (limite DOMU)',
+    labelMonthly: 'Até 2.000 disparos/mês (limite DOMU)',
     labelDaily: null,
   },
   ENTERPRISE: {
-    monthly: 999999,
+    monthly: 6000,
     daily: null,
-    labelMonthly: 'Disparos ilimitados na plataforma (sujeito à Meta)',
+    labelMonthly: 'Até 6.000 disparos/mês (limite DOMU)',
     labelDaily: null,
   },
 };
@@ -100,9 +100,9 @@ export function segmentAfterPlanActivation(
 
 /** Limite de usuários por tenant (ADMIN + convites). */
 export const PLAN_USER_LIMITS: Record<PlanTier, number> = {
-  STARTER: 3,
-  PRO: 10,
-  ENTERPRISE: 50,
+  STARTER: 2,
+  PRO: 5,
+  ENTERPRISE: 10,
 };
 
 export function getPlanUserLimit(planTier: string | null | undefined): number {

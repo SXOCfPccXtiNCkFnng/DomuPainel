@@ -37,7 +37,7 @@ import {
   validateCityState,
   validateWhatsAppPhone,
 } from '@/lib/onboardingValidation';
-import { PLAN_PRICES_BRL, isPlanAllowedForSegment } from '@/lib/planLimits';
+import { PLAN_DISPATCH_LIMITS, PLAN_PRICES_BRL, PLAN_USER_LIMITS, isPlanAllowedForSegment } from '@/lib/planLimits';
 
 const STEPS = [
   { id: 1, label: 'Segmento' },
@@ -69,8 +69,8 @@ const PLAN_OPTIONS: {
       { label: 'Cadastro de imóveis (foto, preço, região, status)' },
       { label: 'Contatos + tags (interesse, região, faixa)' },
       { label: 'Campanha: imóvel → segmento → envio' },
-      { label: 'Até 1.500 disparos/mês (limite DOMU)' },
-      { label: 'Até 200 disparos/dia (trava de segurança)' },
+      { label: PLAN_DISPATCH_LIMITS.STARTER.labelMonthly },
+      { label: PLAN_DISPATCH_LIMITS.STARTER.labelDaily! },
       { label: 'Leads que responderam + métricas de ROI' },
     ],
   },
@@ -83,9 +83,9 @@ const PLAN_OPTIONS: {
     highlight: true,
     features: [
       { label: 'Tudo do Starter' },
-      { label: 'Até 6.000 disparos/mês (limite DOMU)' },
+      { label: PLAN_DISPATCH_LIMITS.PRO.labelMonthly },
       { label: 'Sem teto diário na plataforma' },
-      { label: 'Mais usuários na mesma conta' },
+      { label: `Até ${PLAN_USER_LIMITS.PRO} usuários na conta` },
       { label: 'Relatórios avançados de campanha' },
       { label: 'CRM e atendimento', comingSoon: true },
       { label: 'Suporte prioritário DOMU' },
@@ -100,7 +100,7 @@ const PLAN_OPTIONS: {
     highlight: false,
     features: [
       { label: 'Tudo do Pro' },
-      { label: 'Disparos ilimitados na plataforma*' },
+      { label: PLAN_DISPATCH_LIMITS.ENTERPRISE.labelMonthly },
       { label: 'Multi-operadores no mesmo canal', comingSoon: true },
       { label: 'API direta / número dedicado' },
       { label: 'Onboarding assistido pela DOMU' },
@@ -118,8 +118,8 @@ const DISPATCH_ONLY_STARTER: (typeof PLAN_OPTIONS)[number] = {
     { label: 'Campanhas e ofertas em massa com template aprovado' },
     { label: 'Contatos + tags e gestão de opt-out' },
     { label: 'Agendamento e acompanhamento de entrega' },
-    { label: 'Até 1.500 disparos/mês (limite DOMU)' },
-    { label: 'Até 200 disparos/dia (trava de segurança)' },
+    { label: PLAN_DISPATCH_LIMITS.STARTER.labelMonthly },
+    { label: PLAN_DISPATCH_LIMITS.STARTER.labelDaily! },
     { label: 'Upgrade para Pro a qualquer momento, sem perder dados' },
   ],
 };

@@ -19,6 +19,7 @@ import {
   PLAN_ASSISTANT_CONVERSATION_LIMITS,
   PLAN_DISPATCH_LIMITS,
   PLAN_PRICES_BRL,
+  PLAN_USER_LIMITS,
   PlanTier,
   isPlanAllowedForSegment,
 } from '@/lib/planLimits';
@@ -43,6 +44,7 @@ const PLANS: {
     features: [
       { label: PLAN_DISPATCH_LIMITS.STARTER.labelMonthly },
       { label: PLAN_DISPATCH_LIMITS.STARTER.labelDaily! },
+      { label: `Até ${PLAN_USER_LIMITS.STARTER} usuários na conta` },
       { label: 'WhatsApp oficial da Meta' },
       { label: 'Coexistência Celular + Web' },
     ],
@@ -56,7 +58,7 @@ const PLANS: {
     features: [
       { label: PLAN_DISPATCH_LIMITS.PRO.labelMonthly },
       { label: 'Sem teto diário na plataforma' },
-      { label: 'Até 10 usuários na conta' },
+      { label: `Até ${PLAN_USER_LIMITS.PRO} usuários na conta` },
       { label: 'Coexistência Celular + Web' },
       { label: 'CRM e atendimento', comingSoon: true },
       { label: 'Suporte prioritário DOMU' },
@@ -69,6 +71,7 @@ const PLANS: {
     blurb: 'Volume alto, API dedicada e acompanhamento próximo da operação.',
     features: [
       { label: PLAN_DISPATCH_LIMITS.ENTERPRISE.labelMonthly },
+      { label: `Até ${PLAN_USER_LIMITS.ENTERPRISE} usuários na conta` },
       { label: 'API direta / número dedicado' },
       { label: 'Multi-operadores no mesmo canal', comingSoon: true },
       { label: 'Gerente de conta dedicado' },
@@ -101,9 +104,9 @@ export default function AssinaturaPage() {
   const [subData, setSubData] = useState({
     planTier: 'STARTER' as PlanTier,
     planName: 'Plano Starter',
-    priceBrl: 197,
+    priceBrl: PLAN_PRICES_BRL.STARTER,
     dispatchesUsed: 0,
-    messageLimit: 1500,
+    messageLimit: PLAN_DISPATCH_LIMITS.STARTER.monthly,
     agentsUsed: 0,
     agentsLimit: 0,
     status: 'ACTIVE',
@@ -178,9 +181,9 @@ export default function AssinaturaPage() {
         setSubData({
           planTier: (json.subscription.planTier || 'STARTER') as PlanTier,
           planName: json.subscription.planName || 'Plano Starter',
-          priceBrl: json.subscription.priceBrl || 197,
+          priceBrl: json.subscription.priceBrl || PLAN_PRICES_BRL.STARTER,
           dispatchesUsed: json.subscription.dispatchesUsed || 0,
-          messageLimit: json.subscription.messageLimit || 1500,
+          messageLimit: json.subscription.messageLimit || PLAN_DISPATCH_LIMITS.STARTER.monthly,
           agentsUsed: json.subscription.agentsUsed || 0,
           agentsLimit: json.subscription.agentsLimit ?? 0,
           status: json.subscription.status || 'ACTIVE',

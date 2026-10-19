@@ -31,8 +31,8 @@ describe('rateLimit', () => {
 describe('planLimits', () => {
   it('normalizes unknown tiers to STARTER', () => {
     expect(normalizePlanTier('xyz')).toBe('STARTER');
-    expect(getPlanMonthlyLimit('STARTER')).toBe(1500);
-    expect(getPlanUserLimit('PRO')).toBe(10);
+    expect(getPlanMonthlyLimit('STARTER')).toBe(500);
+    expect(getPlanUserLimit('PRO')).toBe(5);
   });
 });
 

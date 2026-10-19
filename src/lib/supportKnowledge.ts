@@ -283,7 +283,7 @@ A campanha fica como **Agendada** e sai sozinha no horário, mesmo com o painel 
     keywords: ['limite do plano', 'limite mensal', 'limite diario', 'limite diário', 'excedido', 'estourou', 'disparos por mes', 'disparos por mês'],
     answer: `São dois limites independentes:
 
-• **Limite do plano Domu** (por mês): **Starter** até 1.500 disparos/mês e 200/dia; **Pro** até 6.000/mês; **Enterprise** sem limite na plataforma.
+• **Limite do plano Domu** (por mês): **Starter** até 500 disparos/mês e 200/dia; **Pro** até 2.000/mês; **Enterprise** até 6.000/mês.
 • **Limite da Meta** (por 24 horas, por número): 250, 1.000, 10.000… conversas iniciadas. Sobe sozinho com boa qualidade.
 
 O disparo é bloqueado se qualquer um dos dois for passar. Para ampliar o da Domu, troque de plano em **Assinatura e Planos**.`,
@@ -318,7 +318,7 @@ Funções:
 • **Corretor:** cria templates e dispara campanhas.
 • **Atendente:** consulta e atende, mas não dispara nem apaga contatos.
 
-Limite de usuários: Starter 3, Pro 10, Enterprise 50. Removeu alguém? O acesso cai na hora.`,
+Limite de usuários: Starter 2, Pro 5, Enterprise 10. Removeu alguém? O acesso cai na hora.`,
   },
   {
     id: 'opt_out',
