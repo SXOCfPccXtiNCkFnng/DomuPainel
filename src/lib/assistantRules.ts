@@ -9,10 +9,13 @@ import type { ServiceItem } from '@/lib/scheduling';
 export const DEBOUNCE_MS = 6_000;
 /** Alguém da equipe respondeu (celular ou painel) ou a IA chamou a equipe: ela fica quieta por esse tempo. */
 export const HUMAN_PAUSE_MS = 12 * 60 * 60 * 1000;
-/** Trava contra loop com outro robô ou abuso: acima disso por hora, a IA para e avisa a equipe. */
-export const MAX_REPLIES_PER_HOUR = 20;
 export const HISTORY_LIMIT = 20;
 export const MAX_REPLY_PARTS = 3;
+/**
+ * Trava contra loop com outro robô ou abuso: acima disso por hora, a IA para e avisa a equipe.
+ * Conta balões enviados (cada resposta vira até MAX_REPLY_PARTS), então equivale a ~20 respostas.
+ */
+export const MAX_REPLIES_PER_HOUR = 20 * MAX_REPLY_PARTS;
 
 /** Quem conta como "alguém da equipe respondeu". */
 export const HUMAN_SENDER_TYPES = ['AGENT', 'AGENT_PHONE'];

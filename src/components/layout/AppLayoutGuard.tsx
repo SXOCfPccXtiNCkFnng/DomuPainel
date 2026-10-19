@@ -12,7 +12,7 @@ import {
   hasFollowUp,
   getSegmentFromStorage,
 } from '@/lib/segmentConfig';
-import { syncSessionToStorage } from '@/lib/sessionHelpers';
+import { syncSessionToStorage, userIdentity } from '@/lib/sessionHelpers';
 import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
 import SupportChatbot from '@/components/shared/SupportChatbot';
 import TestModePanel, { TEST_ONBOARDING_KEY } from '@/components/layout/TestModePanel';
@@ -90,6 +90,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
               setAuthItem('domu_selected_segment', data.segment);
               setAuthItem('domu_company_name', data.companyName);
               setAuthItem('domu_tenant_id', data.tenantId);
+              for (const [key, value] of Object.entries(userIdentity(data))) setAuthItem(key, value);
             }
           } else if (!loggedIn) {
           if (!isPublicAuthEntry && pathname !== '/convite') {

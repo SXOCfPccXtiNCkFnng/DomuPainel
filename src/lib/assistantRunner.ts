@@ -43,8 +43,10 @@ type GeminiPart = {
   functionCall?: { name: string; args?: Record<string, unknown> };
 };
 type GeminiTurn = { role: 'user' | 'model'; parts: Record<string, unknown>[] };
+/** Tokens gastos numa resposta (somando as rodadas de ferramenta) — base do custo por cliente. */
+type TokenUsage = { calls: number; input: number; output: number };
 
-async function callGemini(apiKey: string, systemPrompt: string, contents: GeminiTurn[]) {
+async function callGemini(apiKey: string, systemPrompt: string, contents: GeminiTurn[], usage: TokenUsage) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   try {
@@ -58,7 +60,7 @@ async function callGemini(apiKey: string, systemPrompt: string, contents: Gemini
           contents,
           tools: [{ functionDeclarations: ASSISTANT_TOOL_DECLARATIONS }],
           generationConfig: {
-            temperature: 0.7,
+            temperature: 0.4,
             maxOutputTokens: 800,
             thinkingConfig: { thinkingBudget: 0 },
           },
@@ -74,8 +76,19 @@ async function callGemini(apiKey: string, systemPrompt: string, contents: Gemini
       return null;
     }
     const data = await res.json();
+    usage.calls += 1;
+    usage.input += Number(data?.usageMetadata?.promptTokenCount) || 0;
+    usage.output += Number(data?.usageMetadata?.candidatesTokenCount) || 0;
     const content = data?.candidates?.[0]?.content as { role?: string; parts?: GeminiPart[] } | undefined;
-    return content?.parts?.length ? content : null;
+    if (!content?.parts?.length) {
+      logger.warn('assistant.ai_empty_response', {
+        model: GEMINI_MODEL,
+        finishReason: data?.candidates?.[0]?.finishReason ?? null,
+        blockReason: data?.promptFeedback?.blockReason ?? null,
+      });
+      return null;
+    }
+    return content;
   } finally {
     clearTimeout(timer);
   }
@@ -87,12 +100,13 @@ async function generateReply(
   systemPrompt: string,
   history: GeminiTurn[],
   toolCtx: AssistantToolContext,
-  deadline: number
+  deadline: number,
+  usage: TokenUsage
 ): Promise<string | null> {
   const contents = [...history];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     if (Date.now() > deadline) return null;
-    const content = await callGemini(apiKey, systemPrompt, contents);
+    const content = await callGemini(apiKey, systemPrompt, contents, usage);
     if (!content?.parts) return null;
 
     const calls = content.parts.filter((p) => p.functionCall);
@@ -219,7 +233,15 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       now,
     });
     if (!decision.reply) {
-      logger.info('assistant.skipped', { tenantId, leadId, reason: decision.reason });
+      if (decision.reason === 'RATE_LIMIT') {
+        logger.warn('assistant.rate_limited', {
+          tenantId,
+          leadId,
+          message: `Atendente pausada por 12h: ${botCountRes.count ?? 0} mensagens da IA na última hora.`,
+        });
+      } else {
+        logger.info('assistant.skipped', { tenantId, leadId, reason: decision.reason });
+      }
       if (decision.reason === 'RATE_LIMIT') {
         await supabaseAdmin
           .from('leads')
@@ -261,12 +283,14 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       now,
     };
 
+    const usage: TokenUsage = { calls: 0, input: 0, output: 0 };
     const reply = await generateReply(
       apiKey,
       systemPrompt,
       toGeminiContents(history),
       toolCtx,
-      startedAt + RUN_BUDGET_MS
+      startedAt + RUN_BUDGET_MS,
+      usage
     );
     const bubbles = reply ? splitReply(reply) : [];
     if (!bubbles.length) {
@@ -307,7 +331,15 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
         status: 'SENT',
       });
     }
-    logger.info('assistant.replied', { tenantId, leadId, bubbles: bubbles.length, ms: Date.now() - startedAt });
+    logger.info('assistant.replied', {
+      tenantId,
+      leadId,
+      bubbles: bubbles.length,
+      ms: Date.now() - startedAt,
+      aiCalls: usage.calls,
+      inputTokens: usage.input,
+      outputTokens: usage.output,
+    });
   } catch (err) {
     logger.error('assistant.run_failed', {
       tenantId,

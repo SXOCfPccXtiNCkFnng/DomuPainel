@@ -6,6 +6,7 @@ export interface SessionData {
   segment: TenantSegment;
   companyName: string;
   tenantId: string;
+  user?: { name?: string | null; email?: string | null } | null;
 }
 
 export function isTenantOnboarded(
@@ -28,5 +29,14 @@ export function syncSessionToStorage(session: SessionData): void {
     domu_selected_segment: session.segment,
     domu_company_name: session.companyName,
     domu_tenant_id: session.tenantId,
+    ...userIdentity(session),
   });
+}
+
+/** Nome/e-mail do cabeçalho: a sessão de aba (sessionStorage) não passa para uma aba nova. */
+export function userIdentity(session: Pick<SessionData, 'user'>): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (session.user?.name) out.domu_user_name = session.user.name;
+  if (session.user?.email) out.domu_user_email = session.user.email;
+  return out;
 }
