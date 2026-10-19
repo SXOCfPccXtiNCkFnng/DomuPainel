@@ -383,8 +383,13 @@ export type RunFilters = {
   flag?: AssistantFlag | null;
   review?: 'OK' | 'BAD' | 'PENDING' | null;
   search?: string | null;
+  /** Só conversas com problema: falha, sem resposta, marcada errada ou sinal suspeito ainda não revisado. */
+  attention?: boolean;
   limit?: number;
 };
+
+const ATTENTION_FILTER =
+  'status.in.(FAILED,NO_REPLY),review_status.eq.BAD,and(flags.ov.{VALOR_NAO_CADASTRADO,HORARIO_SEM_AGENDA,NAO_SABIA,ERRO_FERRAMENTA},review_status.is.null)';
 
 export async function loadAssistantRuns(filters: RunFilters): Promise<AssistantRunView[]> {
   const since = new Date(Date.now() - filters.days * DAY_MS).toISOString();
@@ -399,6 +404,7 @@ export async function loadAssistantRuns(filters: RunFilters): Promise<AssistantR
   if (filters.flag) query = query.contains('flags', [filters.flag]);
   if (filters.review === 'PENDING') query = query.is('review_status', null);
   else if (filters.review) query = query.eq('review_status', filters.review);
+  if (filters.attention) query = query.or(ATTENTION_FILTER);
   if (filters.search?.trim()) {
     const q = filters.search.trim().replace(/[%,()]/g, ' ').slice(0, 80);
     query = query.or(`customer_message.ilike.%${q}%,reply_text.ilike.%${q}%`);
@@ -406,7 +412,26 @@ export async function loadAssistantRuns(filters: RunFilters): Promise<AssistantR
   const { data, error } = await query;
   if (isMissingTable(error)) return [];
   if (error) throw error;
-  const rows = (data || []) as RunRow[];
+  let rows = (data || []) as RunRow[];
+
+  // Com problema numa resposta, traz o resto da conversa do dia para ver o contexto.
+  if (filters.attention && rows.length) {
+    const keys = conversationKeys(rows);
+    const leadIds = [...new Set(rows.map((r) => r.lead_id).filter(Boolean))] as string[];
+    const { data: siblings, error: sibError } = await supabaseAdmin
+      .from('assistant_runs')
+      .select('*')
+      .in('lead_id', leadIds)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(600);
+    if (sibError) throw sibError;
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const s of (siblings || []) as RunRow[]) {
+      if (s.lead_id && keys.has(`${s.lead_id}:${brtDate(s.created_at)}`)) byId.set(s.id, s);
+    }
+    rows = [...byId.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
 
   const names = await tenantNames([...new Set(rows.map((r) => r.tenant_id))]);
   const leadIds = [...new Set(rows.map((r) => r.lead_id).filter(Boolean))] as string[];

@@ -18,7 +18,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /**
  * Consumo e monitor da atendente de IA.
  * ?view=metrics&days=&tenantId=          → números agregados
- * ?view=runs&days=&tenantId=&status=&flag=&review=&q=  → respostas para revisar
+ * ?view=runs&days=&tenantId=&status=&flag=&review=&q=&attention=1  → respostas para revisar
  * ?view=conversation&tenantId=&leadId=   → conversa completa
  */
 export async function GET(req: NextRequest) {
@@ -45,7 +45,16 @@ export async function GET(req: NextRequest) {
       const flag = FLAGS.find((f) => f === q.get('flag')) || null;
       const reviewParam = q.get('review');
       const review = reviewParam === 'OK' || reviewParam === 'BAD' || reviewParam === 'PENDING' ? reviewParam : null;
-      const runs = await loadAssistantRuns({ days, tenantId, status, flag, review, search: q.get('q'), limit: 150 });
+      const runs = await loadAssistantRuns({
+        days,
+        tenantId,
+        status,
+        flag,
+        review,
+        search: q.get('q'),
+        attention: q.get('attention') === '1',
+        limit: q.get('attention') === '1' ? 100 : 300,
+      });
       return NextResponse.json({ success: true, runs });
     }
 

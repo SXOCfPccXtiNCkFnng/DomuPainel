@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, CheckCircle2, MessageSquareText, RefreshCw, Search, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import type { AssistantMetrics, AssistantRunView, ConversationMessage } from '@/lib/assistantMetrics';
-import { FLAG_LABELS, type AssistantFlag, type AssistantRunStatus } from '@/lib/assistantUsage';
+import { brtDate, FLAG_LABELS, type AssistantFlag, type AssistantRunStatus } from '@/lib/assistantUsage';
 
 const STATUS_LABEL: Record<AssistantRunStatus, { text: string; className: string }> = {
   REPLIED: { text: 'Respondeu', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -81,6 +81,16 @@ function when(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
+function time(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Mesmo critério do filtro "Precisa de atenção" da API. */
+function needsAttention(run: AssistantRunView): boolean {
+  if (run.status === 'FAILED' || run.status === 'NO_REPLY' || run.reviewStatus === 'BAD') return true;
+  return run.reviewStatus == null && run.flags.some((f) => f !== 'CHAMOU_EQUIPE');
+}
+
 function Kpi({ label, value, hint, tone = 'slate' }: { label: string; value: string; hint?: string; tone?: 'slate' | 'green' | 'amber' | 'red' | 'blue' }) {
   const color = { slate: 'text-slate-900', green: 'text-emerald-600', amber: 'text-amber-600', red: 'text-red-600', blue: 'text-domu-blue' }[tone];
   return (
@@ -131,6 +141,9 @@ export default function AssistantMonitor() {
 
   const [runs, setRuns] = useState<AssistantRunView[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
+  const [attention, setAttention] = useState(true);
+  const [grouped, setGrouped] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<AssistantRunStatus | ''>('');
   const [flagFilter, setFlagFilter] = useState<AssistantFlag | ''>('');
   const [reviewFilter, setReviewFilter] = useState<'' | 'PENDING' | 'OK' | 'BAD'>('');
@@ -175,13 +188,14 @@ export default function AssistantMonitor() {
       if (flagFilter) params.set('flag', flagFilter);
       if (reviewFilter) params.set('review', reviewFilter);
       if (searchApplied) params.set('q', searchApplied);
+      if (attention) params.set('attention', '1');
       const res = await fetch(`/api/interno/assistant?${params}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.success) setRuns(json.runs || []);
     } finally {
       setRunsLoading(false);
     }
-  }, [days, tenantId, statusFilter, flagFilter, reviewFilter, searchApplied]);
+  }, [days, tenantId, statusFilter, flagFilter, reviewFilter, searchApplied, attention]);
 
   useEffect(() => {
     loadMetrics();
@@ -229,6 +243,185 @@ export default function AssistantMonitor() {
   const attempts = t ? t.replied + t.noReply + t.failed : 0;
   const maxDayCost = useMemo(() => Math.max(0.000001, ...(metrics?.daily || []).map((d) => d.costUsdFull)), [metrics]);
   const maxDayRuns = useMemo(() => Math.max(1, ...(metrics?.daily || []).map((d) => d.replied)), [metrics]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, AssistantRunView[]>();
+    for (const r of runs) {
+      const key = r.leadId ? `${r.tenantId}:${r.leadId}:${brtDate(r.createdAt)}` : r.id;
+      map.set(key, [...(map.get(key) || []), r]);
+    }
+    return [...map.entries()].map(([key, list]) => ({
+      key,
+      runs: [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    }));
+  }, [runs]);
+
+  const openConversation = (run: AssistantRunView) =>
+    run.leadId &&
+    setConversation({ tenantId: run.tenantId, leadId: run.leadId, title: `${run.leadName || run.leadPhone || 'Contato'} · ${run.tenantName}` });
+
+  const toggleExpanded = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  function renderRun(run: AssistantRunView, standalone: boolean) {
+    return (
+      <div
+        key={run.id}
+        className={`space-y-2 ${standalone ? 'p-4' : 'py-2'} ${run.reviewStatus === 'BAD' ? 'bg-red-50/40' : ''}`}
+      >
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          <span className="text-slate-400">{standalone ? when(run.createdAt) : time(run.createdAt)}</span>
+          {standalone ? (
+            <>
+              <span className="font-bold text-slate-900">{run.tenantName}</span>
+              <span className="text-slate-400">·</span>
+              <span className="text-slate-600">{run.leadName || run.leadPhone || 'Contato'}</span>
+            </>
+          ) : null}
+          <span className={`font-bold px-1.5 py-px rounded border ${STATUS_LABEL[run.status].className}`}>{STATUS_LABEL[run.status].text}</span>
+          {run.reason ? <span className="text-slate-500">({REASON_LABEL[run.reason] || run.reason})</span> : null}
+          {run.flags.map((f) => (
+            <span key={f} title={FLAG_HINT[f]} className={`font-bold px-1.5 py-px rounded border ${FLAG_TONE[f]}`}>
+              {FLAG_LABELS[f]}
+            </span>
+          ))}
+          {run.booked ? <span className="font-bold px-1.5 py-px rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Agendou</span> : null}
+          {run.reviewStatus === 'OK' ? (
+            <span className="font-bold text-emerald-600 inline-flex items-center gap-0.5">
+              <CheckCircle2 className="w-3 h-3" /> Certa
+            </span>
+          ) : null}
+          {run.reviewStatus === 'BAD' ? <span className="font-bold text-red-600">Errada{run.reviewNote ? `: ${run.reviewNote}` : ''}</span> : null}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="rounded-lg bg-slate-100 px-3 py-2">
+            <p className="text-[10px] font-bold uppercase text-slate-500 mb-0.5">Cliente</p>
+            <p className="text-xs text-slate-800 whitespace-pre-wrap">{run.customerMessage || '—'}</p>
+          </div>
+          <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+            <p className="text-[10px] font-bold uppercase text-domu-blue mb-0.5 inline-flex items-center gap-1">
+              <Bot className="w-3 h-3" /> Atendente{run.status !== 'REPLIED' && run.replyText ? ' (não enviada)' : ''}
+            </p>
+            <p className="text-xs text-slate-800 whitespace-pre-wrap">{run.replyText || run.error || '—'}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+          {run.tools.length ? <span>{run.tools.map((n) => TOOL_LABEL[n] || n).join(' → ')}</span> : null}
+          {run.aiCalls ? <span>{run.aiCalls} chamada(s) à IA</span> : null}
+          {run.inputTokens || run.outputTokens ? (
+            <span>
+              {int(run.inputTokens)} + {int(run.outputTokens)} tokens
+            </span>
+          ) : null}
+          {run.costUsdFull ? <span>{money(run.costUsdFull * rate)}</span> : null}
+          {run.aiMs != null ? <span>IA {seconds(run.aiMs)}</span> : null}
+          {run.responseMs != null ? <span>respondeu em {seconds(run.responseMs)}</span> : null}
+          <span className="ml-auto flex items-center gap-1">
+            {standalone && run.leadId ? (
+              <button
+                type="button"
+                onClick={() => openConversation(run)}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 text-slate-600 font-bold hover:border-domu-blue/40"
+              >
+                <MessageSquareText className="w-3 h-3" /> Ver conversa
+              </button>
+            ) : null}
+            {run.replyText ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => review(run, run.reviewStatus === 'OK' ? null : 'OK')}
+                  title="Resposta certa"
+                  className={`p-1 rounded-md border ${
+                    run.reviewStatus === 'OK' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-200 text-slate-500 hover:text-emerald-600'
+                  }`}
+                >
+                  <ThumbsUp className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => review(run, run.reviewStatus === 'BAD' ? null : 'BAD')}
+                  title="Resposta errada (alucinou, não respondeu o que devia...)"
+                  className={`p-1 rounded-md border ${
+                    run.reviewStatus === 'BAD' ? 'bg-red-600 text-white border-red-600' : 'border-slate-200 text-slate-500 hover:text-red-600'
+                  }`}
+                >
+                  <ThumbsDown className="w-3 h-3" />
+                </button>
+              </>
+            ) : null}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  function renderGroup(group: { key: string; runs: AssistantRunView[] }) {
+    const first = group.runs[0];
+    const last = group.runs[group.runs.length - 1];
+    const problems = group.runs.filter(needsAttention);
+    const isOpen = expanded.has(group.key);
+    const visible = isOpen ? group.runs : problems.length ? problems : [last];
+    const flags = [...new Set(group.runs.flatMap((r) => r.flags))];
+    const cost = group.runs.reduce((s, r) => s + r.costUsdFull, 0);
+    const replied = group.runs.filter((r) => r.status === 'REPLIED').length;
+    return (
+      <div key={group.key} className={`p-4 space-y-2 ${problems.length ? 'border-l-4 border-l-amber-400' : ''}`}>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          <span className="text-slate-400">
+            {when(first.createdAt)}
+            {group.runs.length > 1 ? ` – ${time(last.createdAt)}` : ''}
+          </span>
+          <span className="font-bold text-slate-900">{first.tenantName}</span>
+          <span className="text-slate-400">·</span>
+          <span className="text-slate-600">{first.leadName || first.leadPhone || 'Contato'}</span>
+          <span className="font-bold px-1.5 py-px rounded border bg-slate-50 text-slate-600 border-slate-200">
+            {replied} resposta{replied === 1 ? '' : 's'}
+          </span>
+          {problems.length ? (
+            <span className="font-bold px-1.5 py-px rounded border bg-amber-50 text-amber-800 border-amber-200">
+              {problems.length} para conferir
+            </span>
+          ) : null}
+          {group.runs.some((r) => r.booked) ? (
+            <span className="font-bold px-1.5 py-px rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Agendou</span>
+          ) : null}
+          {flags.map((f) => (
+            <span key={f} title={FLAG_HINT[f]} className={`font-bold px-1.5 py-px rounded border ${FLAG_TONE[f]}`}>
+              {FLAG_LABELS[f]}
+            </span>
+          ))}
+          {cost ? <span className="text-slate-500">{money(cost * rate)}</span> : null}
+          {first.leadId ? (
+            <button
+              type="button"
+              onClick={() => openConversation(first)}
+              className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 text-slate-600 text-[10px] font-bold hover:border-domu-blue/40"
+            >
+              <MessageSquareText className="w-3 h-3" /> Ver conversa
+            </button>
+          ) : null}
+        </div>
+        <div className="pl-3 border-l-2 border-slate-100 divide-y divide-slate-100">{visible.map((run) => renderRun(run, false))}</div>
+        {group.runs.length > visible.length || isOpen ? (
+          <button type="button" onClick={() => toggleExpanded(group.key)} className="text-[11px] font-bold text-domu-blue hover:underline">
+            {isOpen
+              ? problems.length
+                ? 'Mostrar só o que precisa de atenção'
+                : 'Mostrar só a última'
+              : `Mostrar as ${group.runs.length} execuções do dia`}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -461,137 +654,89 @@ export default function AssistantMonitor() {
 
       {/* Monitor de conversas */}
       <Panel
-        title="Monitor de respostas"
-        subtitle="Cada linha é uma vez que a atendente rodou: o que o cliente mandou, o que ela respondeu e os sinais automáticos. Marque como certa ou errada para acompanhar a qualidade."
+        title="Monitor de conversas"
+        subtitle="Abre só no que precisa de atenção: falhas, respostas que não saíram, marcadas como erradas e sinais suspeitos ainda não revisados. Cada cartão é um cliente num dia, com o resto da conversa a um clique."
       >
-        <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-2">
-          <Chip active={statusFilter === ''} onClick={() => setStatusFilter('')}>
-            Todas
-          </Chip>
-          {(Object.keys(STATUS_LABEL) as AssistantRunStatus[]).map((s) => (
-            <Chip key={s} active={statusFilter === s} onClick={() => setStatusFilter(statusFilter === s ? '' : s)}>
-              {STATUS_LABEL[s].text}
+        <div className="px-4 py-3 border-b border-slate-100 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip active={attention} onClick={() => setAttention(true)}>
+              Precisa de atenção
             </Chip>
-          ))}
-          <span className="w-px h-5 bg-slate-200 mx-1" />
-          <select
-            value={flagFilter}
-            onChange={(e) => setFlagFilter(e.target.value as AssistantFlag | '')}
-            className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1"
-          >
-            <option value="">Qualquer sinal</option>
-            {(Object.keys(FLAG_LABELS) as AssistantFlag[]).map((f) => (
-              <option key={f} value={f}>
-                {FLAG_LABELS[f]}
-              </option>
-            ))}
-          </select>
-          <select
-            value={reviewFilter}
-            onChange={(e) => setReviewFilter(e.target.value as '' | 'PENDING' | 'OK' | 'BAD')}
-            className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1"
-          >
-            <option value="">Revisadas ou não</option>
-            <option value="PENDING">Não revisadas</option>
-            <option value="BAD">Marcadas como erradas</option>
-            <option value="OK">Marcadas como certas</option>
-          </select>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSearchApplied(search);
-            }}
-            className="flex items-center gap-1 ml-auto"
-          >
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar no texto"
-                className="text-[11px] bg-white border border-slate-200 rounded-md pl-7 pr-2 py-1 w-44"
-              />
-            </div>
-          </form>
+            <Chip active={!attention} onClick={() => setAttention(false)}>
+              Todas
+            </Chip>
+            <span className="w-px h-5 bg-slate-200 mx-1" />
+            <Chip active={grouped} onClick={() => setGrouped(true)}>
+              Por conversa
+            </Chip>
+            <Chip active={!grouped} onClick={() => setGrouped(false)}>
+              Por resposta
+            </Chip>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearchApplied(search);
+              }}
+              className="flex items-center gap-1 ml-auto"
+            >
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar no texto"
+                  className="text-[11px] bg-white border border-slate-200 rounded-md pl-7 pr-2 py-1 w-44"
+                />
+              </div>
+            </form>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as AssistantRunStatus | '')}
+              className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1"
+            >
+              <option value="">Qualquer resultado</option>
+              {(Object.keys(STATUS_LABEL) as AssistantRunStatus[]).map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABEL[s].text}
+                </option>
+              ))}
+            </select>
+            <select
+              value={flagFilter}
+              onChange={(e) => setFlagFilter(e.target.value as AssistantFlag | '')}
+              className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1"
+            >
+              <option value="">Qualquer sinal</option>
+              {(Object.keys(FLAG_LABELS) as AssistantFlag[]).map((f) => (
+                <option key={f} value={f}>
+                  {FLAG_LABELS[f]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={reviewFilter}
+              onChange={(e) => setReviewFilter(e.target.value as '' | 'PENDING' | 'OK' | 'BAD')}
+              className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-1"
+            >
+              <option value="">Revisadas ou não</option>
+              <option value="PENDING">Não revisadas</option>
+              <option value="BAD">Marcadas como erradas</option>
+              <option value="OK">Marcadas como certas</option>
+            </select>
+          </div>
         </div>
 
         {runsLoading && !runs.length ? <p className="p-4 text-xs text-slate-500">Carregando…</p> : null}
-        {!runsLoading && !runs.length ? <p className="p-4 text-xs text-slate-500">Nenhuma resposta com esses filtros.</p> : null}
+        {!runsLoading && !runs.length ? (
+          <p className="p-4 text-xs text-slate-500">
+            {attention ? 'Nada precisando de atenção no período. Para ver tudo, clique em "Todas".' : 'Nenhuma resposta com esses filtros.'}
+          </p>
+        ) : null}
 
         <div className="divide-y divide-slate-100">
-          {runs.map((run) => (
-            <div key={run.id} className={`p-4 space-y-2 ${run.reviewStatus === 'BAD' ? 'bg-red-50/40' : ''}`}>
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="text-slate-400">{when(run.createdAt)}</span>
-                <span className="font-bold text-slate-900">{run.tenantName}</span>
-                <span className="text-slate-400">·</span>
-                <span className="text-slate-600">{run.leadName || run.leadPhone || 'Contato'}</span>
-                <span className={`font-bold px-1.5 py-px rounded border ${STATUS_LABEL[run.status].className}`}>{STATUS_LABEL[run.status].text}</span>
-                {run.reason ? <span className="text-slate-500">({REASON_LABEL[run.reason] || run.reason})</span> : null}
-                {run.flags.map((f) => (
-                  <span key={f} title={FLAG_HINT[f]} className={`font-bold px-1.5 py-px rounded border ${FLAG_TONE[f]}`}>
-                    {FLAG_LABELS[f]}
-                  </span>
-                ))}
-                {run.booked ? <span className="font-bold px-1.5 py-px rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Agendou</span> : null}
-                {run.reviewStatus === 'OK' ? <span className="font-bold text-emerald-600 inline-flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> Certa</span> : null}
-                {run.reviewStatus === 'BAD' ? <span className="font-bold text-red-600">Errada{run.reviewNote ? `: ${run.reviewNote}` : ''}</span> : null}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="rounded-lg bg-slate-100 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase text-slate-500 mb-0.5">Cliente</p>
-                  <p className="text-xs text-slate-800 whitespace-pre-wrap">{run.customerMessage || '—'}</p>
-                </div>
-                <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase text-domu-blue mb-0.5 inline-flex items-center gap-1">
-                    <Bot className="w-3 h-3" /> Atendente{run.status !== 'REPLIED' && run.replyText ? ' (não enviada)' : ''}
-                  </p>
-                  <p className="text-xs text-slate-800 whitespace-pre-wrap">{run.replyText || run.error || '—'}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                {run.tools.length ? <span>{run.tools.map((n) => TOOL_LABEL[n] || n).join(' → ')}</span> : null}
-                {run.aiCalls ? <span>{run.aiCalls} chamada(s) à IA</span> : null}
-                {run.inputTokens || run.outputTokens ? <span>{int(run.inputTokens)} + {int(run.outputTokens)} tokens</span> : null}
-                {run.costUsdFull ? <span>{money(run.costUsdFull * rate)}</span> : null}
-                {run.aiMs != null ? <span>IA {seconds(run.aiMs)}</span> : null}
-                {run.responseMs != null ? <span>respondeu em {seconds(run.responseMs)}</span> : null}
-                <span className="ml-auto flex items-center gap-1">
-                  {run.leadId ? (
-                    <button
-                      type="button"
-                      onClick={() => setConversation({ tenantId: run.tenantId, leadId: run.leadId!, title: `${run.leadName || run.leadPhone || 'Contato'} · ${run.tenantName}` })}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 text-slate-600 font-bold hover:border-domu-blue/40"
-                    >
-                      <MessageSquareText className="w-3 h-3" /> Ver conversa
-                    </button>
-                  ) : null}
-                  {run.replyText ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => review(run, run.reviewStatus === 'OK' ? null : 'OK')}
-                        title="Resposta certa"
-                        className={`p-1 rounded-md border ${run.reviewStatus === 'OK' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-200 text-slate-500 hover:text-emerald-600'}`}
-                      >
-                        <ThumbsUp className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => review(run, run.reviewStatus === 'BAD' ? null : 'BAD')}
-                        title="Resposta errada (alucinou, não respondeu o que devia...)"
-                        className={`p-1 rounded-md border ${run.reviewStatus === 'BAD' ? 'bg-red-600 text-white border-red-600' : 'border-slate-200 text-slate-500 hover:text-red-600'}`}
-                      >
-                        <ThumbsDown className="w-3 h-3" />
-                      </button>
-                    </>
-                  ) : null}
-                </span>
-              </div>
-            </div>
-          ))}
+          {grouped ? groups.map(renderGroup) : runs.map((run) => renderRun(run, true))}
         </div>
       </Panel>
 
