@@ -4,12 +4,14 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle2, Circle, Headset, Info, Loader2, Megaphone } from 'lucide-react';
 import WhatsAppPreview from '@/components/shared/WhatsAppPreview';
+import { setAuthItem } from '@/lib/authStorage';
 import {
   ABOUT_MAX,
   ADDRESS_MAX,
   ASSISTANT_NAME_MAX,
   ASSISTANT_NAME_SUGGESTIONS,
   activePromo,
+  COMPANY_NAME_MAX,
   DEFAULT_ASSISTANT_SETTINGS,
   EXTRA_INFO_MAX,
   formatPromoUntil,
@@ -49,6 +51,7 @@ export default function AssistantTab({
   const [form, setForm] = useState<AssistantSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [saved, setSaved] = useState<AssistantSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [companyName, setCompanyName] = useState('');
+  const [savedCompanyName, setSavedCompanyName] = useState('');
   const [aiAvailable, setAiAvailable] = useState(true);
   const [promoAvailable, setPromoAvailable] = useState(true);
   const [quota, setQuota] = useState<{ planName: string; limit: number; used: number } | null>(null);
@@ -70,6 +73,7 @@ export default function AssistantTab({
         setForm(json.settings);
         setSaved(json.settings);
         setCompanyName(json.companyName || '');
+        setSavedCompanyName(json.companyName || '');
         setAiAvailable(Boolean(json.aiAvailable));
         setQuota(json.quota || null);
         setPromoAvailable(json.promoAvailable !== false);
@@ -102,7 +106,7 @@ export default function AssistantTab({
       const res = await fetch('/api/assistant/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(companyName.trim() !== savedCompanyName ? { ...form, companyName } : form),
       });
       const json = await res.json();
       if (!json.success) {
@@ -111,6 +115,11 @@ export default function AssistantTab({
       }
       setForm(json.settings);
       setSaved(json.settings);
+      if (json.companyName) {
+        setCompanyName(json.companyName);
+        setSavedCompanyName(json.companyName);
+        setAuthItem('domu_company_name', json.companyName);
+      }
       setNotice('Atendente salva.');
     } catch {
       setError('Não foi possível salvar.');
@@ -127,7 +136,7 @@ export default function AssistantTab({
     );
   }
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(saved);
+  const dirty = JSON.stringify(form) !== JSON.stringify(saved) || companyName.trim() !== savedCompanyName;
   const disabled = !canEdit;
   const activeServices = services.filter((s) => s.active).length;
   const knowledge = [
@@ -337,6 +346,19 @@ export default function AssistantTab({
 
           <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
             <h2 className="text-sm font-black text-slate-900">O que ela sabe sobre a loja</h2>
+            <Field label="Nome da loja" hint="É assim que a atendente apresenta a loja. Também aparece no topo do painel.">
+              <input
+                value={companyName}
+                maxLength={COMPANY_NAME_MAX}
+                disabled={disabled}
+                onChange={(e) => {
+                  setCompanyName(e.target.value);
+                  setNotice(null);
+                }}
+                placeholder="Ex.: Brilho Car Estética Automotiva"
+                className={agendaInputClass}
+              />
+            </Field>
             <Field label="Sobre a loja" hint={`${form.about.length}/${ABOUT_MAX}`}>
               <textarea
                 value={form.about}

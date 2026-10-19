@@ -39,6 +39,7 @@ export const ASSISTANT_NAME_MAX = 40;
 export const ABOUT_MAX = 400;
 export const ADDRESS_MAX = 300;
 export const EXTRA_INFO_MAX = 800;
+export const COMPANY_NAME_MAX = 80;
 export const PROMO_MAX = 300;
 export const GREETING_MAX = 200;
 

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAdmin, requireAuth } from '@/lib/requireAuth';
 import { internalErrorResponse } from '@/lib/errors';
-import { assistantSettingsFromRow, validateAssistantSettings } from '@/lib/assistantPrompt';
+import {
+  assistantSettingsFromRow,
+  COMPANY_NAME_MAX,
+  sanitizeOwnerText,
+  validateAssistantSettings,
+} from '@/lib/assistantPrompt';
 import { isSchemaPendingError, SCHEDULING_MIGRATION_PENDING } from '@/lib/schedulingServer';
 import { loadAssistantQuota } from '@/lib/assistantQuota';
 
@@ -65,6 +70,15 @@ export async function PUT(req: NextRequest) {
     if (!parsed.ok) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
 
     const { settings } = parsed;
+
+    let companyName: string | undefined;
+    if (body.companyName !== undefined) {
+      companyName = sanitizeOwnerText(body.companyName, COMPANY_NAME_MAX, { singleLine: true });
+      if (companyName.length < 2) {
+        return NextResponse.json({ success: false, error: 'Informe o nome da loja.' }, { status: 400 });
+      }
+    }
+
     if (settings.enabled) {
       const { count, error: countError } = await supabaseAdmin
         .from('services')
@@ -109,7 +123,15 @@ export async function PUT(req: NextRequest) {
     }
     if (error) throw error;
 
-    return NextResponse.json({ success: true, settings });
+    if (companyName) {
+      const { error: nameError } = await supabaseAdmin
+        .from('tenants')
+        .update({ name: companyName, updated_at: new Date().toISOString() })
+        .eq('id', auth.session.tenantId);
+      if (nameError) throw nameError;
+    }
+
+    return NextResponse.json({ success: true, settings, companyName });
   } catch (error: unknown) {
     if (isSchemaPendingError(error)) return migrationPending();
     return internalErrorResponse('api.assistant.settings.put', error);
