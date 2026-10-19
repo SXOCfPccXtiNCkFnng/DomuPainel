@@ -108,7 +108,11 @@ export default function ConfiguracoesPage() {
         setErrorMsg(json.error || 'Falha ao salvar.');
         return;
       }
-      if (whatsappPhone) setAuthItem('domu_whatsapp_phone', whatsappPhone);
+      const savedPhone: string = json.whatsappPhone || whatsappPhone;
+      if (savedPhone) {
+        setWhatsappPhone(savedPhone);
+        setAuthItem('domu_whatsapp_phone', savedPhone);
+      }
       if (json.warning) setErrorMsg(json.warning);
       setSavedSuccess(true);
       // Credenciais novas: o quadro de status confere a conexão de novo.

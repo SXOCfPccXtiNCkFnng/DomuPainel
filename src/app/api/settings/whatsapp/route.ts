@@ -182,9 +182,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           message: 'Configurações salvas.',
+          whatsappPhone: ownership.displayPhoneNumber,
           warning: `Credenciais salvas, mas a Meta não confirmou o recebimento de mensagens: ${subscribed.error}`,
         });
       }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Configurações salvas no banco.',
+        whatsappPhone: ownership.displayPhoneNumber,
+      });
     }
 
     return NextResponse.json({
