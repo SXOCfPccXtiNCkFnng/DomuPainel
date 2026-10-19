@@ -59,6 +59,52 @@ export function costUsdFullPrice(usage: TokenUsage, model: string): number {
 
 export type AssistantRunStatus = 'REPLIED' | 'SKIPPED' | 'NO_REPLY' | 'FAILED' | 'SUPERSEDED';
 
+const BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/** Data (AAAA-MM-DD) no horário de Brasília. */
+export function brtDate(at: Date | string): string {
+  return new Date(new Date(at).getTime() - BRT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Meia-noite do dia 1 do mês corrente em Brasília, em ISO UTC. */
+export function brtMonthStartIso(now: Date = new Date()): string {
+  const [y, m] = brtDate(now).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 1) + BRT_OFFSET_MS).toISOString();
+}
+
+/** Conversas = pares contato+dia distintos entre as execuções que responderam. */
+export function conversationKeys(runs: { lead_id: string | null; created_at: string }[]): Set<string> {
+  const keys = new Set<string>();
+  for (const r of runs) if (r.lead_id) keys.add(`${r.lead_id}:${brtDate(r.created_at)}`);
+  return keys;
+}
+
+export type QuotaCheck = {
+  allowed: boolean;
+  /** Esta mensagem abre uma conversa nova (conta na cota). */
+  opensConversation: boolean;
+  /** Avisar o dono: 'WARN' ao chegar em 80%, 'EXHAUSTED' na primeira barrada do mês. */
+  notify: 'WARN' | 'EXHAUSTED' | null;
+};
+
+/**
+ * Conversa que já começou hoje sempre continua — cortar o cliente no meio do
+ * agendamento é pior que estourar a cota em uma conversa.
+ */
+export function checkAssistantQuota(input: {
+  limit: number;
+  used: number;
+  continuingToday: boolean;
+  alreadyBlockedThisMonth: boolean;
+}): QuotaCheck {
+  if (input.continuingToday) return { allowed: true, opensConversation: false, notify: null };
+  if (input.used >= input.limit) {
+    return { allowed: false, opensConversation: false, notify: input.alreadyBlockedThisMonth ? null : 'EXHAUSTED' };
+  }
+  const warnAt = Math.ceil(input.limit * 0.8);
+  return { allowed: true, opensConversation: true, notify: input.used + 1 === warnAt ? 'WARN' : null };
+}
+
 /**
  * Sinais automáticos para revisar. Não provam erro — apontam onde olhar:
  * - VALOR_NAO_CADASTRADO: citou um R$ que não está nos serviços nem nas regras da loja.

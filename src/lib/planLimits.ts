@@ -108,3 +108,17 @@ export const PLAN_USER_LIMITS: Record<PlanTier, number> = {
 export function getPlanUserLimit(planTier: string | null | undefined): number {
   return PLAN_USER_LIMITS[normalizePlanTier(planTier)];
 }
+
+/**
+ * Conversas com a atendente de IA por mês. Conversa = um contato num dia
+ * (horário de Brasília), não importa quantas mensagens troquem.
+ */
+export const PLAN_ASSISTANT_CONVERSATION_LIMITS: Record<PlanTier, number> = {
+  STARTER: 150,
+  PRO: 500,
+  ENTERPRISE: 1200,
+};
+
+export function getPlanAssistantConversationLimit(planTier: string | null | undefined): number {
+  return PLAN_ASSISTANT_CONVERSATION_LIMITS[normalizePlanTier(planTier)];
+}

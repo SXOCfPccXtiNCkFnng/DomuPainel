@@ -4,7 +4,15 @@
  * começo cabe folgado; quando crescer, trocar por uma view agregada por dia.
  */
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { FLAG_LABELS, type AssistantFlag, type AssistantRunStatus } from '@/lib/assistantUsage';
+import {
+  brtDate,
+  brtMonthStartIso,
+  conversationKeys,
+  FLAG_LABELS,
+  type AssistantFlag,
+  type AssistantRunStatus,
+} from '@/lib/assistantUsage';
+import { getPlanAssistantConversationLimit, getPlanDisplayName, normalizePlanTier } from '@/lib/planLimits';
 
 /** Cotação usada só para exibir em reais. Ajustável sem deploy de código pela env. */
 export const USD_BRL = Number(process.env.USD_BRL_RATE) || 5.5;
@@ -116,6 +124,10 @@ export type AssistantTenantStats = {
   costPerReplyUsdFull: number;
   flagged: number;
   lastRunAt: string | null;
+  planName: string;
+  /** Cota do mês corrente (não do período filtrado). */
+  quotaLimit: number;
+  quotaUsed: number;
 };
 
 export type AssistantDay = { date: string; runs: number; replied: number; failed: number; costUsd: number; costUsdFull: number };
@@ -134,10 +146,6 @@ export type AssistantMetrics = {
 };
 
 const num = (v: unknown) => Number(v) || 0;
-
-function brtDate(iso: string): string {
-  return new Date(new Date(iso).getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
 
 function percentile(values: number[], p: number): number | null {
   if (!values.length) return null;
@@ -280,6 +288,9 @@ export async function loadAssistantMetrics(opts: { days: number; tenantId?: stri
         costPerReplyUsdFull: 0,
         flagged: 0,
         lastRunAt: r.created_at,
+        planName: '',
+        quotaLimit: 0,
+        quotaUsed: 0,
         _customers: new Set(),
       };
       byTenant.set(r.tenant_id, t);
@@ -313,9 +324,34 @@ export async function loadAssistantMetrics(opts: { days: number; tenantId?: stri
   totals.p95AiMs = percentile(aiMs, 95);
   totals.avgResponseMs = avg(responseMs);
 
+  const quotaIds = [...byTenant.keys()];
+  const plans = new Map<string, string | null>();
+  const monthKeys = new Map<string, { lead_id: string | null; created_at: string }[]>();
+  if (quotaIds.length) {
+    const [subsRes, monthRes] = await Promise.all([
+      supabaseAdmin.from('subscriptions').select('tenant_id, plan_tier').in('tenant_id', quotaIds),
+      supabaseAdmin
+        .from('assistant_runs')
+        .select('tenant_id, lead_id, created_at')
+        .in('tenant_id', quotaIds)
+        .eq('status', 'REPLIED')
+        .gte('created_at', brtMonthStartIso())
+        .limit(MAX_ROWS),
+    ]);
+    for (const s of subsRes.data || []) plans.set(s.tenant_id, s.plan_tier);
+    for (const r of monthRes.data || []) {
+      const list = monthKeys.get(r.tenant_id) || [];
+      list.push(r);
+      monthKeys.set(r.tenant_id, list);
+    }
+  }
+
   const tenants: AssistantTenantStats[] = [...byTenant.values()]
     .map(({ _customers, ...t }) => ({
       ...t,
+      planName: getPlanDisplayName(normalizePlanTier(plans.get(t.tenantId))),
+      quotaLimit: getPlanAssistantConversationLimit(plans.get(t.tenantId)),
+      quotaUsed: conversationKeys(monthKeys.get(t.tenantId) || []).size,
       customers: _customers.size,
       projectedMonthUsdFull: (t.costUsdFull / opts.days) * 30,
       costPerReplyUsdFull: t.replied ? t.costUsdFull / t.replied : 0,

@@ -16,12 +16,13 @@ import {
 } from 'lucide-react';
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
 import {
+  PLAN_ASSISTANT_CONVERSATION_LIMITS,
   PLAN_DISPATCH_LIMITS,
   PLAN_PRICES_BRL,
   PlanTier,
   isPlanAllowedForSegment,
 } from '@/lib/planLimits';
-import { BUSINESS_SEGMENT_OPTIONS, getSegmentFromStorage } from '@/lib/segmentConfig';
+import { BUSINESS_SEGMENT_OPTIONS, getSegmentFromStorage, isAutomotiveSegment } from '@/lib/segmentConfig';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 
 type PlanFeature = { label: string; comingSoon?: boolean };
@@ -547,6 +548,14 @@ export default function AssinaturaPage() {
                     <li className="flex items-start gap-2 text-xs text-domu-blue font-bold">
                       <Zap className="w-4 h-4 shrink-0 mt-0.5" />
                       <span>Ativa as ferramentas do seu ramo</span>
+                    </li>
+                  )}
+                  {isAutomotiveSegment(segment) && (
+                    <li className="flex items-start gap-2 text-xs text-slate-700 font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
+                      <span>
+                        Atendente IA: {PLAN_ASSISTANT_CONVERSATION_LIMITS[plan.tier].toLocaleString('pt-BR')} conversas/mês
+                      </span>
                     </li>
                   )}
                   {plan.features.map((f) => (

@@ -25,6 +25,7 @@ const REASON_LABEL: Record<string, string> = {
   ERRO_INTERNO: 'Erro no sistema',
   MENSAGEM_NOVA: 'Cliente mandou outra mensagem',
   SEM_CHAVE_IA: 'Chave da IA não configurada',
+  COTA_ESGOTADA: 'Cota do mês esgotada',
 };
 
 const TOOL_LABEL: Record<string, string> = {
@@ -356,6 +357,7 @@ export default function AssistantMonitor() {
                   <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
                     <tr>
                       <th className="text-left px-3 py-2">Cliente</th>
+                      <th className="text-right px-3 py-2" title="Conversas usadas no mês corrente / cota do plano">Cota do mês</th>
                       <th className="text-right px-3 py-2">Respostas</th>
                       <th className="text-right px-3 py-2">Clientes finais</th>
                       <th className="text-right px-3 py-2">Agend.</th>
@@ -375,7 +377,17 @@ export default function AssistantMonitor() {
                         onClick={() => setTenantId(row.tenantId === tenantId ? '' : row.tenantId)}
                         className={`cursor-pointer hover:bg-slate-50 ${row.tenantId === tenantId ? 'bg-blue-50' : ''}`}
                       >
-                        <td className="px-3 py-2 font-bold text-slate-900">{row.tenantName}</td>
+                        <td className="px-3 py-2 font-bold text-slate-900">
+                          {row.tenantName}
+                          <span className="ml-1.5 text-[10px] font-semibold text-slate-400">{row.planName}</span>
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-bold ${
+                            row.quotaUsed >= row.quotaLimit ? 'text-red-600' : row.quotaUsed >= row.quotaLimit * 0.8 ? 'text-amber-600' : 'text-slate-700'
+                          }`}
+                        >
+                          {int(row.quotaUsed)}/{int(row.quotaLimit)}
+                        </td>
                         <td className="px-3 py-2 text-right">{int(row.replied)}</td>
                         <td className="px-3 py-2 text-right">{int(row.customers)}</td>
                         <td className="px-3 py-2 text-right">{int(row.bookings)}</td>

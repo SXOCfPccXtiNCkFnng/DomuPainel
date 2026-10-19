@@ -1,5 +1,56 @@
 import { describe, expect, it } from 'vitest';
-import { addUsage, costUsd, costUsdFullPrice, detectFlags, emptyUsage, extractBrlValues, priceFor } from '@/lib/assistantUsage';
+import {
+  addUsage,
+  brtDate,
+  brtMonthStartIso,
+  checkAssistantQuota,
+  conversationKeys,
+  costUsd,
+  costUsdFullPrice,
+  detectFlags,
+  emptyUsage,
+  extractBrlValues,
+  priceFor,
+} from '@/lib/assistantUsage';
+
+describe('cota de conversas', () => {
+  it('mês e dia seguem o horário de Brasília', () => {
+    expect(brtDate('2026-11-01T02:30:00Z')).toBe('2026-10-31');
+    expect(brtMonthStartIso(new Date('2026-11-01T02:30:00Z'))).toBe('2026-10-01T03:00:00.000Z');
+    expect(brtMonthStartIso(new Date('2026-11-01T03:30:00Z'))).toBe('2026-11-01T03:00:00.000Z');
+  });
+
+  it('conversa = contato por dia, não por mensagem', () => {
+    const keys = conversationKeys([
+      { lead_id: 'a', created_at: '2026-10-19T12:00:00Z' },
+      { lead_id: 'a', created_at: '2026-10-19T20:00:00Z' },
+      { lead_id: 'a', created_at: '2026-10-20T12:00:00Z' },
+      { lead_id: 'b', created_at: '2026-10-19T12:00:00Z' },
+      { lead_id: null, created_at: '2026-10-19T12:00:00Z' },
+    ]);
+    expect(keys.size).toBe(3);
+  });
+
+  const base = { limit: 150, used: 10, continuingToday: false, alreadyBlockedThisMonth: false };
+
+  it('libera conversa nova dentro da cota', () => {
+    expect(checkAssistantQuota(base)).toEqual({ allowed: true, opensConversation: true, notify: null });
+  });
+
+  it('avisa uma vez ao chegar em 80%', () => {
+    expect(checkAssistantQuota({ ...base, used: 119 }).notify).toBe('WARN');
+    expect(checkAssistantQuota({ ...base, used: 120 }).notify).toBeNull();
+  });
+
+  it('barra conversa nova com a cota cheia e avisa só na primeira vez do mês', () => {
+    expect(checkAssistantQuota({ ...base, used: 150 })).toEqual({ allowed: false, opensConversation: false, notify: 'EXHAUSTED' });
+    expect(checkAssistantQuota({ ...base, used: 150, alreadyBlockedThisMonth: true }).notify).toBeNull();
+  });
+
+  it('conversa que já começou hoje continua mesmo com a cota cheia', () => {
+    expect(checkAssistantQuota({ ...base, used: 150, continuingToday: true }).allowed).toBe(true);
+  });
+});
 
 describe('addUsage', () => {
   it('soma chamadas, conta raciocínio como saída e aceita metadata vazio', () => {

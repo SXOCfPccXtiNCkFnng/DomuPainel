@@ -26,8 +26,10 @@ import {
 import { ASSISTANT_TOOL_DECLARATIONS, executeAssistantTool, type AssistantToolContext } from '@/lib/assistantTools';
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import type { ServiceItem } from '@/lib/scheduling';
+import { loadAssistantQuota } from '@/lib/assistantQuota';
 import {
   addUsage,
+  checkAssistantQuota,
   costUsd,
   costUsdFullPrice,
   detectFlags,
@@ -344,6 +346,36 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       }
       await recordRun(trigger, { status: 'SKIPPED', reason: decision.reason, usage, tools: toolLog, customerMessage });
       return;
+    }
+
+    const quota = await loadAssistantQuota(tenantId, now);
+    if (quota) {
+      const check = checkAssistantQuota({
+        limit: quota.limit,
+        used: quota.used,
+        continuingToday: quota.leadsToday.has(leadId),
+        alreadyBlockedThisMonth: quota.alreadyBlockedThisMonth,
+      });
+      if (check.notify === 'EXHAUSTED') {
+        logger.info('assistant.quota_exhausted', { tenantId, plan: quota.planTier, limit: quota.limit });
+        await notifyTenantAdmins(tenantId, {
+          title: 'Acabaram as conversas da atendente neste mês',
+          message: `Seu plano ${quota.planName} inclui ${quota.limit} conversas por mês com a atendente e todas já foram usadas. Conversas novas ficam com a sua equipe até o dia 1º. Para a atendente voltar agora, mude de plano.`,
+          type: 'WARNING',
+          url: '/assinatura',
+        });
+      } else if (check.notify === 'WARN') {
+        await notifyTenantAdmins(tenantId, {
+          title: 'Conversas da atendente acabando',
+          message: `Você já usou 80% das ${quota.limit} conversas do mês da atendente (plano ${quota.planName}). Quando acabarem, conversas novas ficam com a sua equipe.`,
+          type: 'WARNING',
+          url: '/assinatura',
+        });
+      }
+      if (!check.allowed) {
+        await recordRun(trigger, { status: 'SKIPPED', reason: 'COTA_ESGOTADA', usage, tools: toolLog, customerMessage });
+        return;
+      }
     }
 
     const companyName = tenant.name || 'a loja';

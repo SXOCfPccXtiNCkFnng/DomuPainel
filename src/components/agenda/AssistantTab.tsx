@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { AlertCircle, CheckCircle2, Circle, Headset, Info, Loader2 } from 'lucide-react';
 import WhatsAppPreview from '@/components/shared/WhatsAppPreview';
 import {
@@ -45,6 +46,7 @@ export default function AssistantTab({
   const [saved, setSaved] = useState<AssistantSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [companyName, setCompanyName] = useState('');
   const [aiAvailable, setAiAvailable] = useState(true);
+  const [quota, setQuota] = useState<{ planName: string; limit: number; used: number } | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +66,7 @@ export default function AssistantTab({
         setSaved(json.settings);
         setCompanyName(json.companyName || '');
         setAiAvailable(Boolean(json.aiAvailable));
+        setQuota(json.quota || null);
         setCanEdit(Boolean(json.canEdit));
       } catch {
         setError('Não foi possível carregar a atendente.');
@@ -199,6 +202,35 @@ export default function AssistantTab({
       </section>
       {form.enabled !== saved.enabled && (
         <p className="text-[11px] text-amber-700">Clique em “Salvar atendente” para aplicar.</p>
+      )}
+
+      {quota && (
+        <section className="bg-white rounded-2xl border border-slate-200/80 p-4 space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-xs font-black text-slate-900">Conversas da atendente neste mês</h2>
+            <span className="text-xs font-bold text-slate-700">
+              {quota.used.toLocaleString('pt-BR')} de {quota.limit.toLocaleString('pt-BR')}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                quota.used >= quota.limit ? 'bg-red-500' : quota.used >= quota.limit * 0.8 ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}
+              style={{ width: `${Math.min(100, (quota.used / quota.limit) * 100)}%` }}
+            />
+          </div>
+          <p className="text-[10.5px] text-slate-500 leading-relaxed">
+            {quota.used >= quota.limit
+              ? 'As conversas do mês acabaram: contatos novos ficam com a sua equipe até o dia 1º. '
+              : ''}
+            Cada contato atendido num dia conta como uma conversa, não importa quantas mensagens troquem. Plano{' '}
+            {quota.planName}.{' '}
+            <Link href="/assinatura" className="font-bold text-domu-blue underline">
+              Ver planos
+            </Link>
+          </p>
+        </section>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

@@ -4,6 +4,7 @@ import { requireAdmin, requireAuth } from '@/lib/requireAuth';
 import { internalErrorResponse } from '@/lib/errors';
 import { assistantSettingsFromRow, validateAssistantSettings } from '@/lib/assistantPrompt';
 import { isSchemaPendingError, SCHEDULING_MIGRATION_PENDING } from '@/lib/schedulingServer';
+import { loadAssistantQuota } from '@/lib/assistantQuota';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +22,10 @@ export async function GET(req: NextRequest) {
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
 
-    const [settingsRes, tenantRes] = await Promise.all([
+    const [settingsRes, tenantRes, quota] = await Promise.all([
       supabaseAdmin.from('assistant_settings').select(COLUMNS).eq('tenant_id', tenantId).maybeSingle(),
       supabaseAdmin.from('tenants').select('name').eq('id', tenantId).maybeSingle(),
+      loadAssistantQuota(tenantId).catch(() => null),
     ]);
     if (settingsRes.error) throw settingsRes.error;
 
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
       success: true,
       settings: assistantSettingsFromRow(settingsRes.data as Record<string, unknown> | null),
       companyName: tenantRes.data?.name || '',
+      quota: quota ? { planName: quota.planName, limit: quota.limit, used: quota.used } : null,
       aiAvailable: Boolean(process.env.GEMINI_API_KEY),
       canEdit: auth.session.role === 'ADMIN' || auth.session.role === 'SUPER_ADMIN',
     });
