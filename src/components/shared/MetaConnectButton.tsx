@@ -53,6 +53,9 @@ export type MetaConnectResult = {
 
 type Step = 'login' | 'coexistencia';
 
+/** FB.init é global da página: roda uma vez só, mesmo com o botão remontando. */
+let fbInitialized = false;
+
 /**
  * Botão do Meta WhatsApp Embedded Signup (Coexistência real). Usado no
  * onboarding e em /configuracoes — mesma lógica, evita duplicar o
@@ -367,13 +370,19 @@ export function MetaConnectButton({
       <Script
         src="https://connect.facebook.net/en_US/sdk.js"
         strategy="afterInteractive"
-        onLoad={() => {
-          window.FB?.init({
-            appId: process.env.NEXT_PUBLIC_META_APP_ID as string,
-            autoLogAppEvents: true,
-            xfbml: true,
-            version: 'v21.0',
-          });
+        // O Next carrega o script uma vez por página: ao trocar de aba o botão
+        // remonta e onLoad não dispara de novo. onReady roda a cada montagem.
+        onReady={() => {
+          if (!window.FB) return;
+          if (!fbInitialized) {
+            window.FB.init({
+              appId: process.env.NEXT_PUBLIC_META_APP_ID as string,
+              autoLogAppEvents: true,
+              xfbml: true,
+              version: 'v21.0',
+            });
+            fbInitialized = true;
+          }
           setFbSdkReady(true);
         }}
       />
