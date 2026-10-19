@@ -2,16 +2,20 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle2, Circle, Headset, Info, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Circle, Headset, Info, Loader2, Megaphone } from 'lucide-react';
 import WhatsAppPreview from '@/components/shared/WhatsAppPreview';
 import {
   ABOUT_MAX,
   ADDRESS_MAX,
   ASSISTANT_NAME_MAX,
   ASSISTANT_NAME_SUGGESTIONS,
+  activePromo,
   DEFAULT_ASSISTANT_SETTINGS,
   EXTRA_INFO_MAX,
+  formatPromoUntil,
+  GREETING_MAX,
   PAYMENT_OPTIONS,
+  PROMO_MAX,
   sampleGreeting,
   TONE_OPTIONS,
   type AssistantSettings,
@@ -46,6 +50,7 @@ export default function AssistantTab({
   const [saved, setSaved] = useState<AssistantSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [companyName, setCompanyName] = useState('');
   const [aiAvailable, setAiAvailable] = useState(true);
+  const [promoAvailable, setPromoAvailable] = useState(true);
   const [quota, setQuota] = useState<{ planName: string; limit: number; used: number } | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +72,7 @@ export default function AssistantTab({
         setCompanyName(json.companyName || '');
         setAiAvailable(Boolean(json.aiAvailable));
         setQuota(json.quota || null);
+        setPromoAvailable(json.promoAvailable !== false);
         setCanEdit(Boolean(json.canEdit));
       } catch {
         setError('Não foi possível carregar a atendente.');
@@ -133,7 +139,18 @@ export default function AssistantTab({
       label: form.payment_methods.length ? 'Formas de pagamento' : 'Formas de pagamento não informadas',
     },
     { done: Boolean(form.extra_info.trim()), label: 'Informações e regras da loja' },
+    {
+      done: Boolean(activePromo(form)),
+      label: activePromo(form) ? 'Promoção em andamento' : 'Nenhuma promoção ativa',
+    },
   ];
+
+  const promoExpired = Boolean(form.promo_text.trim() && !activePromo(form));
+  const promoStatus = promoExpired
+    ? { text: `Venceu em ${formatPromoUntil(form.promo_until)}: a atendente não oferece mais.`, tone: 'text-red-600' }
+    : form.promo_until
+      ? { text: `A atendente oferece até ${formatPromoUntil(form.promo_until)} e depois para sozinha.`, tone: 'text-emerald-700' }
+      : { text: 'Sem data: vale até você remover.', tone: 'text-slate-500' };
 
   return (
     <div className="space-y-4">
@@ -362,7 +379,7 @@ export default function AssistantTab({
               </div>
             </div>
             <Field
-              label="Informações e regras"
+              label="Informações e regras (fixas)"
               hint={`Escreva fatos e regras da loja, um por linha. ${form.extra_info.length}/${EXTRA_INFO_MAX}`}
             >
               <textarea
@@ -375,6 +392,69 @@ export default function AssistantTab({
                 className={`${agendaInputClass} resize-y leading-relaxed`}
               />
             </Field>
+          </section>
+
+          <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-domu-blue" />
+              <h2 className="text-sm font-black text-slate-900">Boas-vindas e promoção</h2>
+            </div>
+            {!promoAvailable && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Ainda não disponível nesta conta (atualização do banco pendente). Os outros campos funcionam normalmente.
+              </p>
+            )}
+            <Field
+              label="Mensagem de boas-vindas"
+              hint={`Opcional. A atendente usa no começo de cada conversa. ${form.greeting.length}/${GREETING_MAX}`}
+            >
+              <textarea
+                value={form.greeting}
+                rows={2}
+                maxLength={GREETING_MAX}
+                disabled={disabled || !promoAvailable}
+                onChange={(e) => update({ greeting: e.target.value })}
+                placeholder={`Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua loja'}. Seu carro merece um trato hoje? Como posso te ajudar?`}
+                className={`${agendaInputClass} resize-y`}
+              />
+            </Field>
+            <Field
+              label="Promoção"
+              hint={`Escreva o que é, o valor e as condições. A atendente só oferece exatamente isso. ${form.promo_text.length}/${PROMO_MAX}`}
+            >
+              <textarea
+                value={form.promo_text}
+                rows={3}
+                maxLength={PROMO_MAX}
+                disabled={disabled || !promoAvailable}
+                onChange={(e) => update({ promo_text: e.target.value })}
+                placeholder="Ex.: Lavagem completa + cera por R$ 70,00, de segunda a quarta. Não vale para caminhonete."
+                className={`${agendaInputClass} resize-y`}
+              />
+            </Field>
+            {form.promo_text.trim() && (
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Válida até (inclusive)">
+                  <input
+                    type="date"
+                    value={form.promo_until}
+                    disabled={disabled || !promoAvailable}
+                    onChange={(e) => update({ promo_until: e.target.value })}
+                    className={`${agendaInputClass} w-44`}
+                  />
+                </Field>
+                <p className={`text-[11px] pb-2 ${promoStatus.tone}`}>{promoStatus.text}</p>
+                {!disabled && (
+                  <button
+                    type="button"
+                    onClick={() => update({ promo_text: '', promo_until: '' })}
+                    className="text-[11px] font-bold text-red-600 hover:underline pb-2 ml-auto"
+                  >
+                    Remover promoção
+                  </button>
+                )}
+              </div>
+            )}
           </section>
 
           {canEdit && (

@@ -8,11 +8,21 @@ import { loadAssistantQuota } from '@/lib/assistantQuota';
 
 export const dynamic = 'force-dynamic';
 
-const COLUMNS =
+const BASE_COLUMNS =
   'enabled, assistant_name, tone, use_emojis, show_prices, about, address, payment_methods, extra_info';
+const COLUMNS = `${BASE_COLUMNS}, promo_text, promo_until, greeting`;
+const PROMO_MIGRATION = '20261019_assistant_promo_greeting.sql';
 
 function migrationPending() {
   return NextResponse.json({ success: false, error: SCHEDULING_MIGRATION_PENDING }, { status: 503 });
+}
+
+/** Colunas de promoção/boas-vindas ainda não criadas: a tela continua funcionando sem elas. */
+async function loadSettingsRow(tenantId: string) {
+  const res = await supabaseAdmin.from('assistant_settings').select(COLUMNS).eq('tenant_id', tenantId).maybeSingle();
+  if (res.error?.code !== '42703') return { ...res, promoAvailable: true };
+  const base = await supabaseAdmin.from('assistant_settings').select(BASE_COLUMNS).eq('tenant_id', tenantId).maybeSingle();
+  return { ...base, promoAvailable: false };
 }
 
 /** Personalização do assistente de IA do WhatsApp. */
@@ -23,7 +33,7 @@ export async function GET(req: NextRequest) {
     const tenantId = auth.session.tenantId;
 
     const [settingsRes, tenantRes, quota] = await Promise.all([
-      supabaseAdmin.from('assistant_settings').select(COLUMNS).eq('tenant_id', tenantId).maybeSingle(),
+      loadSettingsRow(tenantId),
       supabaseAdmin.from('tenants').select('name').eq('id', tenantId).maybeSingle(),
       loadAssistantQuota(tenantId).catch(() => null),
     ]);
@@ -34,6 +44,7 @@ export async function GET(req: NextRequest) {
       settings: assistantSettingsFromRow(settingsRes.data as Record<string, unknown> | null),
       companyName: tenantRes.data?.name || '',
       quota: quota ? { planName: quota.planName, limit: quota.limit, used: quota.used } : null,
+      promoAvailable: settingsRes.promoAvailable,
       aiAvailable: Boolean(process.env.GEMINI_API_KEY),
       canEdit: auth.session.role === 'ADMIN' || auth.session.role === 'SUPER_ADMIN',
     });
@@ -68,18 +79,34 @@ export async function PUT(req: NextRequest) {
         );
       }
     }
-    const { error } = await supabaseAdmin.from('assistant_settings').upsert(
-      {
-        tenant_id: auth.session.tenantId,
-        ...settings,
-        assistant_name: settings.assistant_name || null,
-        about: settings.about || null,
-        address: settings.address || null,
-        extra_info: settings.extra_info || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tenant_id' }
-    );
+    const { promo_text, promo_until, greeting, ...base } = settings;
+    const row = {
+      tenant_id: auth.session.tenantId,
+      ...base,
+      assistant_name: settings.assistant_name || null,
+      about: settings.about || null,
+      address: settings.address || null,
+      extra_info: settings.extra_info || null,
+      updated_at: new Date().toISOString(),
+    };
+    const upsert = (values: Record<string, unknown>) =>
+      supabaseAdmin.from('assistant_settings').upsert(values, { onConflict: 'tenant_id' });
+
+    let { error } = await upsert({
+      ...row,
+      promo_text: promo_text || null,
+      promo_until: promo_until || null,
+      greeting: greeting || null,
+    });
+    if (error?.code === '42703' || error?.code === 'PGRST204') {
+      if (promo_text || greeting) {
+        return NextResponse.json(
+          { success: false, error: `Promoção e boas-vindas ainda não foram ativadas no banco (migration ${PROMO_MIGRATION}).` },
+          { status: 503 }
+        );
+      }
+      ({ error } = await upsert(row));
+    }
     if (error) throw error;
 
     return NextResponse.json({ success: true, settings });

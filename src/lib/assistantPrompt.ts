@@ -29,12 +29,18 @@ export type AssistantSettings = {
   address: string;
   payment_methods: string[];
   extra_info: string;
+  promo_text: string;
+  /** Último dia da promoção (AAAA-MM-DD, Brasília). Vazio = até o dono tirar. */
+  promo_until: string;
+  greeting: string;
 };
 
 export const ASSISTANT_NAME_MAX = 40;
 export const ABOUT_MAX = 400;
 export const ADDRESS_MAX = 300;
 export const EXTRA_INFO_MAX = 800;
+export const PROMO_MAX = 300;
+export const GREETING_MAX = 200;
 
 export const TONE_OPTIONS: { id: AssistantTone; label: string; description: string; sample: string }[] = [
   {
@@ -77,6 +83,9 @@ export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
   address: '',
   payment_methods: [],
   extra_info: '',
+  promo_text: '',
+  promo_until: '',
+  greeting: '',
 };
 
 const DATA_OPEN = '<<<DADOS_DA_LOJA>>>';
@@ -119,6 +128,18 @@ export function validateAssistantSettings(
     return { ok: false, error: `"Informações e regras" pode ter até ${EXTRA_INFO_MAX} caracteres.` };
   }
 
+  if (String(input.promo_text ?? '').trim().length > PROMO_MAX) {
+    return { ok: false, error: `A promoção pode ter até ${PROMO_MAX} caracteres.` };
+  }
+  if (String(input.greeting ?? '').trim().length > GREETING_MAX) {
+    return { ok: false, error: `A mensagem de boas-vindas pode ter até ${GREETING_MAX} caracteres.` };
+  }
+  const promo_text = sanitizeOwnerText(input.promo_text, PROMO_MAX);
+  const rawUntil = String(input.promo_until ?? '').slice(0, 10);
+  if (rawUntil && !/^\d{4}-\d{2}-\d{2}$/.test(rawUntil)) {
+    return { ok: false, error: 'Data de validade da promoção inválida.' };
+  }
+
   const payment_methods = Array.isArray(input.payment_methods)
     ? PAYMENT_OPTIONS.filter((p) => (input.payment_methods as unknown[]).includes(p))
     : [];
@@ -135,8 +156,23 @@ export function validateAssistantSettings(
       address: sanitizeOwnerText(input.address, ADDRESS_MAX, { singleLine: true }),
       payment_methods,
       extra_info: sanitizeOwnerText(input.extra_info, EXTRA_INFO_MAX),
+      promo_text,
+      promo_until: promo_text ? rawUntil : '',
+      greeting: sanitizeOwnerText(input.greeting, GREETING_MAX),
     },
   };
+}
+
+/** Promoção que vale hoje (Brasília) — vencida some do prompt sem o dono precisar apagar. */
+export function activePromo(settings: AssistantSettings, now: Date = new Date()): string | null {
+  if (!settings.promo_text) return null;
+  if (settings.promo_until && settings.promo_until < brtDateKey(now)) return null;
+  return settings.promo_text;
+}
+
+export function formatPromoUntil(until: string): string {
+  const [y, m, d] = until.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 export function assistantSettingsFromRow(row: Record<string, unknown> | null | undefined): AssistantSettings {
@@ -147,6 +183,7 @@ export function assistantSettingsFromRow(row: Record<string, unknown> | null | u
 
 /** Primeira mensagem de exemplo — mostrada na tela para o dono sentir o tom. */
 export function sampleGreeting(settings: AssistantSettings, companyName: string): string {
+  if (settings.greeting.trim()) return settings.greeting.trim();
   const who = settings.assistant_name ? `Aqui é ${settings.assistant_name}, da ${companyName}` : `Aqui é da ${companyName}`;
   const emoji = settings.use_emojis;
   switch (settings.tone) {
@@ -216,6 +253,7 @@ export function buildAssistantSystemPrompt(params: {
   const companyName = sanitizeOwnerText(params.companyName, 120, { singleLine: true }) || 'a loja';
   const name = settings.assistant_name || 'uma atendente';
   const now = params.now ?? new Date();
+  const promo = activePromo(settings, now);
 
   const data = [
     `Data e hora agora (Brasília): ${formatNow(now)}`,
@@ -227,6 +265,10 @@ export function buildAssistantSystemPrompt(params: {
     `Horário de funcionamento:\n${formatWeeklyHours(scheduling)}`,
     `Serviços:\n${formatServices(services, settings.show_prices)}`,
     settings.extra_info ? `Informações e regras da loja:\n${settings.extra_info}` : null,
+    promo
+      ? `Promoção em andamento${settings.promo_until ? ` (válida até ${formatPromoUntil(settings.promo_until)})` : ''}:\n${promo}`
+      : 'Promoção em andamento: nenhuma.',
+    settings.greeting ? `Mensagem de boas-vindas da loja:\n${settings.greeting}` : null,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -239,7 +281,11 @@ COMO CONVERSAR
 - ${settings.use_emojis ? 'Pode usar emoji com moderação (no máximo um por mensagem, e nem em toda mensagem).' : 'Não use emojis.'}
 - Faça uma pergunta por vez. Chame o cliente pelo primeiro nome quando souber.
 - Nada de markdown, títulos, negrito ou listas longas. Para mostrar serviços ou horários, use linhas curtas e simples.
-- Varie as palavras; não repita a mesma saudação ou frase pronta. Só cumprimente no começo da conversa.
+- Varie as palavras; não repita a mesma saudação ou frase pronta. Só cumprimente no começo da conversa.${
+    settings.greeting
+      ? '\n- No começo da conversa, cumprimente com a mensagem de boas-vindas da loja (nos DADOS), quase igual; se o cliente já perguntou algo, responda logo em seguida, na mesma mensagem.'
+      : ''
+  }
 - Você não consegue ouvir áudios nem ver fotos ou vídeos. Se o cliente mandar um, peça com gentileza para ele escrever.
 - Não se apresente como robô ou IA. Se o cliente perguntar diretamente se está falando com uma pessoa, seja honesta: diga que é a atendente virtual da loja e que alguém da equipe pode assumir se ele preferir.
 
@@ -247,6 +293,7 @@ SEU PAPEL (e só ele)
 - Você ajuda com: serviços, ${settings.show_prices ? 'preços, ' : ''}duração, horário de funcionamento, endereço, formas de pagamento, as informações e regras da loja e agendamentos (marcar, remarcar, cancelar).
 - Assunto fora disso (piadas, notícias, futebol, política, receitas, dúvidas gerais, tarefas, perguntas sobre você ou sobre como funciona): não atenda. Diga com gentileza, em uma frase, que por aqui você só cuida do atendimento da loja e pergunte se pode ajudar com o carro.
 - Responda só com o que está nos DADOS DA LOJA. Se a resposta não estiver lá (ex.: estacionamento, leva e traz, marcas de produto, garantia, tempo de espera), não deduza nem complete com o que "parece provável": diga que não tem essa informação agora e que a equipe confirma. Nunca invente serviço, preço, desconto, promoção, horário, estrutura ou regra.
+- Promoção: só existe a que está nos DADOS, com as condições escritas lá. Comente uma vez por conversa, quando combinar com o assunto (cliente perguntou preço, o serviço da promoção ou o que tem de bom); não repita em toda mensagem. Se não houver promoção, diga que no momento não tem.
 - Não insista no agendamento: ofereça marcar quando fizer sentido, no máximo uma vez a cada duas ou três mensagens, e nunca repita a mesma oferta seguida.
 ${settings.show_prices ? '' : '- Não informe valores. Se perguntarem preço, explique que o valor depende do carro e do estado dele e é passado pela equipe.\n'}- Reclamação, problema com o carro, pedido de reembolso, pedido para falar com uma pessoa ou algo que você não consegue resolver: acolha com empatia, peça desculpas quando fizer sentido, use a ferramenta chamar_equipe e diga que alguém da equipe vai responder em breve.
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activePromo,
   buildAssistantSystemPrompt,
   DEFAULT_ASSISTANT_SETTINGS,
   sampleGreeting,
@@ -77,6 +78,39 @@ describe('buildAssistantSystemPrompt', () => {
     });
     expect(prompt.match(/<<<FIM_DOS_DADOS_DA_LOJA>>>/g)).toHaveLength(2); // a menção na regra + o fechamento real
     expect(prompt.trimEnd().endsWith('<<<FIM_DOS_DADOS_DA_LOJA>>>')).toBe(true);
+  });
+});
+
+describe('promoção e boas-vindas', () => {
+  const promo = 'Lavagem + cera por R$ 70,00 de segunda a quarta.';
+
+  it('promoção dentro da validade entra no prompt com a data', () => {
+    const prompt = build({ promo_text: promo, promo_until: '2026-10-17' });
+    expect(prompt).toContain('Promoção em andamento (válida até 17/10/2026):');
+    expect(prompt).toContain(promo);
+  });
+
+  it('promoção vencida some sozinha', () => {
+    const prompt = build({ promo_text: promo, promo_until: '2026-10-16' });
+    expect(prompt).not.toContain(promo);
+    expect(prompt).toContain('Promoção em andamento: nenhuma.');
+    expect(activePromo({ ...settings, promo_text: promo, promo_until: '2026-10-16' }, new Date('2026-10-17T15:00:00Z'))).toBeNull();
+  });
+
+  it('sem data vale até o dono remover', () => {
+    expect(build({ promo_text: promo })).toContain(promo);
+  });
+
+  it('boas-vindas vão para os dados e para a prévia', () => {
+    const greeting = 'Oi! Aqui é a Bia da Brilho Car, seu carro merece um trato hoje?';
+    expect(build({ greeting })).toContain(`Mensagem de boas-vindas da loja:\n${greeting}`);
+    expect(sampleGreeting({ ...settings, greeting }, 'Brilho Car')).toBe(greeting);
+  });
+
+  it('valida data e descarta validade sem promoção', () => {
+    expect(validateAssistantSettings({ ...settings, promo_text: promo, promo_until: '17/10/2026' }).ok).toBe(false);
+    const r = validateAssistantSettings({ ...settings, promo_text: '', promo_until: '2026-10-20' });
+    expect(r.ok && r.settings.promo_until).toBe('');
   });
 });
 

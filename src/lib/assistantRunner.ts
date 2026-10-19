@@ -11,7 +11,7 @@ import { isAutomotiveSegment } from '@/lib/segmentConfig';
 import { isOptOutMessage, sendMetaText } from '@/lib/metaClient';
 import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import { notifyTenantAdmins } from '@/lib/notify';
-import { assistantSettingsFromRow, buildAssistantSystemPrompt } from '@/lib/assistantPrompt';
+import { activePromo, assistantSettingsFromRow, buildAssistantSystemPrompt } from '@/lib/assistantPrompt';
 import {
   ASSISTANT_SENDER_TYPE,
   DEBOUNCE_MS,
@@ -426,7 +426,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     const flags = detectFlags({
       reply: replyText,
       knownPrices: services.filter((s) => s.price != null).map((s) => s.price as number),
-      ownerText: `${settings.extra_info}\n${settings.about}`,
+      ownerText: `${settings.extra_info}\n${settings.about}\n${activePromo(settings, now) || ''}`,
       tools: toolLog,
     });
 
