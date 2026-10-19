@@ -49,6 +49,11 @@ export default function ConfiguracoesPage() {
   const [statusWidgetKey, setStatusWidgetKey] = useState(0);
   const [showManualCredentials, setShowManualCredentials] = useState(false);
 
+  useEffect(() => {
+    if (!showManualCredentials) return;
+    document.getElementById('credenciais-manuais')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [showManualCredentials]);
+
   const loadSettings = async () => {
     setIsLoading(true);
     setErrorMsg('');
@@ -333,9 +338,10 @@ export default function ConfiguracoesPage() {
                     <button
                       type="button"
                       onClick={() => setShowManualCredentials((v) => !v)}
-                      className="block text-[11px] font-bold text-slate-500 hover:text-domu-blue"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-slate-700 border border-slate-200 rounded-xl hover:border-domu-blue/40 hover:text-domu-blue"
                     >
-                      {showManualCredentials ? 'Ocultar conexão por token' : 'Avançado: conectar com token da Meta'}
+                      <Key className="w-3.5 h-3.5" />
+                      {showManualCredentials ? 'Ocultar conexão por token' : 'Já tenho os IDs e o token da Meta'}
                     </button>
                     {showManualCredentials ? (
                       <p className="text-[11px] text-slate-500 leading-relaxed">
@@ -381,9 +387,10 @@ export default function ConfiguracoesPage() {
                     <button
                       type="button"
                       onClick={() => setShowManualCredentials((v) => !v)}
-                      className="block text-[11px] font-bold text-slate-500 hover:text-domu-blue"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-slate-700 border border-slate-200 rounded-xl hover:border-domu-blue/40 hover:text-domu-blue"
                     >
-                      {showManualCredentials ? 'Ocultar conexão por token' : 'Avançado: conectar com token da Meta'}
+                      <Key className="w-3.5 h-3.5" />
+                      {showManualCredentials ? 'Ocultar conexão por token' : 'Já tenho os IDs e o token da Meta'}
                     </button>
                   </div>
                 )}
@@ -511,8 +518,9 @@ export default function ConfiguracoesPage() {
             {/* Número dedicado: credenciais coladas à mão — único caso em que o formulário aparece. */}
             {isMetaConnected === false && showManualCredentials && (
               <form
+                id="credenciais-manuais"
                 onSubmit={handleSave}
-                className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden"
+                className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden scroll-mt-6"
               >
                 <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
