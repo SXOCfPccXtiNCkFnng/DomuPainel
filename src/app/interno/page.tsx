@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Activity,
   AlertTriangle,
+  Bot,
   Building2,
   CheckCircle2,
   ChevronDown,
@@ -21,6 +22,7 @@ import type { PlatformOverview, SubscriptionStatus } from '@/lib/platformOvervie
 import type { OpsAlert } from '@/lib/opsAlert';
 import type { HealthCheck, HealthStatus } from '@/lib/platformHealth';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import AssistantMonitor from '@/components/interno/AssistantMonitor';
 
 type CouponRow = {
   code: string;
@@ -33,7 +35,7 @@ type CouponRow = {
 };
 
 type HealthData = { checkedAt: string; summary: Record<HealthStatus, number>; checks: HealthCheck[] };
-type Tab = 'overview' | 'health' | 'errors' | 'tenants' | 'commercial';
+type Tab = 'overview' | 'health' | 'errors' | 'tenants' | 'assistant' | 'commercial';
 
 function statusLabel(status: SubscriptionStatus) {
   switch (status) {
@@ -429,6 +431,7 @@ export default function InternoPage() {
     { id: 'health', label: 'Saúde do sistema', icon: <Stethoscope className="w-4 h-4" />, badge: healthFails || healthWarns, badgeTone: healthFails ? 'bg-red-600' : 'bg-amber-500' },
     { id: 'errors', label: 'Erros', icon: <AlertTriangle className="w-4 h-4" />, badge: openErrors, badgeTone: 'bg-red-600' },
     { id: 'tenants', label: 'Empresas', icon: <Building2 className="w-4 h-4" /> },
+    { id: 'assistant', label: 'Atendente IA', icon: <Bot className="w-4 h-4" /> },
     { id: 'commercial', label: 'Comercial', icon: <Tag className="w-4 h-4" /> },
   ];
 
@@ -1006,6 +1009,8 @@ export default function InternoPage() {
       ) : null}
 
       {/* ───────── Comercial ───────── */}
+      {tab === 'assistant' ? <AssistantMonitor /> : null}
+
       {tab === 'commercial' ? (
         <div className="space-y-4">
           <section className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">

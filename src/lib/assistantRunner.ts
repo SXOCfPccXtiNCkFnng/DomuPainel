@@ -2,7 +2,8 @@
  * Assistente de IA no WhatsApp (segmento automotivo). Roda depois que o
  * webhook já respondeu 200 para a Meta: espera o cliente terminar de digitar,
  * confere se pode responder, conversa com o Gemini (com as ferramentas de
- * agenda) e envia a resposta.
+ * agenda) e envia a resposta. Toda execução que passa da espera vira uma
+ * linha em assistant_runs (consumo e monitor de conversas no /interno).
  */
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { logger } from '@/lib/logger';
@@ -25,6 +26,16 @@ import {
 import { ASSISTANT_TOOL_DECLARATIONS, executeAssistantTool, type AssistantToolContext } from '@/lib/assistantTools';
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import type { ServiceItem } from '@/lib/scheduling';
+import {
+  addUsage,
+  costUsd,
+  costUsdFullPrice,
+  detectFlags,
+  emptyUsage,
+  type AssistantFlag,
+  type AssistantRunStatus,
+  type TokenUsage,
+} from '@/lib/assistantUsage';
 
 export type AssistantTrigger = { tenantId: string; leadId: string; messageId: string };
 
@@ -43,8 +54,7 @@ type GeminiPart = {
   functionCall?: { name: string; args?: Record<string, unknown> };
 };
 type GeminiTurn = { role: 'user' | 'model'; parts: Record<string, unknown>[] };
-/** Tokens gastos numa resposta (somando as rodadas de ferramenta) — base do custo por cliente. */
-type TokenUsage = { calls: number; input: number; output: number };
+type ToolCall = { name: string; ok: boolean };
 
 async function callGemini(apiKey: string, systemPrompt: string, contents: GeminiTurn[], usage: TokenUsage) {
   const controller = new AbortController();
@@ -76,9 +86,7 @@ async function callGemini(apiKey: string, systemPrompt: string, contents: Gemini
       return null;
     }
     const data = await res.json();
-    usage.calls += 1;
-    usage.input += Number(data?.usageMetadata?.promptTokenCount) || 0;
-    usage.output += Number(data?.usageMetadata?.candidatesTokenCount) || 0;
+    addUsage(usage, data?.usageMetadata);
     const content = data?.candidates?.[0]?.content as { role?: string; parts?: GeminiPart[] } | undefined;
     if (!content?.parts?.length) {
       logger.warn('assistant.ai_empty_response', {
@@ -101,7 +109,8 @@ async function generateReply(
   history: GeminiTurn[],
   toolCtx: AssistantToolContext,
   deadline: number,
-  usage: TokenUsage
+  usage: TokenUsage,
+  toolLog: ToolCall[]
 ): Promise<string | null> {
   const contents = [...history];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -135,6 +144,7 @@ async function generateReply(
         });
         result = { erro: 'Falha temporária no sistema. Peça desculpas e diga que a equipe vai confirmar.' };
       }
+      toolLog.push({ name, ok: !result.erro && result.ok !== false });
       logger.info('assistant.tool_called', { tool: name, tenantId: toolCtx.tenantId });
       responses.push({ functionResponse: { name, response: { result } } });
     }
@@ -155,9 +165,85 @@ async function latestInboundId(tenantId: string, leadId: string): Promise<string
   return data?.[0]?.id ?? null;
 }
 
+/** Mensagens do cliente desde a última resposta da loja — o que esta execução respondeu. */
+function pendingCustomerText(history: HistoryMessage[]): string {
+  const out: string[] = [];
+  for (let i = history.length - 1; i >= 0 && history[i].direction === 'INBOUND'; i--) {
+    if (history[i].body) out.unshift(String(history[i].body));
+  }
+  return out.join('\n').slice(0, 2000);
+}
+
+type RunRecord = {
+  status: AssistantRunStatus;
+  reason?: string | null;
+  usage: TokenUsage;
+  tools: ToolCall[];
+  aiMs?: number | null;
+  responseMs?: number | null;
+  bubbles?: number;
+  flags?: AssistantFlag[];
+  customerMessage?: string | null;
+  replyText?: string | null;
+  error?: string | null;
+};
+
+let runsTableMissingLogged = false;
+
+/** Grava a execução. Nunca lança: medir não pode derrubar o atendimento. */
+async function recordRun(trigger: AssistantTrigger, run: RunRecord): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin.from('assistant_runs').insert({
+      tenant_id: trigger.tenantId,
+      lead_id: trigger.leadId,
+      trigger_message_id: trigger.messageId,
+      status: run.status,
+      reason: run.reason?.slice(0, 60) ?? null,
+      model: GEMINI_MODEL,
+      ai_calls: run.usage.calls,
+      input_tokens: run.usage.input,
+      output_tokens: run.usage.output,
+      cached_tokens: run.usage.cached,
+      cost_usd: costUsd(run.usage, GEMINI_MODEL),
+      cost_usd_full: costUsdFullPrice(run.usage, GEMINI_MODEL),
+      ai_ms: run.aiMs ?? null,
+      response_ms: run.responseMs ?? null,
+      tools: run.tools.map((t) => t.name),
+      tool_errors: run.tools.filter((t) => !t.ok).length,
+      booked: run.tools.some((t) => t.name === 'agendar' && t.ok),
+      handoff: run.tools.some((t) => t.name === 'chamar_equipe' && t.ok),
+      bubbles: run.bubbles ?? 0,
+      flags: run.flags ?? [],
+      customer_message: run.customerMessage ?? null,
+      reply_text: run.replyText?.slice(0, 4000) ?? null,
+      error: run.error?.slice(0, 1000) ?? null,
+    });
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        if (!runsTableMissingLogged) {
+          runsTableMissingLogged = true;
+          logger.warn('assistant.runs_table_missing', {
+            message: 'Tabela assistant_runs não existe: aplique a migration 20261019_assistant_runs.sql.',
+          });
+        }
+        return;
+      }
+      logger.warn('assistant.run_record_failed', { tenantId: trigger.tenantId, message: error.message });
+    }
+  } catch (err) {
+    logger.warn('assistant.run_record_failed', {
+      tenantId: trigger.tenantId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise<void> {
   const { tenantId, leadId } = trigger;
-  const startedAt = Date.now();
+  const usage = emptyUsage();
+  const toolLog: ToolCall[] = [];
+  let customerMessage: string | null = null;
+  let aiStartedAt: number | null = null;
   try {
     // Barato primeiro: a grande maioria das contas não usa o assistente.
     const [{ data: tenant }, { data: settingsRow }] = await Promise.all([
@@ -169,6 +255,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.warn('assistant.no_api_key', { tenantId });
+      await recordRun(trigger, { status: 'FAILED', reason: 'SEM_CHAVE_IA', usage, tools: toolLog });
       return;
     }
 
@@ -222,6 +309,8 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     const history = ((historyRes.data || []) as HistoryMessage[]).reverse();
     const lastMessage = history[history.length - 1];
     if (!lastMessage || lastMessage.direction !== 'INBOUND') return;
+    customerMessage = pendingCustomerText(history);
+    const customerSentAt = new Date(lastMessage.created_at).getTime();
 
     const decision = shouldAssistantReply({
       enabled: true,
@@ -239,10 +328,6 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
           leadId,
           message: `Atendente pausada por 12h: ${botCountRes.count ?? 0} mensagens da IA na última hora.`,
         });
-      } else {
-        logger.info('assistant.skipped', { tenantId, leadId, reason: decision.reason });
-      }
-      if (decision.reason === 'RATE_LIMIT') {
         await supabaseAdmin
           .from('leads')
           .update({ assistant_paused_until: new Date(now.getTime() + HUMAN_PAUSE_MS).toISOString() })
@@ -254,22 +339,20 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
           type: 'WARNING',
           url: '/atendente',
         });
+      } else {
+        logger.info('assistant.skipped', { tenantId, leadId, reason: decision.reason });
       }
+      await recordRun(trigger, { status: 'SKIPPED', reason: decision.reason, usage, tools: toolLog, customerMessage });
       return;
     }
 
     const companyName = tenant.name || 'a loja';
+    const settings = assistantSettingsFromRow(settingsRow);
     const services = ((servicesRes.data || []) as ServiceItem[]).map((s) => ({
       ...s,
       price: s.price == null ? null : Number(s.price),
     }));
-    const systemPrompt = buildAssistantSystemPrompt({
-      settings: assistantSettingsFromRow(settingsRow),
-      companyName,
-      services,
-      scheduling,
-      now,
-    });
+    const systemPrompt = buildAssistantSystemPrompt({ settings, companyName, services, scheduling, now });
 
     const toolCtx: AssistantToolContext = {
       tenantId,
@@ -283,15 +366,17 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       now,
     };
 
-    const usage: TokenUsage = { calls: 0, input: 0, output: 0 };
+    aiStartedAt = Date.now();
     const reply = await generateReply(
       apiKey,
       systemPrompt,
       toGeminiContents(history),
       toolCtx,
-      startedAt + RUN_BUDGET_MS,
-      usage
+      aiStartedAt + RUN_BUDGET_MS - DEBOUNCE_MS,
+      usage,
+      toolLog
     );
+    const aiMs = Date.now() - aiStartedAt;
     const bubbles = reply ? splitReply(reply) : [];
     if (!bubbles.length) {
       logger.error('assistant.no_reply', { tenantId, leadId });
@@ -301,15 +386,38 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
         type: 'WARNING',
         url: '/atendente',
       });
+      await recordRun(trigger, { status: 'NO_REPLY', reason: 'IA_SEM_RESPOSTA', usage, tools: toolLog, aiMs, customerMessage });
       return;
     }
 
+    const replyText = bubbles.join('\n\n');
+    const flags = detectFlags({
+      reply: replyText,
+      knownPrices: services.filter((s) => s.price != null).map((s) => s.price as number),
+      ownerText: `${settings.extra_info}\n${settings.about}`,
+      tools: toolLog,
+    });
+
     // Chegou mensagem nova enquanto a IA pensava: a execução dela responde, com tudo no contexto.
-    if ((await latestInboundId(tenantId, leadId)) !== trigger.messageId) return;
+    if ((await latestInboundId(tenantId, leadId)) !== trigger.messageId) {
+      await recordRun(trigger, { status: 'SUPERSEDED', reason: 'MENSAGEM_NOVA', usage, tools: toolLog, aiMs, flags, customerMessage, replyText });
+      return;
+    }
 
     const wa = await requireVerifiedWhatsApp(tenantId);
     if (!wa.ok) {
       logger.warn('assistant.whatsapp_unavailable', { tenantId, error: wa.error });
+      await recordRun(trigger, {
+        status: 'FAILED',
+        reason: 'WHATSAPP_INDISPONIVEL',
+        usage,
+        tools: toolLog,
+        aiMs,
+        flags,
+        customerMessage,
+        replyText,
+        error: wa.error,
+      });
       return;
     }
 
@@ -318,6 +426,18 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       const sent = await sendMetaText({ to: lead.phone, textBody: bubbles[i], credentials: wa.credentials });
       if (!sent.success || !sent.messageId) {
         logger.error('assistant.send_failed', { tenantId, leadId, error: sent.error });
+        await recordRun(trigger, {
+          status: 'FAILED',
+          reason: 'ENVIO_FALHOU',
+          usage,
+          tools: toolLog,
+          aiMs,
+          bubbles: i,
+          flags,
+          customerMessage,
+          replyText,
+          error: sent.error || null,
+        });
         return;
       }
       await supabaseAdmin.from('chat_messages').insert({
@@ -331,20 +451,38 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
         status: 'SENT',
       });
     }
+    const responseMs = Number.isFinite(customerSentAt) ? Date.now() - customerSentAt : null;
     logger.info('assistant.replied', {
       tenantId,
       leadId,
       bubbles: bubbles.length,
-      ms: Date.now() - startedAt,
+      aiMs,
       aiCalls: usage.calls,
       inputTokens: usage.input,
       outputTokens: usage.output,
     });
+    await recordRun(trigger, {
+      status: 'REPLIED',
+      usage,
+      tools: toolLog,
+      aiMs,
+      responseMs,
+      bubbles: bubbles.length,
+      flags,
+      customerMessage,
+      replyText,
+    });
   } catch (err) {
-    logger.error('assistant.run_failed', {
-      tenantId,
-      leadId,
-      message: err instanceof Error ? err.message : String(err),
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error('assistant.run_failed', { tenantId, leadId, message });
+    await recordRun(trigger, {
+      status: 'FAILED',
+      reason: 'ERRO_INTERNO',
+      usage,
+      tools: toolLog,
+      aiMs: aiStartedAt ? Date.now() - aiStartedAt : null,
+      customerMessage,
+      error: message,
     });
   }
 }

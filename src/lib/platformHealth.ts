@@ -33,6 +33,7 @@ const REQUIRED_COLUMNS: { table: string; columns: string; migration: string }[] 
   { table: 'system_heartbeats', columns: 'name', migration: '20261013_ops_observability.sql' },
   { table: 'plan_prices', columns: 'plan_tier', migration: '20260908_plan_prices.sql' },
   { table: 'subscription_price_changes', columns: 'id', migration: '20260908_subscription_price_changes.sql' },
+  { table: 'assistant_runs', columns: 'cost_usd, flags, review_status', migration: '20261019_assistant_runs.sql' },
 ];
 
 /**
