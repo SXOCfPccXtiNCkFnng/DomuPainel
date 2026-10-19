@@ -17,6 +17,15 @@
   --whatsapp-green: #25D366;
 }
 
+html.dark {
+  color-scheme: dark;
+  --bg-slate: #0B1120;
+  --surface-white: #0F172A;
+  --border-slate: #273348;
+  --text-primary: #F1F5F9;
+  --text-muted: #94A3B8;
+}
+
 body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-slate);
@@ -78,6 +87,28 @@ body {
   background-color: #0052FF;
   transform: translateY(-1px);
   box-shadow: 0 8px 20px -4px rgba(30, 90, 246, 0.4);
+}
+
+html.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(39, 51, 72, 0.8);
+}
+
+html.dark .card-domu {
+  background: #0F172A;
+  border-color: #273348;
+}
+
+html.dark .card-domu:hover {
+  border-color: #334155;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #0B1120;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
 }
 
 /* Custom Scrollbars */

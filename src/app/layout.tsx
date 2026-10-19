@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import AppLayoutGuard from '@/components/layout/AppLayoutGuard';
 import PwaSetup from '@/components/layout/PwaSetup';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
 export const metadata: Metadata = {
   title: 'Plataforma Domu Tech',
@@ -24,8 +25,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className="h-full">
+    <html lang="pt-BR" className="h-full" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="icon" href="/fraucon.png" sizes="any" />
         <link rel="shortcut icon" href="/fraucon.png" />
         <link rel="apple-touch-icon" href="/fraucon.png" />

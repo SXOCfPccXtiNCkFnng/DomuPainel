@@ -91,7 +91,7 @@ export default function AuthShell({ title, subtitle, children, footer }: AuthShe
       </div>
 
       {/* Form panel */}
-      <div className="flex-1 flex flex-col justify-center bg-[#F8FAFC] px-6 py-10 sm:px-12 xl:px-16">
+      <div className="flex-1 flex flex-col justify-center bg-slate-50 px-6 py-10 sm:px-12 xl:px-16">
         <div className="w-full max-w-md mx-auto">
           <div className="lg:hidden mb-10">
             <Image

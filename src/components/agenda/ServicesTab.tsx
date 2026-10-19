@@ -11,7 +11,14 @@ import {
 } from '@/lib/scheduling';
 import { agendaInputClass } from './agendaStyles';
 
+/** price: número em texto com ponto decimal ("50.00") — formato que a API aceita. */
 type FormState = { name: string; duration_minutes: number; price: string; description: string };
+
+/** Máscara de valor: os dígitos entram como centavos (digitar 5000 mostra R$ 50,00). */
+function priceFromTyped(typed: string): string {
+  const digits = typed.replace(/\D/g, '').replace(/^0+/, '').slice(0, 10);
+  return digits ? (Number(digits) / 100).toFixed(2) : '';
+}
 
 const EMPTY_FORM: FormState = { name: '', duration_minutes: 30, price: '', description: '' };
 
@@ -47,7 +54,7 @@ export default function ServicesTab({
     setForm({
       name: s.name,
       duration_minutes: s.duration_minutes,
-      price: s.price == null ? '' : String(s.price),
+      price: s.price == null ? '' : s.price.toFixed(2),
       description: s.description || '',
     });
     setEditingId(s.id);
@@ -155,12 +162,12 @@ export default function ServicesTab({
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="block text-[11px] font-bold text-slate-600">Preço (R$)</span>
+              <span className="block text-[11px] font-bold text-slate-600">Preço</span>
               <input
-                value={form.price}
-                inputMode="decimal"
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                placeholder="Opcional"
+                value={form.price === '' ? '' : formatPrice(Number(form.price))}
+                inputMode="numeric"
+                onChange={(e) => setForm((f) => ({ ...f, price: priceFromTyped(e.target.value) }))}
+                placeholder="R$ 0,00 (opcional)"
                 className={agendaInputClass}
               />
             </label>

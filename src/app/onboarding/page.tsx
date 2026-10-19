@@ -629,7 +629,7 @@ export default function OnboardingPage() {
 
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
         <div className="w-10 h-10 border-2 border-domu-blue/20 border-t-domu-blue rounded-full animate-spin" />
         <p className="text-sm font-semibold text-slate-500">Verificando sua conta...</p>
       </div>
@@ -637,7 +637,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Header Bar */}
       <header className="bg-white border-b border-slate-200 py-4 px-4 sm:px-10">
         <div className="max-w-5xl mx-auto flex flex-col gap-4">

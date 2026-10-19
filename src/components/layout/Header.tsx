@@ -7,6 +7,7 @@ import { Bell, PlusCircle, LogOut, Settings, CreditCard, ChevronDown, Menu, Line
 import { getPageTitle, getSegmentFromStorage } from '@/lib/segmentConfig';
 import CampaignWizardModal from '@/components/disparos/CampaignWizardModal';
 import PushNotificationsToggle from '@/components/layout/PushNotificationsToggle';
+import ThemeToggle from '@/components/layout/ThemeToggle';
 import { clearAuthSession, getAuthItem } from '@/lib/authStorage';
 import { redirectIfDispatchBlocked } from '@/lib/billingGuard';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
@@ -195,6 +196,8 @@ export default function Header({ onOpenNewDispatchModal, onMenuClick }: HeaderPr
             <span className="hidden sm:inline">Novo Disparo</span>
             <span className="sm:hidden">Disparo</span>
           </button>
+
+          <ThemeToggle />
 
           {/* Notifications Bell & Dropdown */}
           <div className="relative" ref={notifRef}>
