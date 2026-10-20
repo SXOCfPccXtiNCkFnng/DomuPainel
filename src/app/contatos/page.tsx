@@ -30,6 +30,7 @@ import {
   formatBudget,
 } from '@/lib/contactTags';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import { useConfirm } from '@/components/shared/ConfirmDialog';
 
 interface LeadContact {
   id: string;
@@ -91,6 +92,7 @@ function formatPhoneDisplay(phone: string): string {
 }
 
 export default function ContatosPage() {
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [contacts, setContacts] = useState<LeadContact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -235,7 +237,13 @@ export default function ContatosPage() {
 
   const deleteContacts = async (ids: string[]) => {
     if (ids.length === 0) return;
-    if (!confirm(`Remover ${ids.length} contato(s)?`)) return;
+    const ok = await askConfirm({
+      title: ids.length === 1 ? 'Remover este contato?' : `Remover ${ids.length} contatos?`,
+      message: 'Eles saem da sua lista e das próximas campanhas.',
+      confirmLabel: 'Remover',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setIsDeleting(true);
     try {
       const tenantId = getAuthItem('domu_tenant_id') || '';
@@ -622,6 +630,7 @@ export default function ContatosPage() {
         onClose={() => setIsImportOpen(false)}
         onSuccess={fetchContacts}
       />
+      {confirmDialog}
     </div>
   );
 }

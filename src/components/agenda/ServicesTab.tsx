@@ -11,6 +11,7 @@ import {
 } from '@/lib/scheduling';
 import { agendaInputClass } from './agendaStyles';
 import { useSchedulingCopy } from '@/hooks/useSchedulingCopy';
+import { useConfirm } from '@/components/shared/ConfirmDialog';
 
 /** price: número em texto com ponto decimal ("50.00") — formato que a API aceita. */
 type FormState = { name: string; duration_minutes: number; price: string; description: string };
@@ -39,6 +40,7 @@ export default function ServicesTab({
   const [showForm, setShowForm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const openNew = (preset: FormState = EMPTY_FORM) => {
     setForm(preset);
@@ -87,8 +89,14 @@ export default function ServicesTab({
       body: JSON.stringify({ active: !s.active }),
     });
 
-  const remove = (s: ServiceItem) => {
-    if (!window.confirm(`Excluir o serviço "${s.name}"? Agendamentos antigos continuam no histórico.`)) return;
+  const remove = async (s: ServiceItem) => {
+    const ok = await confirm({
+      title: `Excluir "${s.name}"?`,
+      message: 'A atendente para de oferecer este serviço na hora. Agendamentos antigos continuam no histórico.',
+      confirmLabel: 'Excluir serviço',
+      tone: 'danger',
+    });
+    if (!ok) return;
     request(`/api/scheduling/services?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' });
   };
 
@@ -106,7 +114,7 @@ export default function ServicesTab({
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-[11px] text-slate-500 max-w-lg">
-          A duração define quanto tempo o serviço ocupa na agenda. O robô do WhatsApp só oferece horários em que o
+          A duração define quanto tempo o serviço ocupa na agenda. A atendente do WhatsApp só oferece horários em que o
           serviço inteiro cabe.
         </p>
         {!showForm && (
@@ -174,7 +182,7 @@ export default function ServicesTab({
                 value={form.description}
                 maxLength={500}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Opcional — o robô usa para explicar o serviço ao cliente"
+                placeholder="Opcional — a atendente usa para explicar o serviço ao cliente"
                 className={agendaInputClass}
               />
             </label>
@@ -269,6 +277,7 @@ export default function ServicesTab({
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

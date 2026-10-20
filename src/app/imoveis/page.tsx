@@ -19,6 +19,7 @@ import {
 import CampaignWizardModal, { CampaignStartPayload } from '@/components/disparos/CampaignWizardModal';
 import CampaignProgress from '@/components/disparos/CampaignProgress';
 import PropertyFormModal from '@/components/imoveis/PropertyFormModal';
+import { useConfirm } from '@/components/shared/ConfirmDialog';
 import { agendaInputClass } from '@/components/agenda/agendaStyles';
 import {
   normalizeSearch,
@@ -50,6 +51,7 @@ export default function ImoveisPage() {
   const [wizardProperty, setWizardProperty] = useState<RealEstateProperty | null>(null);
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<{ limit: number; used: number; planName: string } | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -98,7 +100,13 @@ export default function ImoveisPage() {
   };
 
   const remove = async (p: RealEstateProperty) => {
-    if (!window.confirm(`Apagar o imóvel ${p.code} · ${p.title}? A atendente deixa de oferecer na hora.`)) return;
+    const ok = await confirm({
+      title: `Apagar o imóvel ${p.code}?`,
+      message: `${p.title}. A atendente deixa de oferecer na hora.`,
+      confirmLabel: 'Apagar imóvel',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/properties?id=${encodeURIComponent(p.id)}`, { method: 'DELETE' });
     const json = await res.json().catch(() => ({}));
     if (!json.success) {
@@ -315,6 +323,7 @@ export default function ImoveisPage() {
         initialPropertyTitle={wizardProperty?.title}
         initialPropertyId={wizardProperty?.id}
       />
+      {confirmDialog}
     </div>
   );
 }

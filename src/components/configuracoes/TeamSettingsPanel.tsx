@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { useConfirm } from '@/components/shared/ConfirmDialog';
 
 type TeamUser = {
   id: string;
@@ -34,6 +35,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function TeamSettingsPanel() {
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [users, setUsers] = useState<TeamUser[]>([]);
   const [invites, setInvites] = useState<TeamInvite[]>([]);
   const [roles, setRoles] = useState<string[]>(['ADMIN', 'BROKER', 'ATTENDANT']);
@@ -117,7 +119,13 @@ export default function TeamSettingsPanel() {
   };
 
   const removeUser = async (userId: string) => {
-    if (!confirm('Tem certeza que deseja remover este membro da equipe?')) return;
+    const ok = await askConfirm({
+      title: 'Remover este membro da equipe?',
+      message: 'O acesso dele ao painel é cortado na hora.',
+      confirmLabel: 'Remover',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/team?userId=${userId}`, { method: 'DELETE' });
     const json = await res.json();
     if (!json.success) {
@@ -329,6 +337,7 @@ export default function TeamSettingsPanel() {
         )}
       </div>
     </div>
+    {confirmDialog}
     </div>
   );
 }
