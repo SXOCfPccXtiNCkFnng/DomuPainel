@@ -17,6 +17,7 @@ import {
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
 import {
   PLAN_ASSISTANT_CONVERSATION_LIMITS,
+  PLAN_PROPERTY_LIMITS,
   PLAN_DISPATCH_LIMITS,
   PLAN_PRICES_BRL,
   PLAN_USER_LIMITS,
@@ -166,7 +167,12 @@ export default function AssinaturaPage() {
       setNeedsPayment(new URLSearchParams(window.location.search).get('pay') === '1');
     }
     fetchSubscription();
-    fetch('/api/plans')
+  }, []);
+
+  // Preço do ramo da conta. Saindo do Somente Disparos, vale o ramo escolhido no modal.
+  useEffect(() => {
+    const qs = modalBusinessSegment ? `?businessSegment=${encodeURIComponent(modalBusinessSegment)}` : '';
+    fetch(`/api/plans${qs}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.prices) setLivePrices(data.prices);
@@ -174,7 +180,7 @@ export default function AssinaturaPage() {
       .catch(() => {
         /* mantém os preços padrão em caso de falha */
       });
-  }, []);
+  }, [modalBusinessSegment]);
 
   const fetchSubscription = async () => {
     setLoading(true);
@@ -253,6 +259,7 @@ export default function AssinaturaPage() {
           couponCode: modalCoupon,
           planTier: modalPlan,
           paymentMethod: modalPaymentMethod,
+          ...(upgradingFromDispatch && modalBusinessSegment ? { businessSegment: modalBusinessSegment } : {}),
         }),
       });
       const data = await res.json();
@@ -575,6 +582,12 @@ export default function AssinaturaPage() {
                           : 'Atendente IA completa: tira dúvidas e anota pedidos de visita'}
                         : {PLAN_ASSISTANT_CONVERSATION_LIMITS[plan.tier].toLocaleString('pt-BR')} conversas/mês
                       </span>
+                    </li>
+                  )}
+                  {isRealEstateSegment(segment) && (
+                    <li className="flex items-start gap-2 text-xs text-slate-700 font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
+                      <span>Até {PLAN_PROPERTY_LIMITS[plan.tier].toLocaleString('pt-BR')} imóveis ativos no catálogo</span>
                     </li>
                   )}
                   {plan.features.map((f) => (

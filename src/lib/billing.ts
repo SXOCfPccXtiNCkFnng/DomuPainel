@@ -5,7 +5,7 @@ import {
   PlanTier,
   segmentAfterPlanActivation,
 } from '@/lib/planLimits';
-import { getLivePlanPrice } from '@/lib/planPricing';
+import { getTenantPlanPrice } from '@/lib/planPricing';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
@@ -517,7 +517,7 @@ export async function syncTenantSubscriptionFromAsaas(
     parsePlanTierFromAsaasDescription(asaasSub.description || '') ||
     normalizePlanTier(sub?.plan_tier || 'STARTER');
   const monthlyPrice =
-    Number(asaasSub.value) || Number(sub?.monthly_price_brl) || (await getLivePlanPrice(planTier));
+    Number(asaasSub.value) || Number(sub?.monthly_price_brl) || (await getTenantPlanPrice(tenantId, planTier));
   const paymentMethod = asaasSub.billingType === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'PIX';
 
   await activateTenantSubscription({

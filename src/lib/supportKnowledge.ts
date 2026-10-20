@@ -288,7 +288,9 @@ O que ela faz depende do plano:
 • **Starter (primeiro atendimento):** entende o que o cliente procura (comprar ou alugar, tipo, região, valor, quartos), mostra os imóveis compatíveis e passa para o corretor quando ele se interessa ou quer visitar.
 • **Pro e Enterprise (atendimento completo):** além disso, tira dúvidas sobre o imóvel e anota o **pedido de visita** com o dia e o horário que o cliente prefere. O pedido aparece em **Visitas** para você confirmar.
 
-Em **Leads** fica o que cada cliente contou que procura e em que etapa está. Negociação, proposta e financiamento ela sempre passa para o corretor.`,
+Em **Leads** fica o que cada cliente contou que procura e em que etapa está. Negociação, proposta e financiamento ela sempre passa para o corretor.
+
+Cada plano tem um limite de **imóveis ativos** no catálogo (disponíveis e lançamentos): Starter 30, Pro 150 e Enterprise 500. Vendidos, alugados e reservados não contam.`,
   },
   {
     id: 'lembrete_agendamento',

@@ -19,7 +19,8 @@ import {
 } from '@/lib/assistantPrompt';
 import { buildRealEstateSystemPrompt } from '@/lib/realEstatePrompt';
 import { executeRealEstateTool, realEstateToolDeclarations, type RealEstateToolContext } from '@/lib/realEstateTools';
-import { propertyFromRow, realEstateModeForPlan } from '@/lib/realEstate';
+import { OFFERABLE_STATUSES, propertyFromRow, realEstateModeForPlan } from '@/lib/realEstate';
+import { getPlanPropertyLimit } from '@/lib/planLimits';
 import {
   ASSISTANT_SENDER_TYPE,
   DEBOUNCE_MS,
@@ -357,7 +358,13 @@ async function prepareVertical(vertical: Vertical, input: VerticalInput): Promis
       .maybeSingle(),
   ]);
   if (propertiesRes.error) throw propertiesRes.error;
-  const properties = (propertiesRes.data || []).map((row) => propertyFromRow(row as Record<string, unknown>));
+  // Limite do plano: conta que caiu de plano com catálogo maior oferece só os
+  // imóveis ativos atualizados mais recentemente (a lista já vem nessa ordem).
+  const catalogLimit = getPlanPropertyLimit(tier);
+  let offered = 0;
+  const properties = (propertiesRes.data || [])
+    .map((row) => propertyFromRow(row as Record<string, unknown>))
+    .filter((p) => !OFFERABLE_STATUSES.includes(p.status) || ++offered <= catalogLimit);
   const ctx: RealEstateToolContext = { ...base, mode, showPrices: settings.show_prices, properties };
   return {
     systemPrompt: buildRealEstateSystemPrompt({

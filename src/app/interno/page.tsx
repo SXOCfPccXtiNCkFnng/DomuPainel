@@ -23,6 +23,7 @@ import type { OpsAlert } from '@/lib/opsAlert';
 import type { HealthCheck, HealthStatus } from '@/lib/platformHealth';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import AssistantMonitor from '@/components/interno/AssistantMonitor';
+import PlanPricingEditor from '@/components/interno/PlanPricingEditor';
 
 type CouponRow = {
   code: string;
@@ -192,9 +193,6 @@ export default function InternoPage() {
   const [couponMax, setCouponMax] = useState('5');
   const [couponMsg, setCouponMsg] = useState('');
   const [grantBusy, setGrantBusy] = useState<string | null>(null);
-  const [planPricesDraft, setPlanPricesDraft] = useState<Record<string, string>>({});
-  const [planPricesMsg, setPlanPricesMsg] = useState('');
-  const [planPricesSaving, setPlanPricesSaving] = useState(false);
 
   const loadOverview = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) {
@@ -247,19 +245,10 @@ export default function InternoPage() {
   }, [alertStatus, alertLevel, alertSource, alertTenant]);
 
   const loadCommercial = useCallback(async () => {
-    const [couponsRes, plansRes] = await Promise.all([
-      fetch('/api/interno/coupons', { cache: 'no-store' }),
-      fetch('/api/plans', { cache: 'no-store' }),
-    ]);
+    const couponsRes = await fetch('/api/interno/coupons', { cache: 'no-store' });
     if (couponsRes.ok) {
       const cjson = await couponsRes.json();
       if (cjson.success) setCoupons(cjson.coupons || []);
-    }
-    if (plansRes.ok) {
-      const pjson = await plansRes.json();
-      if (pjson.success && pjson.prices) {
-        setPlanPricesDraft(Object.fromEntries(Object.entries(pjson.prices).map(([k, v]) => [k, String(v)])));
-      }
     }
   }, []);
 
@@ -307,44 +296,6 @@ export default function InternoPage() {
       body: JSON.stringify({ code, active }),
     });
     loadCommercial();
-  }
-
-  async function savePlanPrices(e: React.FormEvent) {
-    e.preventDefault();
-    setPlanPricesMsg('');
-    setPlanPricesSaving(true);
-    try {
-      const prices: Record<string, number> = {};
-      for (const [tier, raw] of Object.entries(planPricesDraft)) {
-        const value = Number(raw);
-        if (!Number.isFinite(value) || value <= 0) {
-          setPlanPricesMsg(`Preço inválido para ${tier}.`);
-          setPlanPricesSaving(false);
-          return;
-        }
-        prices[tier] = value;
-      }
-      const res = await fetch('/api/interno/plans', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prices }),
-      });
-      const json = await res.json();
-      if (!json.success) {
-        setPlanPricesMsg(json.error || 'Não foi possível salvar.');
-        return;
-      }
-      const parts = ['Preço de tabela atualizado (vale para cadastros novos e trocas de plano já).'];
-      if (json.loweredNow > 0) parts.push(`${json.loweredNow} assinante(s) já teve(ram) o valor reduzido na hora.`);
-      if (json.scheduledIncreases > 0) {
-        parts.push(`${json.scheduledIncreases} assinante(s) avisado(s) por e-mail — aumento entra em vigor em 30 dias.`);
-      }
-      setPlanPricesMsg(parts.join(' '));
-    } catch {
-      setPlanPricesMsg('Erro de conexão ao salvar os preços.');
-    } finally {
-      setPlanPricesSaving(false);
-    }
   }
 
   async function grantAccess(tenantId: string) {
@@ -1013,37 +964,7 @@ export default function InternoPage() {
 
       {tab === 'commercial' ? (
         <div className="space-y-4">
-          <section className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
-            <div>
-              <h2 className="text-sm font-black text-slate-900">Preço dos planos</h2>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Vale na hora para cadastro novo e troca/reativação de plano. Assinantes ativos: redução aplica na hora;
-                aumento é avisado por e-mail e entra na cobrança em 30 dias (Termos de Uso, seção 6).
-              </p>
-            </div>
-            <form onSubmit={savePlanPrices} className="flex flex-wrap gap-3 items-end">
-              {(['STARTER', 'PRO', 'ENTERPRISE'] as const).map((tier) => (
-                <label key={tier} className="text-xs font-bold text-slate-600">
-                  {tier}
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="text-slate-400 text-sm">R$</span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="0.01"
-                      value={planPricesDraft[tier] ?? ''}
-                      onChange={(e) => setPlanPricesDraft((prev) => ({ ...prev, [tier]: e.target.value }))}
-                      className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm font-mono"
-                    />
-                  </div>
-                </label>
-              ))}
-              <button type="submit" disabled={planPricesSaving} className="btn-domu-primary text-xs py-2 px-4 disabled:opacity-50">
-                {planPricesSaving ? 'Salvando…' : 'Salvar preços'}
-              </button>
-            </form>
-            {planPricesMsg ? <p className="text-xs text-slate-600">{planPricesMsg}</p> : null}
-          </section>
+          <PlanPricingEditor />
 
           <section className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
             <div>

@@ -3,7 +3,14 @@ import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { isSchemaPendingError } from '@/lib/schedulingServer';
-import { propertyFromRow, validatePropertyInput, type PropertyFields } from '@/lib/realEstate';
+import {
+  OFFERABLE_STATUSES,
+  propertyFromRow,
+  validatePropertyInput,
+  type PropertyFields,
+  type PropertyStatus,
+} from '@/lib/realEstate';
+import { getPlanDisplayName, getPlanPropertyLimit } from '@/lib/planLimits';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +29,36 @@ async function codeTaken(tenantId: string, code: string, exceptId?: string): Pro
   return Boolean(data?.length);
 }
 
+/** Imóveis ativos (o que a atendente oferece) contra o limite do plano. */
+async function catalogQuota(tenantId: string) {
+  const [{ data: sub }, { count, error }] = await Promise.all([
+    supabaseAdmin.from('subscriptions').select('plan_tier').eq('tenant_id', tenantId).maybeSingle(),
+    supabaseAdmin
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .in('status', OFFERABLE_STATUSES),
+  ]);
+  if (error) throw error;
+  return {
+    limit: getPlanPropertyLimit(sub?.plan_tier),
+    used: count ?? 0,
+    planName: getPlanDisplayName(sub?.plan_tier),
+  };
+}
+
+function limitReached(quota: { limit: number; planName: string }) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: `Seu plano ${quota.planName} permite até ${quota.limit} imóveis ativos (disponíveis e lançamentos). Marque como vendido, alugado ou reservado os que já saíram, ou mude de plano.`,
+    },
+    { status: 403 }
+  );
+}
+
+const isOfferable = (status: PropertyStatus) => OFFERABLE_STATUSES.includes(status);
+
 function toRow(fields: PropertyFields) {
   const { code: _code, ...rest } = fields;
   void _code;
@@ -34,17 +71,21 @@ export async function GET(req: NextRequest) {
     const auth = await requireAuth(req);
     if ('error' in auth) return auth.error;
 
-    const { data, error } = await supabaseAdmin
-      .from('properties')
-      .select('*')
-      .eq('tenant_id', auth.session.tenantId)
-      .order('created_at', { ascending: false })
-      .limit(1000);
+    const [{ data, error }, catalog] = await Promise.all([
+      supabaseAdmin
+        .from('properties')
+        .select('*')
+        .eq('tenant_id', auth.session.tenantId)
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      catalogQuota(auth.session.tenantId),
+    ]);
     if (error) throw error;
 
     return NextResponse.json({
       success: true,
       properties: (data || []).map((row) => propertyFromRow(row as Record<string, unknown>)),
+      catalog,
     });
   } catch (error: unknown) {
     return internalErrorResponse('api.properties.get', error);
@@ -62,6 +103,11 @@ export async function POST(req: NextRequest) {
     const input = (body.property && typeof body.property === 'object' ? body.property : body) as Record<string, unknown>;
     const parsed = validatePropertyInput(input);
     if (!parsed.ok) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+
+    if (isOfferable(parsed.fields.status)) {
+      const quota = await catalogQuota(tenantId);
+      if (quota.used >= quota.limit) return limitReached(quota);
+    }
 
     const code = parsed.fields.code || `IMV-${Date.now().toString(36).toUpperCase()}`;
     if (await codeTaken(tenantId, code)) {
@@ -97,6 +143,20 @@ export async function PATCH(req: NextRequest) {
 
     const parsed = validatePropertyInput(body);
     if (!parsed.ok) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+
+    // Voltar um vendido/alugado para disponível ocupa uma vaga do catálogo.
+    if (isOfferable(parsed.fields.status)) {
+      const { data: current } = await supabaseAdmin
+        .from('properties')
+        .select('status')
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (current && !isOfferable(current.status as PropertyStatus)) {
+        const quota = await catalogQuota(tenantId);
+        if (quota.used >= quota.limit) return limitReached(quota);
+      }
+    }
 
     const patch: Record<string, unknown> = { ...toRow(parsed.fields), updated_at: new Date().toISOString() };
     if (parsed.fields.code) {

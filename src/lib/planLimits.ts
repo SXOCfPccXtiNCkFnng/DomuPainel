@@ -122,3 +122,17 @@ export const PLAN_ASSISTANT_CONVERSATION_LIMITS: Record<PlanTier, number> = {
 export function getPlanAssistantConversationLimit(planTier: string | null | undefined): number {
   return PLAN_ASSISTANT_CONVERSATION_LIMITS[normalizePlanTier(planTier)];
 }
+
+/**
+ * Imóveis ativos no catálogo (disponíveis + lançamentos: o que a atendente
+ * oferece). Vendidos, alugados e reservados não contam — ficam de histórico.
+ */
+export const PLAN_PROPERTY_LIMITS: Record<PlanTier, number> = {
+  STARTER: 30,
+  PRO: 150,
+  ENTERPRISE: 500,
+};
+
+export function getPlanPropertyLimit(planTier: string | null | undefined): number {
+  return PLAN_PROPERTY_LIMITS[normalizePlanTier(planTier)];
+}

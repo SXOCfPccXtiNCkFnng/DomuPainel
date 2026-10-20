@@ -29,7 +29,7 @@ import { generateSecureToken } from '@/lib/email';
 import { clientIpFromRequest } from '@/lib/rateLimit';
 import { isValidBrazilianPhone, isValidCpfCnpjLength } from '@/lib/validators';
 import { LEGAL_DOCS_VERSION } from '@/lib/legal';
-import { getLivePlanPrice } from '@/lib/planPricing';
+import { getTenantPlanPrice } from '@/lib/planPricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,7 +114,11 @@ export async function POST(req: NextRequest) {
       coupon = found.coupon;
     }
 
-    const basePrice = await getLivePlanPrice(planTier);
+    // Preço do ramo em que a conta vai ficar (o escolhido agora vale sobre o gravado).
+    const basePrice = await getTenantPlanPrice(tenantId, planTier, {
+      segment: typeof body.segment === 'string' ? body.segment : null,
+      businessSegment: isValidBusinessSegment(body.businessSegment) ? body.businessSegment : null,
+    });
     const price = computeSubscriptionPrice({ planTier, paymentMethod, coupon, basePrice });
 
     // select('*'): inclui as colunas da troca de plano pendente (se a migration rodou).

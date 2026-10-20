@@ -269,8 +269,12 @@ export default function OnboardingPage() {
     return () => window.removeEventListener(TEST_STEP_EVENT, onStep);
   }, []);
 
+  // Cada ramo pode ter preço próprio: recarrega quando a pessoa troca o ramo.
   useEffect(() => {
-    fetch('/api/plans')
+    const params = new URLSearchParams({ segment: selectedSegment });
+    const business = selectedSegment === 'marketing_apenas' ? businessSegment : selectedSegment;
+    if (business) params.set('businessSegment', business);
+    fetch(`/api/plans?${params}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.prices) setLivePrices(data.prices);
@@ -278,7 +282,7 @@ export default function OnboardingPage() {
       .catch(() => {
         /* mantém os preços padrão em caso de falha */
       });
-  }, []);
+  }, [selectedSegment, businessSegment]);
 
   // Somente Disparos só tem Starter: se a pessoa tinha marcado Pro e trocou de modo, volta pro Starter.
   useEffect(() => {
@@ -507,6 +511,8 @@ export default function OnboardingPage() {
           couponCode,
           planTier: selectedPlan,
           paymentMethod,
+          segment: selectedSegment,
+          businessSegment: selectedSegment === 'marketing_apenas' ? businessSegment : selectedSegment,
         }),
       });
       const data = await res.json();

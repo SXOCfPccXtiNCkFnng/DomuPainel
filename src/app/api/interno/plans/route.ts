@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/platformAdmin';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getPlanDisplayName, normalizePlanTier, PlanTier } from '@/lib/planLimits';
-import { getLivePlanPrices } from '@/lib/planPricing';
+import { getDefaultPlanPrices, getSegmentPriceOverrides, PLAN_TIERS } from '@/lib/planPricing';
+import { SEGMENT_LABELS } from '@/lib/segmentConfig';
 import { adjustSubscriptionPrice } from '@/lib/billing';
 import { isBillingMockEnabled, asaasUpdateSubscriptionValue } from '@/lib/asaasClient';
 import { sendEmail, appBaseUrl, contactFooterText } from '@/lib/email';
@@ -18,11 +19,34 @@ function formatDateBR(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+type PriceTable = Record<PlanTier, number>;
+type Overrides = Record<string, Partial<Record<PlanTier, number>>>;
+
+/** Preço que vale para um ramo: o próprio do ramo ou o padrão. */
+function effectivePrice(segment: string | null, tier: PlanTier, defaults: PriceTable, overrides: Overrides): number {
+  return (segment && overrides[segment]?.[tier]) || defaults[tier];
+}
+
+/** Ramos que podem ter preço próprio (Somente Disparos só tem Starter). */
+function isPricedSegment(value: unknown): value is string {
+  return typeof value === 'string' && value in SEGMENT_LABELS;
+}
+
+/** Tabela de preços: padrão + preços próprios de cada ramo. */
+export async function GET(req: NextRequest) {
+  const gate = await requirePlatformAdmin(req);
+  if ('error' in gate) return gate.error;
+  const [defaults, overrides] = await Promise.all([getDefaultPlanPrices(), getSegmentPriceOverrides()]);
+  return NextResponse.json({ success: true, defaults, overrides });
+}
+
 /**
- * Atualiza o preço de um ou mais planos (tabela plan_prices) — vale na hora
- * pra cadastro novo e troca/reativação de plano.
+ * Atualiza preços — o padrão (plan_prices) ou o de um ramo (segment_plan_prices).
+ * Vale na hora pra cadastro novo e troca/reativação de plano.
+ * Body: { segment?: 'imobiliario' | ... (vazio = padrão), prices: { STARTER: 197, PRO: null, ... } }
+ * No ramo, preço vazio (null) volta a usar o padrão.
  *
- * Para quem JÁ é assinante ACTIVE daquele plano:
+ * Para quem JÁ é assinante ACTIVE e teve o preço do seu ramo alterado:
  * - preço menor → aplica na hora (redução nunca precisa de aviso)
  * - preço maior → agenda pra daqui a 30 dias e avisa por e-mail agora; o cron
  *   /api/billing/apply-price-changes aplica de fato na data marcada.
@@ -33,6 +57,10 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const segment = body.segment ? String(body.segment) : null;
+    if (segment && !isPricedSegment(segment)) {
+      return NextResponse.json({ success: false, error: 'Ramo inválido.' }, { status: 400 });
+    }
     const updates = body.prices as Record<string, unknown> | undefined;
     if (!updates || typeof updates !== 'object') {
       return NextResponse.json(
@@ -41,50 +69,99 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const rows: { plan_tier: string; price_brl: number }[] = [];
+    const rows: { plan_tier: PlanTier; price_brl: number | null }[] = [];
     for (const [tierRaw, valueRaw] of Object.entries(updates)) {
       const tier = normalizePlanTier(tierRaw);
+      if (segment && (valueRaw === null || valueRaw === '')) {
+        rows.push({ plan_tier: tier, price_brl: null });
+        continue;
+      }
       const value = Number(valueRaw);
       if (!Number.isFinite(value) || value <= 0) {
         return NextResponse.json(
-          { success: false, error: `Preço inválido para o plano ${tier}.` },
+          { success: false, error: `Preço inválido para o plano ${getPlanDisplayName(tier)}.` },
           { status: 400 }
         );
       }
-      rows.push({ plan_tier: tier, price_brl: value });
+      rows.push({ plan_tier: tier, price_brl: Math.round(value * 100) / 100 });
     }
     if (rows.length === 0) {
       return NextResponse.json({ success: false, error: 'Nenhum plano informado.' }, { status: 400 });
     }
 
-    // Preço de tabela ANTES de salvar: o painel manda os 3 planos sempre, e só
-    // plano cujo preço realmente mudou pode mexer em assinante.
-    const oldTable = await getLivePlanPrices();
+    // Tabela ANTES de salvar: só assinante cujo preço efetivo mudou é mexido.
+    const [oldDefaults, oldOverrides] = await Promise.all([getDefaultPlanPrices(), getSegmentPriceOverrides()]);
+    const now = new Date().toISOString();
 
-    // 1. Preço "de tabela" pra cadastro novo — vale imediatamente.
-    const { error: upsertErr } = await supabaseAdmin
-      .from('plan_prices')
-      .upsert(
-        rows.map((r) => ({ ...r, updated_at: new Date().toISOString() })),
-        { onConflict: 'plan_tier' }
-      );
-    if (upsertErr) throw upsertErr;
+    // 1. Preço de tabela pra cadastro novo — vale imediatamente.
+    if (!segment) {
+      const { error: upsertErr } = await supabaseAdmin
+        .from('plan_prices')
+        .upsert(
+          rows.map((r) => ({ plan_tier: r.plan_tier, price_brl: r.price_brl, updated_at: now })),
+          { onConflict: 'plan_tier' }
+        );
+      if (upsertErr) throw upsertErr;
+    } else {
+      const set = rows.filter((r) => r.price_brl != null);
+      const cleared = rows.filter((r) => r.price_brl == null).map((r) => r.plan_tier);
+      if (set.length) {
+        const { error } = await supabaseAdmin
+          .from('segment_plan_prices')
+          .upsert(
+            set.map((r) => ({ segment, plan_tier: r.plan_tier, price_brl: r.price_brl, updated_at: now })),
+            { onConflict: 'segment,plan_tier' }
+          );
+        if (error) {
+          if (error.code === '42P01' || error.code === 'PGRST205') {
+            return NextResponse.json(
+              { success: false, error: 'Preço por ramo ainda não ativado no banco (migration 20261021_segment_plan_prices.sql).' },
+              { status: 503 }
+            );
+          }
+          throw error;
+        }
+      }
+      if (cleared.length) {
+        const { error } = await supabaseAdmin
+          .from('segment_plan_prices')
+          .delete()
+          .eq('segment', segment)
+          .in('plan_tier', cleared);
+        if (error) throw error;
+      }
+    }
+
+    const [newDefaults, newOverrides] = await Promise.all([getDefaultPlanPrices(), getSegmentPriceOverrides()]);
 
     let loweredNow = 0;
     let scheduledIncreases = 0;
+    const changedTiers = PLAN_TIERS.filter((tier) =>
+      [null, ...Object.keys(SEGMENT_LABELS)].some(
+        (seg) => effectivePrice(seg, tier, oldDefaults, oldOverrides) !== effectivePrice(seg, tier, newDefaults, newOverrides)
+      )
+    );
 
-    const changedRows = rows.filter((r) => oldTable[r.plan_tier as PlanTier] !== r.price_brl);
-
-    // 2. Assinantes ativos que já pagam por um plano cujo preço mudou.
-    for (const { plan_tier: tier, price_brl: newTablePrice } of changedRows) {
-      const oldTablePrice = oldTable[tier as PlanTier];
+    // 2. Assinantes ativos cujo preço (do ramo deles) mudou.
+    for (const tier of changedTiers) {
       const { data: activeSubs } = await supabaseAdmin
         .from('subscriptions')
         .select('tenant_id, asaas_subscription_id, monthly_price_brl')
         .eq('plan_tier', tier)
         .eq('status', 'ACTIVE');
 
+      const tenantIds = (activeSubs || []).map((sub) => sub.tenant_id);
+      const segmentOf = new Map<string, string | null>();
+      if (tenantIds.length) {
+        const { data: tenants } = await supabaseAdmin.from('tenants').select('id, segment').in('id', tenantIds);
+        for (const t of tenants || []) segmentOf.set(t.id, t.segment ?? null);
+      }
+
       for (const sub of activeSubs || []) {
+        const tenantSegment = segmentOf.get(sub.tenant_id) ?? null;
+        const oldTablePrice = effectivePrice(tenantSegment, tier, oldDefaults, oldOverrides);
+        const newTablePrice = effectivePrice(tenantSegment, tier, newDefaults, newOverrides);
+        if (oldTablePrice === newTablePrice) continue;
         const paying = Number(sub.monthly_price_brl);
 
         // Reajuste ainda não aplicado deste assinante: é a referência do novo
@@ -210,8 +287,9 @@ export async function PATCH(req: NextRequest) {
 
     logger.info('interno.plan_prices_updated', {
       byEmail: gate.email,
+      segment: segment || 'padrão',
       prices: Object.fromEntries(rows.map((r) => [r.plan_tier, r.price_brl])),
-      changedTiers: changedRows.map((r) => r.plan_tier),
+      changedTiers,
       loweredNow,
       scheduledIncreases,
     });

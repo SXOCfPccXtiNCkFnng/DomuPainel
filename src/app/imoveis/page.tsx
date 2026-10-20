@@ -49,6 +49,7 @@ export default function ImoveisPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [wizardProperty, setWizardProperty] = useState<RealEstateProperty | null>(null);
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<{ limit: number; used: number; planName: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -59,6 +60,7 @@ export default function ImoveisPage() {
         return;
       }
       setProperties(json.properties || []);
+      setCatalog(json.catalog || null);
       setError(null);
     } catch {
       setError('Não foi possível carregar os imóveis.');
@@ -90,11 +92,9 @@ export default function ImoveisPage() {
     setIsFormOpen(true);
   };
 
-  const onSaved = (saved: RealEstateProperty) => {
-    setProperties((list) => {
-      const exists = list.some((p) => p.id === saved.id);
-      return exists ? list.map((p) => (p.id === saved.id ? saved : p)) : [saved, ...list];
-    });
+  // Recarrega para o contador do plano refletir a mudança.
+  const onSaved = () => {
+    load();
   };
 
   const remove = async (p: RealEstateProperty) => {
@@ -105,7 +105,7 @@ export default function ImoveisPage() {
       setError(json.error || 'Não foi possível apagar o imóvel.');
       return;
     }
-    setProperties((list) => list.filter((x) => x.id !== p.id));
+    load();
   };
 
   const handleStartCampaign = (payload: CampaignStartPayload) => {
@@ -115,11 +115,19 @@ export default function ImoveisPage() {
   return (
     <div className="space-y-4 w-full font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-xs text-slate-500">
-          {properties.length
-            ? `${offerableCount} disponíveis para a atendente oferecer · ${properties.length} no total`
-            : 'Cadastre os imóveis que a atendente vai apresentar aos clientes.'}
-        </p>
+        <div className="space-y-0.5">
+          <p className="text-xs text-slate-500">
+            {properties.length
+              ? `${offerableCount} disponíveis para a atendente oferecer · ${properties.length} no total`
+              : 'Cadastre os imóveis que a atendente vai apresentar aos clientes.'}
+          </p>
+          {catalog && (
+            <p className={`text-[11px] font-bold ${catalog.used >= catalog.limit ? 'text-amber-700' : 'text-slate-400'}`}>
+              {catalog.used} de {catalog.limit} imóveis ativos no plano {catalog.planName}
+              {catalog.used >= catalog.limit ? ' · limite atingido: marque como vendido/alugado os que saíram ou mude de plano' : ''}
+            </p>
+          )}
+        </div>
         <button type="button" onClick={openNew} className="btn-domu-primary text-xs py-2 px-4 flex items-center gap-1.5 w-fit">
           <Plus className="w-4 h-4" /> Cadastrar imóvel
         </button>
