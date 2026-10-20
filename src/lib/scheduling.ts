@@ -5,6 +5,8 @@
  * carros cabem ao mesmo tempo (mesma regra do gatilho no banco).
  */
 
+import { REMINDER_SOON_OPTIONS } from '@/lib/appointmentReminderRules';
+
 export type DayHours = { enabled: boolean; open: string; close: string };
 
 export type SchedulingSettings = {
@@ -15,6 +17,10 @@ export type SchedulingSettings = {
   booking_horizon_days: number;
   /** Carros atendidos ao mesmo tempo (boxes/equipes). */
   capacity: number;
+  /** Lembrete para o cliente 1 hora antes. */
+  reminder_hour_enabled: boolean;
+  /** Lembrete "em cima da hora": 15 ou 30 min antes (0 = desligado). */
+  reminder_soon_minutes: number;
 };
 
 export type ServiceItem = {
@@ -43,6 +49,9 @@ export type Appointment = {
   ends_at: string;
   status: AppointmentStatus;
   source: AppointmentSource;
+  /** Último lembrete para o cliente: SENT · FAILED · SKIPPED (null = nenhum ainda). */
+  reminder_status?: 'SENT' | 'FAILED' | 'SKIPPED' | null;
+  reminder_note?: string | null;
 };
 
 export const WEEKDAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -88,6 +97,8 @@ export const DEFAULT_SCHEDULING_SETTINGS: SchedulingSettings = {
   min_notice_minutes: 60,
   booking_horizon_days: 14,
   capacity: 1,
+  reminder_hour_enabled: true,
+  reminder_soon_minutes: 15,
 };
 
 /** "08:30" → 510. Aceita "24:00" como fim do dia. */
@@ -198,6 +209,12 @@ export function validateSchedulingSettings(
   if (!Number.isInteger(capacity) || capacity < 1 || capacity > CAPACITY_MAX) {
     return { ok: false, error: `A capacidade precisa ficar entre 1 e ${CAPACITY_MAX} carros ao mesmo tempo.` };
   }
+  // Contas de antes dos lembretes não mandam esses campos: vale o padrão (ligado).
+  const reminder_hour_enabled = input.reminder_hour_enabled === undefined ? true : Boolean(input.reminder_hour_enabled);
+  const reminder_soon_minutes = input.reminder_soon_minutes === undefined ? 15 : Number(input.reminder_soon_minutes);
+  if (!(REMINDER_SOON_OPTIONS as readonly number[]).includes(reminder_soon_minutes)) {
+    return { ok: false, error: 'Escolha quando mandar o lembrete em cima da hora.' };
+  }
 
   return {
     ok: true,
@@ -207,6 +224,8 @@ export function validateSchedulingSettings(
       min_notice_minutes: notice,
       booking_horizon_days: horizon,
       capacity,
+      reminder_hour_enabled,
+      reminder_soon_minutes,
     },
   };
 }

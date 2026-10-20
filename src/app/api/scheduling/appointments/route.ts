@@ -30,16 +30,20 @@ export async function GET(req: NextRequest) {
     const date = isValidDateKey(requested) ? requested : brtDateKey(new Date());
     const { start, end } = brtDayRange(date);
 
-    const { data, error } = await supabaseAdmin
-      .from('appointments')
-      .select(APPOINTMENT_COLUMNS)
-      .eq('tenant_id', auth.session.tenantId)
-      .gte('starts_at', start.toISOString())
-      .lt('starts_at', end.toISOString())
-      .order('starts_at', { ascending: true });
+    const select = (columns: string) =>
+      supabaseAdmin
+        .from('appointments')
+        .select(columns)
+        .eq('tenant_id', auth.session.tenantId)
+        .gte('starts_at', start.toISOString())
+        .lt('starts_at', end.toISOString())
+        .order('starts_at', { ascending: true });
+    let { data, error } = await select(`${APPOINTMENT_COLUMNS}, reminder_status, reminder_note`);
+    // Migration dos lembretes pendente: lista sem o status do lembrete.
+    if (error?.code === '42703') ({ data, error } = await select(APPOINTMENT_COLUMNS));
     if (error) throw error;
 
-    return NextResponse.json({ success: true, date, appointments: (data || []).map(toAppointment) });
+    return NextResponse.json({ success: true, date, appointments: ((data || []) as unknown as Record<string, unknown>[]).map(toAppointment) });
   } catch (error: unknown) {
     if (isSchemaPendingError(error)) return migrationPending();
     return internalErrorResponse('api.scheduling.appointments.get', error);

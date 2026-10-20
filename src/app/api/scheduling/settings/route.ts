@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAdmin, requireAuth } from '@/lib/requireAuth';
 import { internalErrorResponse } from '@/lib/errors';
+import { logger } from '@/lib/logger';
+import { ensureReminderTemplate } from '@/lib/appointmentReminders';
 import { validateSchedulingSettings } from '@/lib/scheduling';
 import {
   isSchemaPendingError,
@@ -50,6 +52,20 @@ export async function PUT(req: NextRequest) {
       { onConflict: 'tenant_id' }
     );
     if (error) throw error;
+
+    // Lembrete fora da janela de 24h precisa de modelo aprovado: já pede à Meta,
+    // para estar aprovado quando o primeiro cliente precisar.
+    if (parsed.settings.reminder_hour_enabled || parsed.settings.reminder_soon_minutes > 0) {
+      const tenantId = auth.session.tenantId;
+      after(() =>
+        ensureReminderTemplate(tenantId).catch((err) =>
+          logger.warn('reminders.template_ensure_failed', {
+            tenantId,
+            message: err instanceof Error ? err.message : String(err),
+          })
+        )
+      );
+    }
 
     return NextResponse.json({ success: true, settings: parsed.settings });
   } catch (error: unknown) {

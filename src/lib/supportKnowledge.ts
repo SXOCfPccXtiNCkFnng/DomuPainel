@@ -277,6 +277,19 @@ Comece conferindo o cartão em **WhatsApp Manager → Configurações de pagamen
 A campanha fica como **Agendada** e sai sozinha no horário, mesmo com o painel fechado. Se o horário já passou, aparece o botão **Disparar agora** na tela de progresso. Lembre: no plano Starter existe a trava de 200 disparos por dia.`,
   },
   {
+    id: 'lembrete_agendamento',
+    question: 'O cliente recebe lembrete do horário marcado na agenda?',
+    shortLabel: 'Lembrete do agendamento',
+    keywords: ['lembrete', 'lembrar', 'esquecer', 'esqueceu', 'faltou', 'falta', 'aviso', 'antes do horario', 'antes do horário'],
+    answer: `Sim. Em **Agenda → Horários**, na parte **Lembretes para o cliente**:
+• **Lembrar 1 hora antes** (ligado por padrão).
+• **Lembrete em cima da hora:** 15 ou 30 minutos antes, ou desligado.
+
+Se o cliente falou com você nas últimas 24h, o lembrete vai como mensagem normal. Se não, a Meta exige um modelo aprovado: a Domu cadastra esse modelo sozinha quando você salva a agenda, e a aprovação costuma levar poucos minutos.
+
+Lembrete **não conta** no limite de disparos do plano. Na lista de agendamentos aparece se o lembrete foi enviado ou por que não saiu.`,
+  },
+  {
     id: 'limite_plano',
     question: 'Qual a diferença entre o limite do meu plano Domu e o limite da Meta?',
     shortLabel: 'Limite do plano x limite da Meta',

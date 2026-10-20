@@ -27,6 +27,17 @@ import {
   type ServiceItem,
 } from '@/lib/scheduling';
 import { createAppointment, loadBusyRanges } from '@/lib/schedulingServer';
+import { phoneLookupVariants } from '@/lib/phone';
+
+/**
+ * Agendamentos deste cliente: os ligados ao contato e os marcados pelo painel
+ * sem contato vinculado, com o mesmo telefone deste WhatsApp.
+ */
+function ownAppointmentsFilter(ctx: AssistantToolContext): string {
+  const phones = phoneLookupVariants(ctx.leadPhone).filter((p) => /^\d+$/.test(p));
+  const byPhone = phones.length ? `,and(lead_id.is.null,customer_phone.in.(${phones.join(',')}))` : '';
+  return `lead_id.eq.${ctx.leadId}${byPhone}`;
+}
 
 export type AssistantToolContext = {
   tenantId: string;
@@ -81,7 +92,8 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
   },
   {
     name: 'cancelar_agendamento',
-    description: 'Cancela um agendamento deste cliente. Use o id retornado por ver_agendamentos_do_cliente.',
+    description:
+      'Cancela um agendamento deste cliente. Só use depois que o cliente confirmar qual agendamento quer cancelar. Use o id retornado por ver_agendamentos_do_cliente.',
     parameters: {
       type: 'OBJECT',
       properties: { agendamento_id: { type: STRING, description: 'Id do agendamento.' } },
@@ -201,7 +213,7 @@ async function verAgendamentos(ctx: AssistantToolContext): Promise<ToolResult> {
     .from('appointments')
     .select('id, service_name, starts_at, vehicle')
     .eq('tenant_id', ctx.tenantId)
-    .eq('lead_id', ctx.leadId)
+    .or(ownAppointmentsFilter(ctx))
     .eq('status', 'CONFIRMED')
     .gte('starts_at', ctx.now.toISOString())
     .order('starts_at', { ascending: true })
@@ -230,7 +242,7 @@ async function cancelarAgendamento(args: Record<string, unknown>, ctx: Assistant
     .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('tenant_id', ctx.tenantId)
-    .eq('lead_id', ctx.leadId)
+    .or(ownAppointmentsFilter(ctx))
     .eq('status', 'CONFIRMED')
     .gte('starts_at', ctx.now.toISOString())
     .select('id, customer_name, service_name, starts_at');

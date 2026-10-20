@@ -19,6 +19,7 @@ const PUBLIC_API_PREFIXES = [
   '/api/whatsapp/webhook',
   '/api/campaigns/run-due',
   '/api/follow-up/run-due',
+  '/api/scheduling/reminders/run-due',
   '/api/billing/webhook',
   '/api/billing/expiry-check',
   '/api/billing/apply-price-changes',

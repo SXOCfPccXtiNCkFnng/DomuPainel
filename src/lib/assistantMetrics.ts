@@ -12,11 +12,13 @@ import {
   type AssistantFlag,
   type AssistantRunStatus,
 } from '@/lib/assistantUsage';
+import { countAssistantConversations } from '@/lib/assistantQuota';
 import { getPlanAssistantConversationLimit, getPlanDisplayName, normalizePlanTier } from '@/lib/planLimits';
 
 /** Cotação usada só para exibir em reais. Ajustável sem deploy de código pela env. */
 export const USD_BRL = Number(process.env.USD_BRL_RATE) || 5.5;
 const MAX_ROWS = 20_000;
+const PAGE_SIZE = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type RunRow = {
@@ -169,19 +171,25 @@ export function isMissingTable(error: { code?: string } | null): boolean {
 
 export async function loadAssistantMetrics(opts: { days: number; tenantId?: string | null }): Promise<AssistantMetrics | { missingTable: true }> {
   const since = new Date(Date.now() - opts.days * DAY_MS).toISOString();
-  let query = supabaseAdmin
-    .from('assistant_runs')
-    .select(
-      'id, tenant_id, lead_id, status, reason, ai_calls, input_tokens, output_tokens, cached_tokens, cost_usd, cost_usd_full, ai_ms, response_ms, tools, booked, handoff, flags, review_status, created_at'
-    )
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(MAX_ROWS);
-  if (opts.tenantId) query = query.eq('tenant_id', opts.tenantId);
-  const { data, error } = await query;
-  if (isMissingTable(error)) return { missingTable: true };
-  if (error) throw error;
-  const rows = (data || []) as RunRow[];
+  // O PostgREST devolve no máximo 1000 linhas por consulta: lê em páginas até MAX_ROWS.
+  const rows: RunRow[] = [];
+  for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
+    let query = supabaseAdmin
+      .from('assistant_runs')
+      .select(
+        'id, tenant_id, lead_id, status, reason, ai_calls, input_tokens, output_tokens, cached_tokens, cost_usd, cost_usd_full, ai_ms, response_ms, tools, booked, handoff, flags, review_status, created_at'
+      )
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (opts.tenantId) query = query.eq('tenant_id', opts.tenantId);
+    const { data, error } = await query;
+    if (isMissingTable(error)) return { missingTable: true };
+    if (error) throw error;
+    rows.push(...((data || []) as RunRow[]));
+    if ((data || []).length < PAGE_SIZE) break;
+  }
 
   // Lista do filtro: todo cliente que já usou a IA (não só os do período).
   const { data: allTenants } = await supabaseAdmin
@@ -326,24 +334,14 @@ export async function loadAssistantMetrics(opts: { days: number; tenantId?: stri
 
   const quotaIds = [...byTenant.keys()];
   const plans = new Map<string, string | null>();
-  const monthKeys = new Map<string, { lead_id: string | null; created_at: string }[]>();
+  let monthCounts = new Map<string, number>();
   if (quotaIds.length) {
-    const [subsRes, monthRes] = await Promise.all([
+    const [subsRes, counts] = await Promise.all([
       supabaseAdmin.from('subscriptions').select('tenant_id, plan_tier').in('tenant_id', quotaIds),
-      supabaseAdmin
-        .from('assistant_runs')
-        .select('tenant_id, lead_id, created_at')
-        .in('tenant_id', quotaIds)
-        .eq('status', 'REPLIED')
-        .gte('created_at', brtMonthStartIso())
-        .limit(MAX_ROWS),
+      countAssistantConversations(quotaIds, brtMonthStartIso()),
     ]);
     for (const s of subsRes.data || []) plans.set(s.tenant_id, s.plan_tier);
-    for (const r of monthRes.data || []) {
-      const list = monthKeys.get(r.tenant_id) || [];
-      list.push(r);
-      monthKeys.set(r.tenant_id, list);
-    }
+    monthCounts = counts;
   }
 
   const tenants: AssistantTenantStats[] = [...byTenant.values()]
@@ -351,7 +349,7 @@ export async function loadAssistantMetrics(opts: { days: number; tenantId?: stri
       ...t,
       planName: getPlanDisplayName(normalizePlanTier(plans.get(t.tenantId))),
       quotaLimit: getPlanAssistantConversationLimit(plans.get(t.tenantId)),
-      quotaUsed: conversationKeys(monthKeys.get(t.tenantId) || []).size,
+      quotaUsed: monthCounts.get(t.tenantId) ?? 0,
       customers: _customers.size,
       projectedMonthUsdFull: (t.costUsdFull / opts.days) * 30,
       costPerReplyUsdFull: t.replied ? t.costUsdFull / t.replied : 0,

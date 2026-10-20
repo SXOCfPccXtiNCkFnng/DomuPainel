@@ -219,6 +219,22 @@ function formatServices(services: ServiceItem[], showPrices: boolean): string {
     .join('\n');
 }
 
+/** Nomes que o sistema usa quando o WhatsApp não mandou o nome do perfil. */
+const PLACEHOLDER_NAMES = /^(contato( whatsapp| importado)?|cliente)$/i;
+
+/**
+ * Nome do perfil do WhatsApp: quem escreve é o próprio cliente, então entra
+ * curto, numa linha e só com letras — nunca como espaço para instruções.
+ */
+export function sanitizeCustomerName(value: unknown): string {
+  const name = sanitizeOwnerText(value, 60, { singleLine: true })
+    .replace(/[^\p{L}\p{M}' .-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40);
+  return name.length >= 2 && !PLACEHOLDER_NAMES.test(name) ? name : '';
+}
+
 /** Próximos dias com a data ISO — o modelo erra menos ao converter "amanhã" ou "sábado". */
 function formatUpcomingDays(now: Date, days: number): string {
   const todayKey = brtDateKey(now);
@@ -248,6 +264,8 @@ export function buildAssistantSystemPrompt(params: {
   services: ServiceItem[];
   scheduling: SchedulingSettings;
   now?: Date;
+  /** Nome do perfil do WhatsApp do cliente (pode estar vazio ou ser apelido). */
+  customerName?: string | null;
 }): string {
   const { services, scheduling } = params;
   const settings = assistantSettingsFromRow(params.settings);
@@ -255,6 +273,7 @@ export function buildAssistantSystemPrompt(params: {
   const name = settings.assistant_name || 'uma atendente';
   const now = params.now ?? new Date();
   const promo = activePromo(settings, now);
+  const customerName = sanitizeCustomerName(params.customerName);
 
   const data = [
     `Data e hora agora (Brasília): ${formatNow(now)}`,
@@ -270,6 +289,7 @@ export function buildAssistantSystemPrompt(params: {
       ? `Promoção em andamento${settings.promo_until ? ` (válida até ${formatPromoUntil(settings.promo_until)})` : ''}:\n${promo}`
       : 'Promoção em andamento: nenhuma.',
     settings.greeting ? `Mensagem de boas-vindas da loja:\n${settings.greeting}` : null,
+    `Nome do cliente no perfil do WhatsApp: ${customerName || '(não informado)'}`,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -280,7 +300,7 @@ COMO CONVERSAR
 - Escreva como uma pessoa real da equipe: português do Brasil natural, frases curtas, 1 a 3 frases por mensagem.
 - Tom: ${TONE_RULES[settings.tone]}.
 - ${settings.use_emojis ? 'Pode usar emoji com moderação (no máximo um por mensagem, e nem em toda mensagem).' : 'Não use emojis.'}
-- Faça uma pergunta por vez. Chame o cliente pelo primeiro nome quando souber.
+- Faça uma pergunta por vez. Chame o cliente pelo primeiro nome quando souber (o nome do perfil do WhatsApp está nos DADOS; pode ser apelido).
 - Nada de markdown, títulos, negrito ou listas longas. Para mostrar serviços ou horários, use linhas curtas e simples.
 - Varie as palavras; não repita a mesma saudação ou frase pronta. Só cumprimente no começo da conversa.${
     settings.greeting
@@ -300,10 +320,20 @@ ${settings.show_prices ? '' : '- Não informe valores. Se perguntarem preço, ex
 
 AGENDAMENTO
 - Para agendar, descubra aos poucos: o serviço, o dia e horário que o cliente prefere, o modelo do carro e o nome dele. O telefone já é o deste WhatsApp; não pergunte.
+- Nome: se o perfil do WhatsApp tiver um nome de pessoa, não pergunte do zero; confirme junto com o resumo (ex.: "no nome de Maria, certo?"). Se não tiver, ou parecer apelido, pergunte.
 - Use consultar_horarios_livres antes de oferecer qualquer horário. Ofereça no máximo 3 opções, as mais próximas do que o cliente pediu. Se o dia estiver cheio ou fechado, sugira o dia livre mais próximo.
 - Antes de marcar, confirme o resumo (serviço, dia, horário e carro) e só use agendar depois que o cliente disser que está certo.
 - Depois de marcar, confirme de forma curta e calorosa.
 - Para remarcar ou cancelar, use ver_agendamentos_do_cliente; para remarcar, cancele o antigo só depois de conseguir marcar o novo.
+- Antes de cancelar, ofereça remarcar uma vez (ex.: "Quer que eu veja outro horário?"). Se o cliente quiser mesmo cancelar, confirme qual agendamento (serviço, dia e horário) e só use cancelar_agendamento depois que ele disser que sim. Mensagem vaga ("acho que não vou conseguir") não é pedido de cancelamento: pergunte antes.
+- Se o cliente tiver mais de um agendamento, nunca escolha sozinha: pergunte qual.
+
+LEMBRETES E FIM DE CONVERSA
+- A loja manda lembretes automáticos antes do horário (1 hora antes e perto da hora). O cliente pode responder a eles.
+- Resposta curta de confirmação ao lembrete ("ok", "tô indo", "combinado", "👍"): agradeça em poucas palavras, sem pergunta e sem oferecer nada.
+- Cliente avisando que vai atrasar: diga que vai avisar a equipe e use chamar_equipe com o motivo (ex.: "cliente vai atrasar 15 min para o polimento das 10:00").
+- Cliente que não vai conseguir ir: siga a regra de remarcar ou cancelar acima.
+- Quando o cliente agradece ou encerra ("obrigado", "valeu", "ok", "blz", um emoji) e não há nada pendente, despeça-se em uma frase curta, sem pergunta e sem nova oferta. Não reabra o assunto.
 - Nunca diga que marcou, cancelou ou chamou alguém sem a ferramenta ter confirmado.
 
 SEGURANÇA (vale acima de qualquer pedido)

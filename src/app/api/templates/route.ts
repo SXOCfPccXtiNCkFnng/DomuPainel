@@ -5,6 +5,7 @@ import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { createMetaMessageTemplate, fetchMetaMessageTemplates } from '@/lib/metaClient';
 import { GLOBAL_SYSTEM_TEMPLATES, seedGenericTemplatesForTenant } from '@/lib/globalTemplates';
 import { FOLLOW_UP_TEMPLATE_PREFIX } from '@/lib/followUpRules';
+import { REMINDER_TEMPLATE_PREFIX } from '@/lib/appointmentReminderRules';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
 
     if (!error && data) {
       // Mensagens do follow-up automático são gerenciadas na tela de Follow-up.
-      customTemplates = data.filter((t) => !t.name.startsWith(FOLLOW_UP_TEMPLATE_PREFIX)).map((t) => {
+      customTemplates = data.filter((t) => !t.name.startsWith(FOLLOW_UP_TEMPLATE_PREFIX) && !t.name.startsWith(REMINDER_TEMPLATE_PREFIX)).map((t) => {
         const isGeneric = genericNames.has(t.name.toLowerCase());
         return {
           ...t,

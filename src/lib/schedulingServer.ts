@@ -27,12 +27,15 @@ export function isSchemaPendingError(error: unknown): boolean {
   return code === '42P01' || code === '42703';
 }
 
+const SETTINGS_COLUMNS = 'weekly_hours, slot_step_minutes, min_notice_minutes, booking_horizon_days, capacity';
+const REMINDER_COLUMNS = 'reminder_hour_enabled, reminder_soon_minutes';
+
 export async function loadSchedulingSettings(tenantId: string): Promise<SchedulingSettings> {
-  const { data, error } = await supabaseAdmin
-    .from('scheduling_settings')
-    .select('weekly_hours, slot_step_minutes, min_notice_minutes, booking_horizon_days, capacity')
-    .eq('tenant_id', tenantId)
-    .maybeSingle();
+  const select = (columns: string) =>
+    supabaseAdmin.from('scheduling_settings').select(columns).eq('tenant_id', tenantId).maybeSingle();
+  let { data, error } = await select(`${SETTINGS_COLUMNS}, ${REMINDER_COLUMNS}`);
+  // Migration dos lembretes pendente: a agenda continua funcionando sem eles.
+  if (error?.code === '42703') ({ data, error } = await select(SETTINGS_COLUMNS));
   if (error) throw error;
   return settingsFromRow(data as Record<string, unknown> | null);
 }

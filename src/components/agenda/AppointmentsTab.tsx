@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  Bell,
   CalendarPlus,
   Car,
   CheckCircle2,
@@ -443,6 +444,19 @@ export default function AppointmentsTab({
                         )}
                         {a.vehicle && a.notes ? ' · ' : ''}
                         {a.notes}
+                      </p>
+                    )}
+                    {a.reminder_note && (
+                      <p
+                        className={`text-[11px] flex items-center gap-1.5 ${
+                          a.reminder_status === 'SENT'
+                            ? 'text-emerald-600'
+                            : a.reminder_status === 'FAILED'
+                              ? 'text-red-600'
+                              : 'text-slate-500'
+                        }`}
+                      >
+                        <Bell className="w-3 h-3" /> {a.reminder_note}
                       </p>
                     )}
                   </div>

@@ -124,3 +124,22 @@ export function resolveService(
   if (partial.length === 1) return { ok: true, service: partial[0] };
   return { ok: false, options: partial.length > 1 ? partial.map((s) => s.name) : options };
 }
+
+/** O que as ferramentas já fizeram de verdade nesta execução (o cliente precisa saber). */
+export type ToolEffects = { booked: Record<string, unknown>[]; cancelled: number; handoff: boolean };
+
+/**
+ * Resposta fixa quando a IA não conseguiu terminar, mas uma ferramenta já
+ * agiu (agendou, cancelou, chamou a equipe): o cliente não pode ficar sem saber.
+ */
+export function fallbackReplyForEffects(effects: ToolEffects): string | null {
+  const parts: string[] = [];
+  for (const b of effects.booked) {
+    const [, month, day] = String(b.data || '').split('-');
+    const when = [b.dia_da_semana, month && day ? `${day}/${month}` : null].filter(Boolean).join(', ');
+    parts.push(`Agendamento confirmado ✅\n${b.servico}${when ? ` — ${when}` : ''}${b.horario ? ` às ${b.horario}` : ''}.`);
+  }
+  if (effects.cancelled) parts.push('Pronto, seu agendamento foi cancelado.');
+  if (effects.handoff) parts.push('Já avisei a equipe. Em breve alguém te responde por aqui.');
+  return parts.length ? parts.join('\n\n') : null;
+}

@@ -19,9 +19,11 @@ import {
   HUMAN_PAUSE_MS,
   HUMAN_SENDER_TYPES,
   shouldAssistantReply,
+  fallbackReplyForEffects,
   splitReply,
   toGeminiContents,
   type HistoryMessage,
+  type ToolEffects,
 } from '@/lib/assistantRules';
 import { ASSISTANT_TOOL_DECLARATIONS, executeAssistantTool, type AssistantToolContext } from '@/lib/assistantTools';
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
@@ -44,8 +46,15 @@ export type AssistantTrigger = { tenantId: string; leadId: string; messageId: st
 const GEMINI_MODEL = process.env.GEMINI_ASSISTANT_MODEL || 'gemini-3.8-flash';
 const AI_TIMEOUT_MS = 20_000;
 const MAX_TOOL_ROUNDS = 6;
-/** Limite da função na Vercel é 60 s: passou disso, desiste antes de ser cortada no meio. */
+/**
+ * Limite da função na Vercel é 60 s (contando o webhook): a IA precisa terminar
+ * até RUN_BUDGET_MS depois do início da execução, deixando SEND_RESERVE_MS para
+ * enviar as mensagens e gravar o registro antes de a função ser cortada.
+ */
 const RUN_BUDGET_MS = 50_000;
+const SEND_RESERVE_MS = 8_000;
+/** Menos que isso não vale começar outra chamada ao Gemini. */
+const MIN_CALL_MS = 3_000;
 const BUBBLE_GAP_MS = 1_200;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -58,9 +67,15 @@ type GeminiPart = {
 type GeminiTurn = { role: 'user' | 'model'; parts: Record<string, unknown>[] };
 type ToolCall = { name: string; ok: boolean };
 
-async function callGemini(apiKey: string, systemPrompt: string, contents: GeminiTurn[], usage: TokenUsage) {
+async function callGemini(
+  apiKey: string,
+  systemPrompt: string,
+  contents: GeminiTurn[],
+  usage: TokenUsage,
+  deadline: number
+) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), Math.min(AI_TIMEOUT_MS, deadline - Date.now()));
   try {
     const request = () =>
       fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
@@ -79,7 +94,7 @@ async function callGemini(apiKey: string, systemPrompt: string, contents: Gemini
         }),
       });
     let res = await request();
-    if (res.status === 500 || res.status === 503) {
+    if ((res.status === 500 || res.status === 503) && deadline - Date.now() > MIN_CALL_MS + 2000) {
       await sleep(2000);
       res = await request();
     }
@@ -112,12 +127,17 @@ async function generateReply(
   toolCtx: AssistantToolContext,
   deadline: number,
   usage: TokenUsage,
-  toolLog: ToolCall[]
+  toolLog: ToolCall[],
+  effects: ToolEffects
 ): Promise<string | null> {
   const contents = [...history];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    if (Date.now() > deadline) return null;
-    const content = await callGemini(apiKey, systemPrompt, contents, usage);
+    if (deadline - Date.now() < MIN_CALL_MS) return null;
+    const content = await callGemini(apiKey, systemPrompt, contents, usage, deadline).catch((err) => {
+      // Timeout (AbortError) ou rede: segue como "sem resposta" — o fallback cuida do cliente.
+      logger.warn('assistant.ai_call_failed', { message: err instanceof Error ? err.message : String(err) });
+      return null;
+    });
     if (!content?.parts) return null;
 
     const calls = content.parts.filter((p) => p.functionCall);
@@ -146,7 +166,11 @@ async function generateReply(
         });
         result = { erro: 'Falha temporária no sistema. Peça desculpas e diga que a equipe vai confirmar.' };
       }
-      toolLog.push({ name, ok: !result.erro && result.ok !== false });
+      const ok = !result.erro && result.ok !== false;
+      toolLog.push({ name, ok });
+      if (ok && name === 'agendar' && result.agendamento) effects.booked.push(result.agendamento as Record<string, unknown>);
+      if (ok && name === 'cancelar_agendamento') effects.cancelled++;
+      if (ok && name === 'chamar_equipe') effects.handoff = true;
       logger.info('assistant.tool_called', { tool: name, tenantId: toolCtx.tenantId });
       responses.push({ functionResponse: { name, response: { result } } });
     }
@@ -244,6 +268,8 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
   const { tenantId, leadId } = trigger;
   const usage = emptyUsage();
   const toolLog: ToolCall[] = [];
+  const effects: ToolEffects = { booked: [], cancelled: 0, handoff: false };
+  const runStartedAt = Date.now();
   let customerMessage: string | null = null;
   let aiStartedAt: number | null = null;
   try {
@@ -348,12 +374,12 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       return;
     }
 
-    const quota = await loadAssistantQuota(tenantId, now);
+    const quota = await loadAssistantQuota(tenantId, now, leadId);
     if (quota) {
       const check = checkAssistantQuota({
         limit: quota.limit,
         used: quota.used,
-        continuingToday: quota.leadsToday.has(leadId),
+        continuingToday: quota.continuingToday,
         alreadyBlockedThisMonth: quota.alreadyBlockedThisMonth,
       });
       if (check.notify === 'EXHAUSTED') {
@@ -384,7 +410,14 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       ...s,
       price: s.price == null ? null : Number(s.price),
     }));
-    const systemPrompt = buildAssistantSystemPrompt({ settings, companyName, services, scheduling, now });
+    const systemPrompt = buildAssistantSystemPrompt({
+      settings,
+      companyName,
+      services,
+      scheduling,
+      now,
+      customerName: lead.name,
+    });
 
     const toolCtx: AssistantToolContext = {
       tenantId,
@@ -404,12 +437,18 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       systemPrompt,
       toGeminiContents(history),
       toolCtx,
-      aiStartedAt + RUN_BUDGET_MS - DEBOUNCE_MS,
+      runStartedAt + RUN_BUDGET_MS - SEND_RESERVE_MS,
       usage,
-      toolLog
+      toolLog,
+      effects
     );
     const aiMs = Date.now() - aiStartedAt;
-    const bubbles = reply ? splitReply(reply) : [];
+    let bubbles = reply ? splitReply(reply) : [];
+    const hasEffects = effects.booked.length > 0 || effects.cancelled > 0 || effects.handoff;
+    if (!bubbles.length && hasEffects) {
+      logger.warn('assistant.fallback_reply', { tenantId, leadId, tools: toolLog.map((t) => t.name) });
+      bubbles = [fallbackReplyForEffects(effects)!];
+    }
     if (!bubbles.length) {
       logger.error('assistant.no_reply', { tenantId, leadId });
       await notifyTenantAdmins(tenantId, {
@@ -431,7 +470,8 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     });
 
     // Chegou mensagem nova enquanto a IA pensava: a execução dela responde, com tudo no contexto.
-    if ((await latestInboundId(tenantId, leadId)) !== trigger.messageId) {
+    // Se esta já agendou/cancelou, responde mesmo assim — a próxima não sabe o que foi feito.
+    if (!hasEffects && (await latestInboundId(tenantId, leadId)) !== trigger.messageId) {
       await recordRun(trigger, { status: 'SUPERSEDED', reason: 'MENSAGEM_NOVA', usage, tools: toolLog, aiMs, flags, customerMessage, replyText });
       return;
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Car, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { AlertCircle, Bell, Car, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import {
   BOOKING_HORIZON_OPTIONS,
   CAPACITY_MAX,
@@ -13,6 +13,7 @@ import {
   type DayHours,
   type SchedulingSettings,
 } from '@/lib/scheduling';
+import { REMINDER_SOON_OPTIONS } from '@/lib/appointmentReminderRules';
 import { agendaInputClass } from './agendaStyles';
 
 /** Segunda primeiro, domingo por último — como o dono pensa a semana. */
@@ -201,6 +202,50 @@ export default function HoursTab() {
             </p>
           </div>
         )}
+      </section>
+
+      <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
+        <div className="flex items-start gap-2">
+          <Bell className="w-4 h-4 text-domu-blue mt-0.5" />
+          <div>
+            <h2 className="text-sm font-black text-slate-900">Lembretes para o cliente</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+              Mensagem automática no WhatsApp do cliente antes do horário, para ele não esquecer. Não conta no
+              limite de disparos do plano.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={form.reminder_hour_enabled}
+              disabled={!canEdit}
+              onChange={(e) => setForm((f) => ({ ...f, reminder_hour_enabled: e.target.checked }))}
+              className="rounded border-slate-300 text-domu-blue focus:ring-domu-blue"
+            />
+            Lembrar 1 hora antes
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold text-slate-600">Lembrete em cima da hora</span>
+            <select
+              value={form.reminder_soon_minutes}
+              disabled={!canEdit}
+              onChange={(e) => setForm((f) => ({ ...f, reminder_soon_minutes: Number(e.target.value) }))}
+              className={agendaInputClass}
+            >
+              {REMINDER_SOON_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {m === 0 ? 'Não mandar' : `${m} minutos antes`}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          Se o cliente falou com você nas últimas 24h, o lembrete vai como mensagem normal. Se não, vai por um modelo
+          que a Domu cadastra na Meta para você (a aprovação costuma levar alguns minutos).
+        </p>
       </section>
 
       <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
