@@ -149,7 +149,20 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         router.replace('/atendente');
         return;
       }
-      if ((pathname === '/agenda' || pathname === '/atendente') && !isAutomotiveSegment(segment)) {
+      // Imobiliário: "Leads e Respostas" virou a página Leads.
+      if (pathname === '/atendimento' && isRealEstateSegment(segment)) {
+        router.replace('/leads');
+        return;
+      }
+      if (pathname === '/agenda' && !isAutomotiveSegment(segment)) {
+        router.replace('/');
+        return;
+      }
+      if (pathname === '/atendente' && !isAutomotiveSegment(segment) && !isRealEstateSegment(segment)) {
+        router.replace('/');
+        return;
+      }
+      if ((pathname === '/leads' || pathname === '/visitas') && !isRealEstateSegment(segment)) {
         router.replace('/');
         return;
       }

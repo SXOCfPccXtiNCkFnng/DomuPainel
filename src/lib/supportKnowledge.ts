@@ -277,6 +277,20 @@ Comece conferindo o cartão em **WhatsApp Manager → Configurações de pagamen
 A campanha fica como **Agendada** e sai sozinha no horário, mesmo com o painel fechado. Se o horário já passou, aparece o botão **Disparar agora** na tela de progresso. Lembre: no plano Starter existe a trava de 200 disparos por dia.`,
   },
   {
+    id: 'imobiliaria_atendente',
+    question: 'Como funciona a atendente de IA para imobiliária?',
+    shortLabel: 'Atendente IA da imobiliária',
+    keywords: ['imobiliaria', 'imobiliária', 'corretor', 'imovel', 'imóvel', 'imoveis', 'imóveis', 'lead', 'visita', 'construtora'],
+    answer: `1. Cadastre os imóveis em **Imóveis** (valor, bairro, quartos e o **link com fotos**). A atendente só fala do que está cadastrado e disponível.
+2. Em **Atendente IA**, ajuste nome, tom e as informações da imobiliária (financiamento, documentos, horários) e ligue.
+
+O que ela faz depende do plano:
+• **Starter (primeiro atendimento):** entende o que o cliente procura (comprar ou alugar, tipo, região, valor, quartos), mostra os imóveis compatíveis e passa para o corretor quando ele se interessa ou quer visitar.
+• **Pro e Enterprise (atendimento completo):** além disso, tira dúvidas sobre o imóvel e anota o **pedido de visita** com o dia e o horário que o cliente prefere. O pedido aparece em **Visitas** para você confirmar.
+
+Em **Leads** fica o que cada cliente contou que procura e em que etapa está. Negociação, proposta e financiamento ela sempre passa para o corretor.`,
+  },
+  {
     id: 'lembrete_agendamento',
     question: 'O cliente recebe lembrete do horário marcado na agenda?',
     shortLabel: 'Lembrete do agendamento',

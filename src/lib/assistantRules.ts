@@ -126,7 +126,13 @@ export function resolveService(
 }
 
 /** O que as ferramentas já fizeram de verdade nesta execução (o cliente precisa saber). */
-export type ToolEffects = { booked: Record<string, unknown>[]; cancelled: number; handoff: boolean };
+export type ToolEffects = {
+  booked: Record<string, unknown>[];
+  /** Pedidos de visita (imobiliário): o corretor ainda confirma o horário. */
+  visits: Record<string, unknown>[];
+  cancelled: number;
+  handoff: boolean;
+};
 
 /**
  * Resposta fixa quando a IA não conseguiu terminar, mas uma ferramenta já
@@ -138,6 +144,11 @@ export function fallbackReplyForEffects(effects: ToolEffects): string | null {
     const [, month, day] = String(b.data || '').split('-');
     const when = [b.dia_da_semana, month && day ? `${day}/${month}` : null].filter(Boolean).join(', ');
     parts.push(`Agendamento confirmado ✅\n${b.servico}${when ? ` — ${when}` : ''}${b.horario ? ` às ${b.horario}` : ''}.`);
+  }
+  for (const v of effects.visits) {
+    parts.push(
+      `Pedido de visita registrado ✅\n${v.imovel}${v.preferencia ? ` — ${v.preferencia}` : ''}.\nO corretor vai confirmar o horário com você por aqui.`
+    );
   }
   if (effects.cancelled) parts.push('Pronto, seu agendamento foi cancelado.');
   if (effects.handoff) parts.push('Já avisei a equipe. Em breve alguém te responde por aqui.');

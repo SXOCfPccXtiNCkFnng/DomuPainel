@@ -10,6 +10,8 @@ import {
 } from '@/lib/assistantPrompt';
 import { isSchemaPendingError, SCHEDULING_MIGRATION_PENDING } from '@/lib/schedulingServer';
 import { loadAssistantQuota } from '@/lib/assistantQuota';
+import { assistantVertical } from '@/lib/assistantRunner';
+import { OFFERABLE_STATUSES, realEstateModeForPlan } from '@/lib/realEstate';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +32,31 @@ async function loadSettingsRow(tenantId: string) {
   return { ...base, promoAvailable: false };
 }
 
+/** O que a atendente precisa para funcionar: serviços ativos ou imóveis disponíveis. */
+async function countReadyItems(tenantId: string, vertical: ReturnType<typeof assistantVertical>): Promise<number> {
+  if (!vertical) return 0;
+  const query =
+    vertical === 'imobiliario'
+      ? supabaseAdmin
+          .from('properties')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+          .in('status', OFFERABLE_STATUSES)
+      : supabaseAdmin
+          .from('services')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+          .eq('active', true);
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function loadPlanTier(tenantId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin.from('subscriptions').select('plan_tier').eq('tenant_id', tenantId).maybeSingle();
+  return data?.plan_tier ?? null;
+}
+
 /** Personalização do assistente de IA do WhatsApp. */
 export async function GET(req: NextRequest) {
   try {
@@ -39,16 +66,26 @@ export async function GET(req: NextRequest) {
 
     const [settingsRes, tenantRes, quota] = await Promise.all([
       loadSettingsRow(tenantId),
-      supabaseAdmin.from('tenants').select('name').eq('id', tenantId).maybeSingle(),
+      supabaseAdmin.from('tenants').select('name, segment').eq('id', tenantId).maybeSingle(),
       loadAssistantQuota(tenantId).catch(() => null),
     ]);
     if (settingsRes.error) throw settingsRes.error;
+
+    const vertical = assistantVertical(tenantRes.data?.segment);
+    const [readyCount, planTier] = await Promise.all([
+      countReadyItems(tenantId, vertical),
+      quota ? Promise.resolve(quota.planTier) : loadPlanTier(tenantId),
+    ]);
 
     return NextResponse.json({
       success: true,
       settings: assistantSettingsFromRow(settingsRes.data as Record<string, unknown> | null),
       companyName: tenantRes.data?.name || '',
       quota: quota ? { planName: quota.planName, limit: quota.limit, used: quota.used } : null,
+      vertical,
+      // Imobiliário: Starter só abre a conversa; Pro/Enterprise conduz até a visita.
+      mode: vertical === 'imobiliario' ? realEstateModeForPlan(planTier) : null,
+      readyCount,
       promoAvailable: settingsRes.promoAvailable,
       aiAvailable: Boolean(process.env.GEMINI_API_KEY),
       canEdit: auth.session.role === 'ADMIN' || auth.session.role === 'SUPER_ADMIN',
@@ -80,15 +117,27 @@ export async function PUT(req: NextRequest) {
     }
 
     if (settings.enabled) {
-      const { count, error: countError } = await supabaseAdmin
-        .from('services')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', auth.session.tenantId)
-        .eq('active', true);
-      if (countError) throw countError;
-      if (!count) {
+      const { data: tenant } = await supabaseAdmin
+        .from('tenants')
+        .select('segment')
+        .eq('id', auth.session.tenantId)
+        .maybeSingle();
+      const vertical = assistantVertical(tenant?.segment);
+      if (!vertical) {
         return NextResponse.json(
-          { success: false, error: 'Cadastre pelo menos um serviço ativo antes de ligar a atendente.' },
+          { success: false, error: 'A atendente ainda não está disponível para o seu ramo.' },
+          { status: 400 }
+        );
+      }
+      if (!(await countReadyItems(auth.session.tenantId, vertical))) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              vertical === 'imobiliario'
+                ? 'Cadastre pelo menos um imóvel disponível antes de ligar a atendente.'
+                : 'Cadastre pelo menos um serviço ativo antes de ligar a atendente.',
+          },
           { status: 400 }
         );
       }

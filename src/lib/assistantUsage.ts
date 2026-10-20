@@ -151,6 +151,8 @@ export function detectFlags(input: {
   knownPrices: number[];
   ownerText: string;
   tools: { name: string; ok: boolean }[];
+  /** Horários oferecidos sem consultar a agenda (só faz sentido onde há agenda). */
+  checkScheduleTimes?: boolean;
 }): AssistantFlag[] {
   const flags = new Set<AssistantFlag>();
   const reply = input.reply || '';
@@ -161,10 +163,10 @@ export function detectFlags(input: {
 
   const usedAgenda = input.tools.some((t) => t.name === 'consultar_horarios_livres' || t.name === 'agendar');
   const timesOffered = (reply.match(/\b([01]?\d|2[0-3])[:h][0-5]\d\b/g) || []).length;
-  if (timesOffered >= 2 && !usedAgenda) flags.add('HORARIO_SEM_AGENDA');
+  if (input.checkScheduleTimes !== false && timesOffered >= 2 && !usedAgenda) flags.add('HORARIO_SEM_AGENDA');
 
   if (UNKNOWN_PATTERNS.some((re) => re.test(lower))) flags.add('NAO_SABIA');
-  if (input.tools.some((t) => t.name === 'chamar_equipe' && t.ok)) flags.add('CHAMOU_EQUIPE');
+  if (input.tools.some((t) => (t.name === 'chamar_equipe' || t.name === 'chamar_corretor') && t.ok)) flags.add('CHAMOU_EQUIPE');
   if (input.tools.some((t) => !t.ok)) flags.add('ERRO_FERRAMENTA');
   return [...flags];
 }

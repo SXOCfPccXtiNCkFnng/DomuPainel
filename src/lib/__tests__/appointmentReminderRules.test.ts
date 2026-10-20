@@ -86,12 +86,13 @@ describe('fallbackReplyForEffects', () => {
   it('confirma o agendamento quando a IA não terminou', () => {
     const text = fallbackReplyForEffects({
       booked: [{ servico: 'Polimento', data: '2026-10-22', dia_da_semana: 'quinta-feira', horario: '09:00' }],
+      visits: [],
       cancelled: 0,
       handoff: false,
     });
     expect(text).toBe('Agendamento confirmado ✅\nPolimento — quinta-feira, 22/10 às 09:00.');
   });
   it('sem efeito nenhum não inventa resposta', () => {
-    expect(fallbackReplyForEffects({ booked: [], cancelled: 0, handoff: false })).toBeNull();
+    expect(fallbackReplyForEffects({ booked: [], visits: [], cancelled: 0, handoff: false })).toBeNull();
   });
 });

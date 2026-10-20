@@ -264,6 +264,19 @@ async function cancelarAgendamento(args: Record<string, unknown>, ctx: Assistant
 
 async function chamarEquipe(args: Record<string, unknown>, ctx: AssistantToolContext): Promise<ToolResult> {
   const reason = String(args.motivo ?? '').trim().slice(0, 300) || 'Cliente precisa de atendimento';
+  return handOffToTeam(ctx, reason, '/atendente');
+}
+
+export type HandoffContext = Pick<
+  AssistantToolContext,
+  'tenantId' | 'leadId' | 'leadPhone' | 'leadName' | 'companyName' | 'lastCustomerMessage' | 'now'
+>;
+
+/**
+ * Passa a conversa para uma pessoa: pausa a IA nesse contato por 12h e avisa
+ * os administradores no painel e por e-mail. Usado pelos dois ramos.
+ */
+export async function handOffToTeam(ctx: HandoffContext, reason: string, panelUrl: string): Promise<ToolResult> {
   const pausedUntil = new Date(ctx.now.getTime() + HUMAN_PAUSE_MS);
 
   await supabaseAdmin
@@ -275,7 +288,7 @@ async function chamarEquipe(args: Record<string, unknown>, ctx: AssistantToolCon
   const phone = formatPhoneBR(ctx.leadPhone) || ctx.leadPhone;
   const title = `${ctx.leadName} precisa de atendimento`;
   const message = `${reason}. WhatsApp: ${phone}. A atendente parou de responder essa conversa por 12 horas; responda pelo WhatsApp Business.`;
-  await notifyTenantAdmins(ctx.tenantId, { title, message, type: 'WARNING', url: '/atendente' });
+  await notifyTenantAdmins(ctx.tenantId, { title, message, type: 'WARNING', url: panelUrl });
 
   const { data: admins } = await supabaseAdmin
     .from('users')

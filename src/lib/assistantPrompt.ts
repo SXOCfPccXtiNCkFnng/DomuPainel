@@ -64,7 +64,7 @@ export const TONE_OPTIONS: { id: AssistantTone; label: string; description: stri
   },
 ];
 
-const TONE_RULES: Record<AssistantTone, string> = {
+export const TONE_RULES: Record<AssistantTone, string> = {
   AMIGAVEL: 'calorosa, simpática e próxima, como alguém da equipe que gosta de atender bem',
   PROFISSIONAL: 'educada, cordial e objetiva; sem gírias, mas sem soar robótica',
   DESCONTRAIDO: 'leve e bem-humorada, com linguagem informal do dia a dia (sem exagerar nas gírias)',
@@ -89,8 +89,8 @@ export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
   greeting: '',
 };
 
-const DATA_OPEN = '<<<DADOS_DA_LOJA>>>';
-const DATA_CLOSE = '<<<FIM_DOS_DADOS_DA_LOJA>>>';
+export const DATA_OPEN = '<<<DADOS_DA_LOJA>>>';
+export const DATA_CLOSE = '<<<FIM_DOS_DADOS_DA_LOJA>>>';
 
 /** Texto livre do dono: sem caracteres de controle, sem os delimitadores do prompt, com limite. */
 export function sanitizeOwnerText(value: unknown, max: number, opts?: { singleLine?: boolean }): string {
@@ -183,15 +183,18 @@ export function assistantSettingsFromRow(row: Record<string, unknown> | null | u
 }
 
 /** Primeira mensagem de exemplo — mostrada na tela para o dono sentir o tom. */
-export function sampleGreeting(settings: AssistantSettings, companyName: string): string {
+export function sampleGreeting(settings: AssistantSettings, companyName: string, opts?: { realEstate?: boolean }): string {
   if (settings.greeting.trim()) return settings.greeting.trim();
   const who = settings.assistant_name ? `Aqui é ${settings.assistant_name}, da ${companyName}` : `Aqui é da ${companyName}`;
   const emoji = settings.use_emojis;
+  const realEstate = Boolean(opts?.realEstate);
   switch (settings.tone) {
     case 'PROFISSIONAL':
-      return `Olá, tudo bem? ${who}. Em que posso ajudar?${emoji ? ' 🚗' : ''}`;
+      return `Olá, tudo bem? ${who}. Em que posso ajudar?${emoji ? (realEstate ? ' 🏡' : ' 🚗') : ''}`;
     case 'DESCONTRAIDO':
-      return `E aí, tudo certo? ${who}${emoji ? ' 😄' : ''} Bora deixar esse carro brilhando?`;
+      return realEstate
+        ? `E aí, tudo certo? ${who}${emoji ? ' 😄' : ''} Bora achar o seu próximo imóvel?`
+        : `E aí, tudo certo? ${who}${emoji ? ' 😄' : ''} Bora deixar esse carro brilhando?`;
     default:
       return `Oi! ${who}${emoji ? ' 😊' : ''} Como posso te ajudar hoje?`;
   }
@@ -246,7 +249,7 @@ function formatUpcomingDays(now: Date, days: number): string {
   }).join('\n');
 }
 
-function formatNow(now: Date): string {
+export function formatNow(now: Date): string {
   return now.toLocaleString('pt-BR', {
     weekday: 'long',
     day: '2-digit',

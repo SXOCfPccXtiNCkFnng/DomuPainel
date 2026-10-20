@@ -78,6 +78,8 @@ export type NavItemId =
   | 'metricas'
   | 'atendimento'
   | 'imoveis'
+  | 'leads'
+  | 'visitas'
   | 'relatorios'
   | 'configuracoes'
   | 'assinatura';
@@ -155,6 +157,57 @@ export const ADMIN_NAV: NavItemConfig[] = [
   { id: 'assinatura', name: 'Assinatura e Planos', href: '/assinatura', isComingSoon: false },
 ];
 
+export type NavSection = { title: string; items: NavItemConfig[] };
+
+/**
+ * Imobiliário: menu por etapa do trabalho do corretor. Visitas aparece para
+ * todos com a etiqueta Pro (no Starter a página explica como liberar).
+ */
+const REAL_ESTATE_NAV: NavSection[] = [
+  {
+    title: 'Vendas',
+    items: [
+      { id: 'dashboard', name: 'Painel', href: '/', isComingSoon: false },
+      { id: 'imoveis', name: 'Imóveis', href: '/imoveis', isComingSoon: false },
+      { id: 'leads', name: 'Leads', href: '/leads', isComingSoon: false },
+      { id: 'atendente', name: 'Atendente IA', href: '/atendente', isComingSoon: false },
+      { id: 'visitas', name: 'Visitas', href: '/visitas', badge: 'Pro', isComingSoon: false },
+    ],
+  },
+  {
+    title: 'Marketing',
+    items: [
+      { id: 'disparos', name: 'Campanhas', href: '/disparos', isComingSoon: false },
+      { id: 'followup', name: 'Follow-up', href: '/follow-up', isComingSoon: false },
+      { id: 'templates', name: 'Modelos de mensagem', href: '/templates', isComingSoon: false },
+      { id: 'contatos', name: 'Contatos', href: '/contatos', isComingSoon: false },
+    ],
+  },
+  {
+    title: 'Resultados',
+    items: [
+      { id: 'metricas', name: 'Resultados', href: '/metricas', isComingSoon: false },
+      { id: 'relatorios', name: 'Relatório de envios', href: '/relatorios', isComingSoon: false },
+    ],
+  },
+  {
+    title: 'Conta',
+    items: [
+      { id: 'configuracoes', name: 'Configurações', href: '/configuracoes', isComingSoon: false },
+      { id: 'assinatura', name: 'Assinatura', href: '/assinatura', isComingSoon: false },
+    ],
+  },
+];
+
+/** Seções do menu lateral para o ramo da conta. */
+export function getNavSectionsForSegment(segment: TenantSegment): NavSection[] {
+  if (isRealEstateSegment(segment)) return REAL_ESTATE_NAV;
+  return [
+    { title: 'Plataforma', items: getPlatformNavForSegment(segment) },
+    { title: 'Administração', items: ADMIN_NAV },
+  ];
+}
+
 export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[] {
   const dispatchOnly = isDispatchOnlySegment(segment);
 
@@ -214,7 +267,15 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   },
   '/imoveis': {
     title: 'Imóveis',
-    subtitle: 'Cadastro enxuto para alimentar campanhas e busca por perfil',
+    subtitle: 'Catálogo que a atendente consulta e que vira campanha',
+  },
+  '/leads': {
+    title: 'Leads',
+    subtitle: 'Quem conversou, o que procura e em que etapa está',
+  },
+  '/visitas': {
+    title: 'Visitas',
+    subtitle: 'Pedidos de visita feitos pela atendente para você confirmar',
   },
   '/relatorios': {
     title: 'Relatórios de Análise e Performance',
@@ -276,6 +337,37 @@ const AUTOMOTIVE_PAGE_TITLES: Record<string, { title: string; subtitle: string }
   },
 };
 
+const REAL_ESTATE_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  '/': {
+    title: 'Painel',
+    subtitle: 'Campanhas, leads e visitas da sua imobiliária',
+  },
+  '/atendente': {
+    title: 'Atendente IA',
+    subtitle: 'Quem responde seus clientes no WhatsApp a qualquer hora',
+  },
+  '/disparos': {
+    title: 'Campanhas',
+    subtitle: 'Imóvel → público → agendar → enviar com status Meta',
+  },
+  '/templates': {
+    title: 'Modelos de mensagem',
+    subtitle: 'Modelos aprovados pela Meta para suas campanhas',
+  },
+  '/contatos': {
+    title: 'Contatos',
+    subtitle: 'Importação e listas por interesse, região e faixa de valor',
+  },
+  '/metricas': {
+    title: 'Resultados',
+    subtitle: 'Alcance, respostas, leads e visitas',
+  },
+  '/relatorios': {
+    title: 'Relatório de envios',
+    subtitle: 'Histórico de campanhas e entregas',
+  },
+};
+
 export function getPageTitle(
   pathname: string,
   segment?: TenantSegment | string | null
@@ -284,7 +376,9 @@ export function getPageTitle(
     ? DISPATCH_ONLY_PAGE_TITLES
     : isAutomotiveSegment(segment || null)
       ? AUTOMOTIVE_PAGE_TITLES
-      : null;
+      : isRealEstateSegment(segment || null)
+        ? REAL_ESTATE_PAGE_TITLES
+        : null;
   const titles =
     override && override[pathname] ? { ...PAGE_TITLES, ...override } : PAGE_TITLES;
 

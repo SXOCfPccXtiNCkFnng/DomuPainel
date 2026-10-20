@@ -23,7 +23,12 @@ import {
   PlanTier,
   isPlanAllowedForSegment,
 } from '@/lib/planLimits';
-import { BUSINESS_SEGMENT_OPTIONS, getSegmentFromStorage, isAutomotiveSegment } from '@/lib/segmentConfig';
+import {
+  BUSINESS_SEGMENT_OPTIONS,
+  getSegmentFromStorage,
+  isAutomotiveSegment,
+  isRealEstateSegment,
+} from '@/lib/segmentConfig';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 
 type PlanFeature = { label: string; comingSoon?: boolean };
@@ -558,6 +563,17 @@ export default function AssinaturaPage() {
                       <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
                       <span>
                         Atendente IA: {PLAN_ASSISTANT_CONVERSATION_LIMITS[plan.tier].toLocaleString('pt-BR')} conversas/mês
+                      </span>
+                    </li>
+                  )}
+                  {isRealEstateSegment(segment) && (
+                    <li className="flex items-start gap-2 text-xs text-slate-700 font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
+                      <span>
+                        {plan.tier === 'STARTER'
+                          ? 'Atendente IA de primeiro atendimento (entende o cliente, mostra os imóveis e passa para o corretor)'
+                          : 'Atendente IA completa: tira dúvidas e anota pedidos de visita'}
+                        : {PLAN_ASSISTANT_CONVERSATION_LIMITS[plan.tier].toLocaleString('pt-BR')} conversas/mês
                       </span>
                     </li>
                   )}

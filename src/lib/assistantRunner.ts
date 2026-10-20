@@ -1,17 +1,25 @@
 /**
- * Assistente de IA no WhatsApp (segmento automotivo). Roda depois que o
+ * Assistente de IA no WhatsApp (lava rápido e imobiliário). Roda depois que o
  * webhook já respondeu 200 para a Meta: espera o cliente terminar de digitar,
- * confere se pode responder, conversa com o Gemini (com as ferramentas de
- * agenda) e envia a resposta. Toda execução que passa da espera vira uma
+ * confere se pode responder, conversa com o Gemini (com as ferramentas do
+ * ramo: agenda ou catálogo de imóveis) e envia a resposta. Toda execução que passa da espera vira uma
  * linha em assistant_runs (consumo e monitor de conversas no /interno).
  */
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { logger } from '@/lib/logger';
-import { isAutomotiveSegment } from '@/lib/segmentConfig';
+import { isAutomotiveSegment, isRealEstateSegment } from '@/lib/segmentConfig';
 import { isOptOutMessage, sendMetaText } from '@/lib/metaClient';
 import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import { notifyTenantAdmins } from '@/lib/notify';
-import { activePromo, assistantSettingsFromRow, buildAssistantSystemPrompt } from '@/lib/assistantPrompt';
+import {
+  activePromo,
+  assistantSettingsFromRow,
+  buildAssistantSystemPrompt,
+  type AssistantSettings,
+} from '@/lib/assistantPrompt';
+import { buildRealEstateSystemPrompt } from '@/lib/realEstatePrompt';
+import { executeRealEstateTool, realEstateToolDeclarations, type RealEstateToolContext } from '@/lib/realEstateTools';
+import { propertyFromRow, realEstateModeForPlan } from '@/lib/realEstate';
 import {
   ASSISTANT_SENDER_TYPE,
   DEBOUNCE_MS,
@@ -25,7 +33,12 @@ import {
   type HistoryMessage,
   type ToolEffects,
 } from '@/lib/assistantRules';
-import { ASSISTANT_TOOL_DECLARATIONS, executeAssistantTool, type AssistantToolContext } from '@/lib/assistantTools';
+import {
+  ASSISTANT_TOOL_DECLARATIONS,
+  executeAssistantTool,
+  type AssistantToolContext,
+  type HandoffContext,
+} from '@/lib/assistantTools';
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import type { ServiceItem } from '@/lib/scheduling';
 import { loadAssistantQuota } from '@/lib/assistantQuota';
@@ -67,12 +80,23 @@ type GeminiPart = {
 type GeminiTurn = { role: 'user' | 'model'; parts: Record<string, unknown>[] };
 type ToolCall = { name: string; ok: boolean };
 
+/** Ferramentas de um ramo: o que o Gemini pode chamar e quem executa. */
+type ToolKit = {
+  declarations: unknown[];
+  execute: (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>>;
+};
+
+/** Ferramentas que agem de verdade (o cliente precisa saber o resultado). */
+const BOOKING_TOOLS = ['agendar', 'solicitar_visita'];
+const HANDOFF_TOOLS = ['chamar_equipe', 'chamar_corretor'];
+
 async function callGemini(
   apiKey: string,
   systemPrompt: string,
   contents: GeminiTurn[],
   usage: TokenUsage,
-  deadline: number
+  deadline: number,
+  declarations: unknown[]
 ) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(AI_TIMEOUT_MS, deadline - Date.now()));
@@ -85,7 +109,7 @@ async function callGemini(
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
           contents,
-          tools: [{ functionDeclarations: ASSISTANT_TOOL_DECLARATIONS }],
+          tools: [{ functionDeclarations: declarations }],
           generationConfig: {
             temperature: 0.4,
             maxOutputTokens: 800,
@@ -124,7 +148,8 @@ async function generateReply(
   apiKey: string,
   systemPrompt: string,
   history: GeminiTurn[],
-  toolCtx: AssistantToolContext,
+  toolkit: ToolKit,
+  tenantId: string,
   deadline: number,
   usage: TokenUsage,
   toolLog: ToolCall[],
@@ -133,7 +158,7 @@ async function generateReply(
   const contents = [...history];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     if (deadline - Date.now() < MIN_CALL_MS) return null;
-    const content = await callGemini(apiKey, systemPrompt, contents, usage, deadline).catch((err) => {
+    const content = await callGemini(apiKey, systemPrompt, contents, usage, deadline, toolkit.declarations).catch((err) => {
       // Timeout (AbortError) ou rede: segue como "sem resposta" — o fallback cuida do cliente.
       logger.warn('assistant.ai_call_failed', { message: err instanceof Error ? err.message : String(err) });
       return null;
@@ -157,11 +182,11 @@ async function generateReply(
       const { name, args } = part.functionCall!;
       let result: Record<string, unknown>;
       try {
-        result = await executeAssistantTool(name, args || {}, toolCtx);
+        result = await toolkit.execute(name, args || {});
       } catch (err) {
         logger.error('assistant.tool_failed', {
           tool: name,
-          tenantId: toolCtx.tenantId,
+          tenantId,
           message: err instanceof Error ? err.message : String(err),
         });
         result = { erro: 'Falha temporária no sistema. Peça desculpas e diga que a equipe vai confirmar.' };
@@ -169,9 +194,10 @@ async function generateReply(
       const ok = !result.erro && result.ok !== false;
       toolLog.push({ name, ok });
       if (ok && name === 'agendar' && result.agendamento) effects.booked.push(result.agendamento as Record<string, unknown>);
+      if (ok && name === 'solicitar_visita' && result.visita) effects.visits.push(result.visita as Record<string, unknown>);
       if (ok && name === 'cancelar_agendamento') effects.cancelled++;
-      if (ok && name === 'chamar_equipe') effects.handoff = true;
-      logger.info('assistant.tool_called', { tool: name, tenantId: toolCtx.tenantId });
+      if (ok && HANDOFF_TOOLS.includes(name)) effects.handoff = true;
+      logger.info('assistant.tool_called', { tool: name, tenantId });
       responses.push({ functionResponse: { name, response: { result } } });
     }
     contents.push({ role: 'user', parts: responses });
@@ -236,8 +262,8 @@ async function recordRun(trigger: AssistantTrigger, run: RunRecord): Promise<voi
       response_ms: run.responseMs ?? null,
       tools: run.tools.map((t) => t.name),
       tool_errors: run.tools.filter((t) => !t.ok).length,
-      booked: run.tools.some((t) => t.name === 'agendar' && t.ok),
-      handoff: run.tools.some((t) => t.name === 'chamar_equipe' && t.ok),
+      booked: run.tools.some((t) => BOOKING_TOOLS.includes(t.name) && t.ok),
+      handoff: run.tools.some((t) => HANDOFF_TOOLS.includes(t.name) && t.ok),
       bubbles: run.bubbles ?? 0,
       flags: run.flags ?? [],
       customer_message: run.customerMessage ?? null,
@@ -264,11 +290,96 @@ async function recordRun(trigger: AssistantTrigger, run: RunRecord): Promise<voi
   }
 }
 
+type Vertical = 'automotivo' | 'imobiliario';
+
+/** Ramos que têm atendente de IA. */
+export function assistantVertical(segment: string | null | undefined): Vertical | null {
+  if (isAutomotiveSegment(segment ?? null)) return 'automotivo';
+  if (isRealEstateSegment(segment ?? null)) return 'imobiliario';
+  return null;
+}
+
+type VerticalInput = HandoffContext & { settings: AssistantSettings; planTier: string | null };
+type VerticalSetup = { systemPrompt: string; toolkit: ToolKit; knownPrices: number[] };
+
+/** Carrega o que cada ramo precisa e monta o prompt e as ferramentas. */
+async function prepareVertical(vertical: Vertical, input: VerticalInput): Promise<VerticalSetup> {
+  const { settings, planTier, ...base } = input;
+
+  if (vertical === 'automotivo') {
+    const [servicesRes, scheduling] = await Promise.all([
+      supabaseAdmin
+        .from('services')
+        .select('id, name, description, duration_minutes, price, active')
+        .eq('tenant_id', base.tenantId)
+        .eq('active', true)
+        .order('name', { ascending: true }),
+      loadSchedulingSettings(base.tenantId),
+    ]);
+    const services = ((servicesRes.data || []) as ServiceItem[]).map((s) => ({
+      ...s,
+      price: s.price == null ? null : Number(s.price),
+    }));
+    const ctx: AssistantToolContext = { ...base, services, scheduling };
+    return {
+      systemPrompt: buildAssistantSystemPrompt({
+        settings,
+        companyName: base.companyName,
+        services,
+        scheduling,
+        now: base.now,
+        customerName: base.leadName,
+      }),
+      toolkit: { declarations: ASSISTANT_TOOL_DECLARATIONS, execute: (name, args) => executeAssistantTool(name, args, ctx) },
+      knownPrices: services.filter((s) => s.price != null).map((s) => s.price as number),
+    };
+  }
+
+  // Imobiliário: o plano decide se a IA só abre a conversa (Starter) ou conduz até a visita.
+  let tier = planTier;
+  if (!tier) {
+    const { data: sub } = await supabaseAdmin.from('subscriptions').select('plan_tier').eq('tenant_id', base.tenantId).maybeSingle();
+    tier = sub?.plan_tier ?? null;
+  }
+  const mode = realEstateModeForPlan(tier);
+  const [propertiesRes, interestRes] = await Promise.all([
+    supabaseAdmin
+      .from('properties')
+      .select('*')
+      .eq('tenant_id', base.tenantId)
+      .order('updated_at', { ascending: false })
+      .limit(1000),
+    supabaseAdmin
+      .from('leads')
+      .select('interest_purpose, interest_property_type, region, budget_max, bedrooms_min, ai_summary')
+      .eq('id', base.leadId)
+      .eq('tenant_id', base.tenantId)
+      .maybeSingle(),
+  ]);
+  if (propertiesRes.error) throw propertiesRes.error;
+  const properties = (propertiesRes.data || []).map((row) => propertyFromRow(row as Record<string, unknown>));
+  const ctx: RealEstateToolContext = { ...base, mode, showPrices: settings.show_prices, properties };
+  return {
+    systemPrompt: buildRealEstateSystemPrompt({
+      settings,
+      companyName: base.companyName,
+      mode,
+      properties,
+      customerName: base.leadName,
+      // Sem a migration do módulo as colunas não existem: segue sem o histórico de interesse.
+      knownInterest: interestRes.error ? null : interestRes.data,
+      now: base.now,
+    }),
+    toolkit: { declarations: realEstateToolDeclarations(mode), execute: (name, args) => executeRealEstateTool(name, args, ctx) },
+    knownPrices: properties.flatMap((p) => [p.price, p.rent_price, p.condo_fee].filter((n): n is number => n != null)),
+  };
+}
+
 export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise<void> {
   const { tenantId, leadId } = trigger;
   const usage = emptyUsage();
   const toolLog: ToolCall[] = [];
-  const effects: ToolEffects = { booked: [], cancelled: 0, handoff: false };
+  const effects: ToolEffects = { booked: [], visits: [], cancelled: 0, handoff: false };
   const runStartedAt = Date.now();
   let customerMessage: string | null = null;
   let aiStartedAt: number | null = null;
@@ -278,7 +389,8 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       supabaseAdmin.from('tenants').select('name, segment').eq('id', tenantId).maybeSingle(),
       supabaseAdmin.from('assistant_settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
     ]);
-    if (!tenant || !isAutomotiveSegment(tenant.segment) || !settingsRow?.enabled) return;
+    const vertical = tenant ? assistantVertical(tenant.segment) : null;
+    if (!tenant || !vertical || !settingsRow?.enabled) return;
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -292,7 +404,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     if ((await latestInboundId(tenantId, leadId)) !== trigger.messageId) return;
 
     const now = new Date();
-    const [leadRes, historyRes, humanRes, botCountRes, servicesRes, scheduling] = await Promise.all([
+    const [leadRes, historyRes, humanRes, botCountRes] = await Promise.all([
       supabaseAdmin
         .from('leads')
         .select('name, phone, assistant_paused_until')
@@ -323,13 +435,6 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
         .eq('lead_id', leadId)
         .eq('sender_type', ASSISTANT_SENDER_TYPE)
         .gte('created_at', new Date(now.getTime() - 60 * 60 * 1000).toISOString()),
-      supabaseAdmin
-        .from('services')
-        .select('id, name, description, duration_minutes, price, active')
-        .eq('tenant_id', tenantId)
-        .eq('active', true)
-        .order('name', { ascending: true }),
-      loadSchedulingSettings(tenantId),
     ]);
     const lead = leadRes.data;
     if (!lead) return;
@@ -404,39 +509,26 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       }
     }
 
-    const companyName = tenant.name || 'a loja';
     const settings = assistantSettingsFromRow(settingsRow);
-    const services = ((servicesRes.data || []) as ServiceItem[]).map((s) => ({
-      ...s,
-      price: s.price == null ? null : Number(s.price),
-    }));
-    const systemPrompt = buildAssistantSystemPrompt({
-      settings,
-      companyName,
-      services,
-      scheduling,
-      now,
-      customerName: lead.name,
-    });
-
-    const toolCtx: AssistantToolContext = {
+    const setup = await prepareVertical(vertical, {
       tenantId,
       leadId,
       leadPhone: lead.phone,
       leadName: lead.name || 'Cliente',
-      companyName,
+      companyName: tenant.name || (vertical === 'imobiliario' ? 'a imobiliária' : 'a loja'),
       lastCustomerMessage: lastMessage.body || '',
-      services,
-      scheduling,
       now,
-    };
+      settings,
+      planTier: quota?.planTier ?? null,
+    });
 
     aiStartedAt = Date.now();
     const reply = await generateReply(
       apiKey,
-      systemPrompt,
+      setup.systemPrompt,
       toGeminiContents(history),
-      toolCtx,
+      setup.toolkit,
+      tenantId,
       runStartedAt + RUN_BUDGET_MS - SEND_RESERVE_MS,
       usage,
       toolLog,
@@ -444,7 +536,8 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     );
     const aiMs = Date.now() - aiStartedAt;
     let bubbles = reply ? splitReply(reply) : [];
-    const hasEffects = effects.booked.length > 0 || effects.cancelled > 0 || effects.handoff;
+    const hasEffects =
+      effects.booked.length > 0 || effects.visits.length > 0 || effects.cancelled > 0 || effects.handoff;
     if (!bubbles.length && hasEffects) {
       logger.warn('assistant.fallback_reply', { tenantId, leadId, tools: toolLog.map((t) => t.name) });
       bubbles = [fallbackReplyForEffects(effects)!];
@@ -464,9 +557,10 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     const replyText = bubbles.join('\n\n');
     const flags = detectFlags({
       reply: replyText,
-      knownPrices: services.filter((s) => s.price != null).map((s) => s.price as number),
+      knownPrices: setup.knownPrices,
       ownerText: `${settings.extra_info}\n${settings.about}\n${activePromo(settings, now) || ''}`,
       tools: toolLog,
+      checkScheduleTimes: vertical === 'automotivo',
     });
 
     // Chegou mensagem nova enquanto a IA pensava: a execução dela responde, com tudo no contexto.

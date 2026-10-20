@@ -6,6 +6,7 @@ import ServicesTab from '@/components/agenda/ServicesTab';
 import HoursTab from '@/components/agenda/HoursTab';
 import AssistantTab from '@/components/agenda/AssistantTab';
 import type { ServiceItem } from '@/lib/scheduling';
+import { getSegmentFromStorage, isRealEstateSegment } from '@/lib/segmentConfig';
 
 type Tab = 'atendente' | 'servicos' | 'horarios';
 
@@ -19,6 +20,8 @@ export default function AtendentePage() {
   const [tab, setTab] = useState<Tab>('atendente');
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Imobiliário: só a atendente (o catálogo fica em Imóveis).
+  const [realEstate, setRealEstate] = useState<boolean | null>(null);
 
   const loadServices = useCallback(async () => {
     try {
@@ -36,11 +39,23 @@ export default function AtendentePage() {
   }, []);
 
   useEffect(() => {
+    const isRealEstate = isRealEstateSegment(getSegmentFromStorage());
+    setRealEstate(isRealEstate);
+    if (isRealEstate) return;
     loadServices();
     // Link "cadastre um serviço" da Agenda abre direto na aba certa.
     const aba = new URLSearchParams(window.location.search).get('aba');
     if (aba === 'servicos' || aba === 'horarios') setTab(aba);
   }, [loadServices]);
+
+  if (realEstate === null) return null;
+  if (realEstate) {
+    return (
+      <div className="space-y-4 w-full font-sans">
+        <AssistantTab services={[]} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 w-full font-sans">

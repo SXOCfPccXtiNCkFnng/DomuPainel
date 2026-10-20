@@ -23,6 +23,8 @@ import {
   type AssistantSettings,
 } from '@/lib/assistantPrompt';
 import type { ServiceItem } from '@/lib/scheduling';
+import { REAL_ESTATE_EXTRA_INFO_PLACEHOLDER } from '@/lib/realEstatePrompt';
+import type { RealEstateMode } from '@/lib/realEstate';
 import { agendaInputClass } from './agendaStyles';
 
 const EXTRA_INFO_PLACEHOLDER = `Ex.:
@@ -55,6 +57,9 @@ export default function AssistantTab({
   const [aiAvailable, setAiAvailable] = useState(true);
   const [promoAvailable, setPromoAvailable] = useState(true);
   const [quota, setQuota] = useState<{ planName: string; limit: number; used: number } | null>(null);
+  const [vertical, setVertical] = useState<'automotivo' | 'imobiliario' | null>(null);
+  const [mode, setMode] = useState<RealEstateMode | null>(null);
+  const [readyCount, setReadyCount] = useState(0);
   const [canEdit, setCanEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -77,6 +82,9 @@ export default function AssistantTab({
         setAiAvailable(Boolean(json.aiAvailable));
         setQuota(json.quota || null);
         setPromoAvailable(json.promoAvailable !== false);
+        setVertical(json.vertical || null);
+        setMode(json.mode || null);
+        setReadyCount(Number(json.readyCount) || 0);
         setCanEdit(Boolean(json.canEdit));
       } catch {
         setError('Não foi possível carregar a atendente.');
@@ -138,8 +146,18 @@ export default function AssistantTab({
 
   const dirty = JSON.stringify(form) !== JSON.stringify(saved) || companyName.trim() !== savedCompanyName;
   const disabled = !canEdit;
-  const activeServices = services.filter((s) => s.active).length;
-  const knowledge = [
+  const realEstate = vertical === 'imobiliario';
+  const business = realEstate ? 'imobiliária' : 'loja';
+  const activeServices = realEstate ? readyCount : services.filter((s) => s.active).length;
+  const knowledge = realEstate
+    ? [
+        { done: readyCount > 0, label: readyCount ? `${readyCount} imóveis disponíveis` : 'Nenhum imóvel disponível' },
+        { done: Boolean(form.address.trim()), label: form.address.trim() ? 'Endereço da imobiliária' : 'Endereço não informado' },
+        { done: Boolean(form.extra_info.trim()), label: 'Informações e regras (financiamento, documentos...)' },
+        { done: Boolean(activePromo(form)), label: activePromo(form) ? 'Destaque em andamento' : 'Nenhum destaque ativo' },
+        { done: true, label: 'O que cada cliente já contou que procura' },
+      ]
+    : [
     { done: activeServices > 0, label: activeServices ? `${activeServices} serviços ativos` : 'Nenhum serviço cadastrado' },
     { done: true, label: 'Horário de funcionamento e horários livres da agenda' },
     { done: Boolean(form.address.trim()), label: form.address.trim() ? 'Endereço' : 'Endereço não informado' },
@@ -152,7 +170,7 @@ export default function AssistantTab({
       done: Boolean(activePromo(form)),
       label: activePromo(form) ? 'Promoção em andamento' : 'Nenhuma promoção ativa',
     },
-  ];
+      ];
 
   const promoExpired = Boolean(form.promo_text.trim() && !activePromo(form));
   const promoStatus = promoExpired
@@ -176,9 +194,9 @@ export default function AssistantTab({
       <p className="text-[11px] text-slate-600 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 flex items-start gap-2">
         <Info className="w-4 h-4 shrink-0 text-domu-blue" />
         <span>
-          A atendente responde seus clientes no WhatsApp como alguém da equipe, focada no lava rápido. Você ajusta o
-          jeito dela e o que ela sabe; as regras de atendimento (não inventar preço, só oferecer horário livre,
-          confirmar antes de marcar) ficam sempre ligadas.
+          {realEstate
+            ? 'A atendente responde seus clientes no WhatsApp como alguém da imobiliária: entende o que cada um procura e apresenta os imóveis do seu catálogo. Você ajusta o jeito dela e o que ela sabe; as regras (só falar de imóvel cadastrado, não negociar valor, não prometer financiamento) ficam sempre ligadas.'
+            : 'A atendente responde seus clientes no WhatsApp como alguém da equipe, focada no lava rápido. Você ajusta o jeito dela e o que ela sabe; as regras de atendimento (não inventar preço, só oferecer horário livre, confirmar antes de marcar) ficam sempre ligadas.'}
           {!aiAvailable && ' A atendente ainda não foi liberada no servidor (falta a GEMINI_API_KEY).'}
         </span>
       </p>
@@ -194,14 +212,25 @@ export default function AssistantTab({
             {form.enabled ? 'Atendente ligada no WhatsApp' : 'Atendente desligada'}
           </h2>
           <p className="text-[11px] text-slate-600 leading-relaxed">
-            {form.enabled
-              ? 'Ela responde a qualquer hora e marca horários sozinha. Quando alguém da equipe responde pelo celular, ela fica quieta naquela conversa por 12 horas. Se o cliente reclamar ou pedir uma pessoa, ela avisa você aqui no painel e por e-mail.'
-              : 'Ligue para ela começar a responder as mensagens que chegarem no WhatsApp conectado.'}
+            {!form.enabled
+              ? 'Ligue para ela começar a responder as mensagens que chegarem no WhatsApp conectado.'
+              : realEstate
+                ? 'Ela responde a qualquer hora. Quando passa o cliente para o corretor, avisa você aqui no painel e por e-mail e fica quieta naquela conversa por 12 horas (o mesmo vale quando alguém da equipe responde pelo celular).'
+                : 'Ela responde a qualquer hora e marca horários sozinha. Quando alguém da equipe responde pelo celular, ela fica quieta naquela conversa por 12 horas. Se o cliente reclamar ou pedir uma pessoa, ela avisa você aqui no painel e por e-mail.'}
           </p>
           {!form.enabled && activeServices === 0 && (
             <p className="text-[11px] text-amber-700">
-              Cadastre pelo menos um serviço antes de ligar.{' '}
-              {onGoToServices && (
+              {realEstate ? (
+                <>
+                  Cadastre pelo menos um imóvel disponível antes de ligar.{' '}
+                  <Link href="/imoveis" className="font-bold underline">
+                    Cadastrar imóveis
+                  </Link>
+                </>
+              ) : (
+                'Cadastre pelo menos um serviço antes de ligar. '
+              )}
+              {!realEstate && onGoToServices && (
                 <button type="button" onClick={onGoToServices} className="font-bold underline">
                   Cadastrar serviços
                 </button>
@@ -228,6 +257,27 @@ export default function AssistantTab({
       </section>
       {form.enabled !== saved.enabled && (
         <p className="text-[11px] text-amber-700">Clique em “Salvar atendente” para aplicar.</p>
+      )}
+
+      {realEstate && mode && (
+        <section className="bg-white rounded-2xl border border-slate-200/80 p-4 space-y-1.5">
+          <h2 className="text-xs font-black text-slate-900">
+            {mode === 'COMPLETO' ? 'Atendimento completo (seu plano)' : 'Primeiro atendimento (seu plano)'}
+          </h2>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            {mode === 'COMPLETO'
+              ? 'Ela entende o que o cliente procura, mostra os imóveis, tira as dúvidas e anota o pedido de visita para você confirmar em Visitas. Negociação, proposta e financiamento ela passa para o corretor.'
+              : 'Ela entende o que o cliente procura, mostra os imóveis compatíveis e passa o cliente para o corretor quando ele se interessa por um imóvel ou quer visitar.'}
+          </p>
+          {mode !== 'COMPLETO' && (
+            <p className="text-[11px] text-slate-500">
+              No Pro ela conduz a conversa até o pedido de visita.{' '}
+              <Link href="/assinatura" className="font-bold text-domu-blue underline">
+                Ver planos
+              </Link>
+            </p>
+          )}
+        </section>
       )}
 
       {quota && (
@@ -334,19 +384,24 @@ export default function AssistantTab({
                   onChange={(e) => update({ show_prices: e.target.checked })}
                   className="rounded border-slate-300 text-domu-blue focus:ring-domu-blue"
                 />
-                Informar preços dos serviços
+                {realEstate ? 'Informar valores dos imóveis' : 'Informar preços dos serviços'}
               </label>
             </div>
             {!form.show_prices && (
               <p className="text-[10.5px] text-slate-500">
-                Sem preços, ela explica que o valor depende do carro e é passado pela equipe.
+                {realEstate
+                  ? 'Sem valores, ela diz que o corretor passa os valores e as condições.'
+                  : 'Sem preços, ela explica que o valor depende do carro e é passado pela equipe.'}
               </p>
             )}
           </section>
 
           <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
-            <h2 className="text-sm font-black text-slate-900">O que ela sabe sobre a loja</h2>
-            <Field label="Nome da loja" hint="É assim que a atendente apresenta a loja. Também aparece no topo do painel.">
+            <h2 className="text-sm font-black text-slate-900">O que ela sabe sobre a {business}</h2>
+            <Field
+              label={`Nome da ${business}`}
+              hint={`É assim que a atendente apresenta a ${business}. Também aparece no topo do painel.`}
+            >
               <input
                 value={companyName}
                 maxLength={COMPANY_NAME_MAX}
@@ -355,18 +410,22 @@ export default function AssistantTab({
                   setCompanyName(e.target.value);
                   setNotice(null);
                 }}
-                placeholder="Ex.: Brilho Car Estética Automotiva"
+                placeholder={realEstate ? 'Ex.: Horizonte Imóveis' : 'Ex.: Brilho Car Estética Automotiva'}
                 className={agendaInputClass}
               />
             </Field>
-            <Field label="Sobre a loja" hint={`${form.about.length}/${ABOUT_MAX}`}>
+            <Field label={`Sobre a ${business}`} hint={`${form.about.length}/${ABOUT_MAX}`}>
               <textarea
                 value={form.about}
                 rows={2}
                 maxLength={ABOUT_MAX}
                 disabled={disabled}
                 onChange={(e) => update({ about: e.target.value })}
-                placeholder="Ex.: Lava rápido e estética automotiva há 8 anos, especialistas em polimento e vitrificação."
+                placeholder={
+                  realEstate
+                    ? 'Ex.: Imobiliária há 15 anos em Ribeirão Preto, especialista em apartamentos na zona sul e lançamentos.'
+                    : 'Ex.: Lava rápido e estética automotiva há 8 anos, especialistas em polimento e vitrificação.'
+                }
                 className={`${agendaInputClass} resize-y`}
               />
             </Field>
@@ -376,10 +435,13 @@ export default function AssistantTab({
                 maxLength={ADDRESS_MAX}
                 disabled={disabled}
                 onChange={(e) => update({ address: e.target.value })}
-                placeholder="Ex.: Av. Brasil, 1200 — Centro, Campinas (ao lado do posto)"
+                placeholder={
+                  realEstate ? 'Ex.: Rua Garibaldi, 500 — Centro, Ribeirão Preto' : 'Ex.: Av. Brasil, 1200 — Centro, Campinas (ao lado do posto)'
+                }
                 className={agendaInputClass}
               />
             </Field>
+            {!realEstate && (
             <div className="space-y-1.5">
               <span className="block text-[11px] font-bold text-slate-600">Formas de pagamento</span>
               <div className="flex flex-wrap gap-1.5">
@@ -400,9 +462,10 @@ export default function AssistantTab({
                 ))}
               </div>
             </div>
+            )}
             <Field
               label="Informações e regras (fixas)"
-              hint={`Escreva fatos e regras da loja, um por linha. ${form.extra_info.length}/${EXTRA_INFO_MAX}`}
+              hint={`Escreva fatos e regras da ${business}, um por linha. ${form.extra_info.length}/${EXTRA_INFO_MAX}`}
             >
               <textarea
                 value={form.extra_info}
@@ -410,7 +473,7 @@ export default function AssistantTab({
                 maxLength={EXTRA_INFO_MAX}
                 disabled={disabled}
                 onChange={(e) => update({ extra_info: e.target.value })}
-                placeholder={EXTRA_INFO_PLACEHOLDER}
+                placeholder={realEstate ? REAL_ESTATE_EXTRA_INFO_PLACEHOLDER : EXTRA_INFO_PLACEHOLDER}
                 className={`${agendaInputClass} resize-y leading-relaxed`}
               />
             </Field>
@@ -419,7 +482,9 @@ export default function AssistantTab({
           <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Megaphone className="w-4 h-4 text-domu-blue" />
-              <h2 className="text-sm font-black text-slate-900">Boas-vindas e promoção</h2>
+              <h2 className="text-sm font-black text-slate-900">
+                {realEstate ? 'Boas-vindas e destaque' : 'Boas-vindas e promoção'}
+              </h2>
             </div>
             {!promoAvailable && (
               <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
@@ -436,12 +501,16 @@ export default function AssistantTab({
                 maxLength={GREETING_MAX}
                 disabled={disabled || !promoAvailable}
                 onChange={(e) => update({ greeting: e.target.value })}
-                placeholder={`Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua loja'}. Seu carro merece um trato hoje? Como posso te ajudar?`}
+                placeholder={
+                  realEstate
+                    ? `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua imobiliária'}. Está procurando imóvel para comprar ou alugar?`
+                    : `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua loja'}. Seu carro merece um trato hoje? Como posso te ajudar?`
+                }
                 className={`${agendaInputClass} resize-y`}
               />
             </Field>
             <Field
-              label="Promoção"
+              label={realEstate ? 'Destaque ou condição especial' : 'Promoção'}
               hint={`Escreva o que é, o valor e as condições. A atendente só oferece exatamente isso. ${form.promo_text.length}/${PROMO_MAX}`}
             >
               <textarea
@@ -450,7 +519,11 @@ export default function AssistantTab({
                 maxLength={PROMO_MAX}
                 disabled={disabled || !promoAvailable}
                 onChange={(e) => update({ promo_text: e.target.value })}
-                placeholder="Ex.: Lavagem completa + cera por R$ 70,00, de segunda a quarta. Não vale para caminhonete."
+                placeholder={
+                  realEstate
+                    ? 'Ex.: Lançamento Residencial Vista Verde: entrada facilitada em 60x até 30/11.'
+                    : 'Ex.: Lavagem completa + cera por R$ 70,00, de segunda a quarta. Não vale para caminhonete.'
+                }
                 className={`${agendaInputClass} resize-y`}
               />
             </Field>
@@ -499,8 +572,8 @@ export default function AssistantTab({
             <h2 className="text-sm font-black text-slate-900">Prévia do tom</h2>
             <WhatsAppPreview
               compact
-              bodyText={sampleGreeting(form, companyName || 'sua loja')}
-              contactName={companyName || 'Sua loja'}
+              bodyText={sampleGreeting(form, companyName || `sua ${business}`, { realEstate })}
+              contactName={companyName || (realEstate ? 'Sua imobiliária' : 'Sua loja')}
               companyLabel={form.assistant_name ? `Atendimento · ${form.assistant_name}` : 'Atendimento'}
             />
             <p className="text-[10.5px] text-slate-400">
