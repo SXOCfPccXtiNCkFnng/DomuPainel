@@ -372,8 +372,8 @@ export default function OnboardingPage() {
         'Lembrete antes do horário (menos faltas)',
         'Campanhas para o cliente voltar',
       ],
-      color: 'text-amber-600',
-      borderColor: 'border-amber-500',
+      color: 'text-rose-600',
+      borderColor: 'border-rose-500',
       available: true,
     },
     {
@@ -406,6 +406,12 @@ export default function OnboardingPage() {
       available: false,
     },
   ];
+  const SEGMENT_ORDER: TenantSegment[] = ['imobiliario', 'automotivo', 'saude', 'marketing_apenas'];
+  const segmentRank = (id: TenantSegment) => {
+    const i = SEGMENT_ORDER.indexOf(id);
+    return i === -1 ? SEGMENT_ORDER.length : i;
+  };
+  segments.sort((a, b) => segmentRank(a.id) - segmentRank(b.id));
 
   const handleSaveMetaCredentials = async () => {
     setStep4Error('');
