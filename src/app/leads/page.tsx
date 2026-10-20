@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Bot, Building2, Loader2, MessageCircle, Search, UserRound } from 'lucide-react';
+import { AlertCircle, Bot, BotOff, Building2, Loader2, MessageCircle, Search, UserRound } from 'lucide-react';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { agendaInputClass } from '@/components/agenda/agendaStyles';
 import { formatPhoneBR } from '@/lib/validators';
@@ -22,7 +22,17 @@ type LeadRow = {
   last_contact_at: string | null;
   updated_at: string | null;
   assistant_paused_until: string | null;
+  assistant_state?: 'OFF' | 'WITH_TEAM' | 'ACTIVE';
+  assistant_back_at?: string | null;
 };
+
+const backAtFormatter = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  day: '2-digit',
+  month: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 const STAGE_STYLES: Record<LeadStage, string> = {
   NOVO: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -54,6 +64,8 @@ export default function LeadsPage() {
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<LeadStage | ''>('');
   const [search, setSearch] = useState('');
+  const [controlAvailable, setControlAvailable] = useState(true);
+  const [busyLead, setBusyLead] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +76,7 @@ export default function LeadsPage() {
         return;
       }
       setLeads(json.leads || []);
+      setControlAvailable(json.controlAvailable !== false);
       setError(null);
     } catch {
       setError('Não foi possível carregar os leads.');
@@ -108,8 +121,37 @@ export default function LeadsPage() {
     }
   };
 
+  const controlAssistant = async (lead: LeadRow, action: 'resume' | 'disable') => {
+    setBusyLead(lead.id);
+    try {
+      const res = await fetch('/api/real-estate/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: lead.id, assistant: action }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!json.success) {
+        setError(json.error || 'Não foi possível alterar a atendente neste lead.');
+        return;
+      }
+      setLeads((list) =>
+        list.map((l) =>
+          l.id === lead.id
+            ? { ...l, assistant_state: action === 'resume' ? 'ACTIVE' : 'OFF', assistant_back_at: null }
+            : l
+        )
+      );
+    } finally {
+      setBusyLead(null);
+    }
+  };
+
   return (
     <div className="space-y-4 w-full font-sans">
+      <p className="text-[11px] text-slate-500 bg-white border border-slate-200/80 rounded-xl px-3 py-2 leading-relaxed">
+        Quando a atendente passa o cliente para o corretor, ou quando alguém da equipe responde, ela fica 12 horas sem
+        responder aquele cliente. Em cada lead dá para devolver o cliente para ela antes disso ou desligá-la só para ele.
+      </p>
       <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
@@ -175,7 +217,7 @@ export default function LeadsPage() {
           {visible.map((l) => {
             const current = stageOf(l.status);
             const interest = interestSummary(l);
-            const handedOff = l.assistant_paused_until && new Date(l.assistant_paused_until) > new Date();
+            const state = l.assistant_state || 'ACTIVE';
             return (
               <div key={l.id} className="p-4 flex flex-col md:flex-row md:items-start gap-3">
                 <div className="flex-1 min-w-0 space-y-1">
@@ -184,9 +226,15 @@ export default function LeadsPage() {
                     <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${STAGE_STYLES[current]}`}>
                       {LEAD_STAGE_LABELS[current]}
                     </span>
-                    {handedOff && (
+                    {state === 'WITH_TEAM' && (
                       <span className="px-1.5 py-0.5 rounded border text-[10px] font-bold bg-amber-50 text-amber-700 border-amber-200">
-                        Aguardando corretor
+                        Com o corretor
+                        {l.assistant_back_at ? ` · atendente volta ${backAtFormatter.format(new Date(l.assistant_back_at))}` : ''}
+                      </span>
+                    )}
+                    {state === 'OFF' && (
+                      <span className="px-1.5 py-0.5 rounded border text-[10px] font-bold bg-slate-100 text-slate-500 border-slate-200">
+                        Atendente desligada
                       </span>
                     )}
                   </p>
@@ -227,6 +275,31 @@ export default function LeadsPage() {
                   >
                     <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                   </a>
+                  {controlAvailable && (
+                    <div className="flex flex-wrap gap-1 md:justify-end">
+                      {state !== 'ACTIVE' && (
+                        <button
+                          type="button"
+                          disabled={busyLead === l.id}
+                          onClick={() => controlAssistant(l, 'resume')}
+                          className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-domu-blue hover:bg-blue-50 flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Bot className="w-3.5 h-3.5" />
+                          {state === 'OFF' ? 'Ligar atendente' : 'Devolver para a atendente'}
+                        </button>
+                      )}
+                      {state !== 'OFF' && (
+                        <button
+                          type="button"
+                          disabled={busyLead === l.id}
+                          onClick={() => controlAssistant(l, 'disable')}
+                          className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <BotOff className="w-3.5 h-3.5" /> Desligar atendente
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );

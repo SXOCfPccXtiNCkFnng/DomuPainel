@@ -27,7 +27,8 @@ export type SkipReason =
   | 'PAUSED_BY_HANDOFF'
   | 'HUMAN_REPLIED'
   | 'RATE_LIMIT'
-  | 'OPT_OUT';
+  | 'OPT_OUT'
+  | 'DISABLED_FOR_CONTACT';
 
 export function shouldAssistantReply(input: {
   enabled: boolean;
@@ -37,12 +38,18 @@ export function shouldAssistantReply(input: {
   repliesLastHour: number;
   isOptOut: boolean;
   now: Date;
+  /** Desligada neste contato pela página Leads. */
+  disabledForContact?: boolean;
+  /** "Devolver para a atendente": resposta da equipe antes disso não pausa mais. */
+  resumedAt?: Date | null;
 }): { reply: true } | { reply: false; reason: SkipReason } {
   if (!input.automotive) return { reply: false, reason: 'WRONG_SEGMENT' };
   if (!input.enabled) return { reply: false, reason: 'DISABLED' };
+  if (input.disabledForContact) return { reply: false, reason: 'DISABLED_FOR_CONTACT' };
   if (input.isOptOut) return { reply: false, reason: 'OPT_OUT' };
   if (input.pausedUntil && input.pausedUntil > input.now) return { reply: false, reason: 'PAUSED_BY_HANDOFF' };
-  if (input.lastHumanReplyAt && input.now.getTime() - input.lastHumanReplyAt.getTime() < HUMAN_PAUSE_MS) {
+  const humanCounts = input.lastHumanReplyAt && (!input.resumedAt || input.lastHumanReplyAt > input.resumedAt);
+  if (humanCounts && input.now.getTime() - input.lastHumanReplyAt!.getTime() < HUMAN_PAUSE_MS) {
     return { reply: false, reason: 'HUMAN_REPLIED' };
   }
   if (input.repliesLastHour >= MAX_REPLIES_PER_HOUR) return { reply: false, reason: 'RATE_LIMIT' };

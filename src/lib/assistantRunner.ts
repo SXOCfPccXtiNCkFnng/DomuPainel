@@ -291,6 +291,26 @@ async function recordRun(trigger: AssistantTrigger, run: RunRecord): Promise<voi
   }
 }
 
+type LeadForAssistant = {
+  name: string;
+  phone: string;
+  assistant_paused_until: string | null;
+  assistant_disabled?: boolean | null;
+  assistant_resumed_at?: string | null;
+};
+
+/** Contato com o controle da atendente (sem a migration 20261022, segue sem ele). */
+async function loadLeadForAssistant(tenantId: string, leadId: string): Promise<{ data: LeadForAssistant | null }> {
+  const select = (columns: string) =>
+    supabaseAdmin.from('leads').select(columns).eq('id', leadId).eq('tenant_id', tenantId).maybeSingle();
+  const full = await select('name, phone, assistant_paused_until, assistant_disabled, assistant_resumed_at');
+  if (full.error?.code === '42703') {
+    const basic = await select('name, phone, assistant_paused_until');
+    return { data: (basic.data as LeadForAssistant | null) ?? null };
+  }
+  return { data: (full.data as LeadForAssistant | null) ?? null };
+}
+
 type Vertical = 'automotivo' | 'imobiliario';
 
 /** Ramos que têm atendente de IA. */
@@ -412,12 +432,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
 
     const now = new Date();
     const [leadRes, historyRes, humanRes, botCountRes] = await Promise.all([
-      supabaseAdmin
-        .from('leads')
-        .select('name, phone, assistant_paused_until')
-        .eq('id', leadId)
-        .eq('tenant_id', tenantId)
-        .maybeSingle(),
+      loadLeadForAssistant(tenantId, leadId),
       supabaseAdmin
         .from('chat_messages')
         .select('direction, sender_type, body, created_at')
@@ -460,6 +475,8 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       repliesLastHour: botCountRes.count ?? 0,
       isOptOut: isOptOutMessage(lastMessage.body || ''),
       now,
+      disabledForContact: Boolean(lead.assistant_disabled),
+      resumedAt: lead.assistant_resumed_at ? new Date(lead.assistant_resumed_at) : null,
     });
     if (!decision.reply) {
       if (decision.reason === 'RATE_LIMIT') {

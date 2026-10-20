@@ -32,6 +32,26 @@ describe('shouldAssistantReply', () => {
     expect(shouldAssistantReply({ ...base, automotive: false })).toEqual({ reply: false, reason: 'WRONG_SEGMENT' });
   });
 
+  it('desligada no contato pela página Leads não responde', () => {
+    expect(shouldAssistantReply({ ...base, disabledForContact: true })).toEqual({
+      reply: false,
+      reason: 'DISABLED_FOR_CONTACT',
+    });
+  });
+
+  it('"devolver para a atendente" ignora resposta da equipe anterior', () => {
+    const humanAt = new Date(now.getTime() - 60 * 60_000);
+    expect(shouldAssistantReply({ ...base, lastHumanReplyAt: humanAt })).toEqual({ reply: false, reason: 'HUMAN_REPLIED' });
+    const resumedAfter = new Date(now.getTime() - 30 * 60_000);
+    expect(shouldAssistantReply({ ...base, lastHumanReplyAt: humanAt, resumedAt: resumedAfter })).toEqual({ reply: true });
+    // Equipe respondeu de novo depois de devolver: pausa outra vez.
+    const resumedBefore = new Date(now.getTime() - 2 * 60 * 60_000);
+    expect(shouldAssistantReply({ ...base, lastHumanReplyAt: humanAt, resumedAt: resumedBefore })).toEqual({
+      reply: false,
+      reason: 'HUMAN_REPLIED',
+    });
+  });
+
   it('fica quieta 12h depois que alguém da equipe respondeu', () => {
     const recent = new Date(now.getTime() - HUMAN_PAUSE_MS + 60_000);
     const old = new Date(now.getTime() - HUMAN_PAUSE_MS - 60_000);
