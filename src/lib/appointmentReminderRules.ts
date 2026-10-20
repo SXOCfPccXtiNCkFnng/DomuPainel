@@ -55,12 +55,13 @@ function firstName(name: string | null | undefined): string {
 export type ReminderParams = { name: string | null; service: string; time: string };
 
 /** Texto livre (dentro da janela de 24h). */
-export function reminderText(kind: ReminderKind, p: ReminderParams): string {
+/** emoji: o do ramo (lava rápido usa o carro; saúde e beleza, nenhum). */
+export function reminderText(kind: ReminderKind, p: ReminderParams, emoji = ' 🚗'): string {
   const hi = firstName(p.name) ? `Oi, ${firstName(p.name)}!` : 'Oi!';
   if (kind === 'HOUR') {
-    return `${hi} Passando para lembrar do seu horário de ${p.service} hoje às ${p.time} 🚗\nSe precisar remarcar, é só responder aqui.`;
+    return `${hi} Passando para lembrar do seu horário de ${p.service} hoje às ${p.time}${emoji}\nSe precisar remarcar, é só responder aqui.`;
   }
-  return `${hi} Seu horário de ${p.service} é daqui a pouco, às ${p.time}. Estamos te esperando! 🚗`;
+  return `${hi} Seu horário de ${p.service} é daqui a pouco, às ${p.time}. Estamos te esperando!${emoji}`;
 }
 
 /**

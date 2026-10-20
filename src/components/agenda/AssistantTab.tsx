@@ -24,14 +24,10 @@ import {
 } from '@/lib/assistantPrompt';
 import type { ServiceItem } from '@/lib/scheduling';
 import { REAL_ESTATE_EXTRA_INFO_PLACEHOLDER } from '@/lib/realEstatePrompt';
+import { SCHEDULING_COPY } from '@/lib/schedulingVerticals';
 import type { RealEstateMode } from '@/lib/realEstate';
 import { agendaInputClass } from './agendaStyles';
 
-const EXTRA_INFO_PLACEHOLDER = `Ex.:
-- Não lavamos motor.
-- Em dia de chuva, remarcamos sem custo.
-- Carro muito sujo (barro, pelo de pet) pode ter valor adicional.
-- Temos sala de espera com café e Wi-Fi.`;
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -57,7 +53,7 @@ export default function AssistantTab({
   const [aiAvailable, setAiAvailable] = useState(true);
   const [promoAvailable, setPromoAvailable] = useState(true);
   const [quota, setQuota] = useState<{ planName: string; limit: number; used: number } | null>(null);
-  const [vertical, setVertical] = useState<'automotivo' | 'imobiliario' | null>(null);
+  const [vertical, setVertical] = useState<'automotivo' | 'saude' | 'imobiliario' | null>(null);
   const [mode, setMode] = useState<RealEstateMode | null>(null);
   const [readyCount, setReadyCount] = useState(0);
   const [canEdit, setCanEdit] = useState(false);
@@ -148,6 +144,9 @@ export default function AssistantTab({
   const disabled = !canEdit;
   const realEstate = vertical === 'imobiliario';
   const business = realEstate ? 'imobiliária' : 'loja';
+  // Lava rápido ou saúde e beleza: mesmos campos, vocabulário do ramo.
+  const schedulingVertical = vertical === 'saude' ? 'saude' : 'automotivo';
+  const copy = SCHEDULING_COPY[schedulingVertical];
   const activeServices = realEstate ? readyCount : services.filter((s) => s.active).length;
   const knowledge = realEstate
     ? [
@@ -196,7 +195,7 @@ export default function AssistantTab({
         <span>
           {realEstate
             ? 'A atendente responde seus clientes no WhatsApp como alguém da imobiliária: entende o que cada um procura e apresenta os imóveis do seu catálogo. Você ajusta o jeito dela e o que ela sabe; as regras (só falar de imóvel cadastrado, não negociar valor, não prometer financiamento) ficam sempre ligadas.'
-            : 'A atendente responde seus clientes no WhatsApp como alguém da equipe, focada no lava rápido. Você ajusta o jeito dela e o que ela sabe; as regras de atendimento (não inventar preço, só oferecer horário livre, confirmar antes de marcar) ficam sempre ligadas.'}
+            : copy.assistantIntro}
           {!aiAvailable && ' A atendente ainda não foi liberada no servidor (falta a GEMINI_API_KEY).'}
         </span>
       </p>
@@ -391,7 +390,7 @@ export default function AssistantTab({
               <p className="text-[10.5px] text-slate-500">
                 {realEstate
                   ? 'Sem valores, ela diz que o corretor passa os valores e as condições.'
-                  : 'Sem preços, ela explica que o valor depende do carro e é passado pela equipe.'}
+                  : `Sem preços, ela explica que ${copy.priceHidden}.`}
               </p>
             )}
           </section>
@@ -410,7 +409,7 @@ export default function AssistantTab({
                   setCompanyName(e.target.value);
                   setNotice(null);
                 }}
-                placeholder={realEstate ? 'Ex.: Horizonte Imóveis' : 'Ex.: Brilho Car Estética Automotiva'}
+                placeholder={realEstate ? 'Ex.: Horizonte Imóveis' : copy.companyPlaceholder}
                 className={agendaInputClass}
               />
             </Field>
@@ -424,7 +423,7 @@ export default function AssistantTab({
                 placeholder={
                   realEstate
                     ? 'Ex.: Imobiliária há 15 anos em Ribeirão Preto, especialista em apartamentos na zona sul e lançamentos.'
-                    : 'Ex.: Lava rápido e estética automotiva há 8 anos, especialistas em polimento e vitrificação.'
+                    : copy.aboutPlaceholder
                 }
                 className={`${agendaInputClass} resize-y`}
               />
@@ -436,7 +435,7 @@ export default function AssistantTab({
                 disabled={disabled}
                 onChange={(e) => update({ address: e.target.value })}
                 placeholder={
-                  realEstate ? 'Ex.: Rua Garibaldi, 500 — Centro, Ribeirão Preto' : 'Ex.: Av. Brasil, 1200 — Centro, Campinas (ao lado do posto)'
+                  realEstate ? 'Ex.: Rua Garibaldi, 500 — Centro, Ribeirão Preto' : copy.addressPlaceholder
                 }
                 className={agendaInputClass}
               />
@@ -473,7 +472,7 @@ export default function AssistantTab({
                 maxLength={EXTRA_INFO_MAX}
                 disabled={disabled}
                 onChange={(e) => update({ extra_info: e.target.value })}
-                placeholder={realEstate ? REAL_ESTATE_EXTRA_INFO_PLACEHOLDER : EXTRA_INFO_PLACEHOLDER}
+                placeholder={realEstate ? REAL_ESTATE_EXTRA_INFO_PLACEHOLDER : copy.extraInfoPlaceholder}
                 className={`${agendaInputClass} resize-y leading-relaxed`}
               />
             </Field>
@@ -504,7 +503,7 @@ export default function AssistantTab({
                 placeholder={
                   realEstate
                     ? `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua imobiliária'}. Está procurando imóvel para comprar ou alugar?`
-                    : `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua loja'}. Seu carro merece um trato hoje? Como posso te ajudar?`
+                    : copy.greetingPlaceholder(form.assistant_name || 'a Bia', companyName || 'sua loja')
                 }
                 className={`${agendaInputClass} resize-y`}
               />
@@ -522,7 +521,7 @@ export default function AssistantTab({
                 placeholder={
                   realEstate
                     ? 'Ex.: Lançamento Residencial Vista Verde: entrada facilitada em 60x até 30/11.'
-                    : 'Ex.: Lavagem completa + cera por R$ 70,00, de segunda a quarta. Não vale para caminhonete.'
+                    : copy.promoPlaceholder
                 }
                 className={`${agendaInputClass} resize-y`}
               />
@@ -572,7 +571,7 @@ export default function AssistantTab({
             <h2 className="text-sm font-black text-slate-900">Prévia do tom</h2>
             <WhatsAppPreview
               compact
-              bodyText={sampleGreeting(form, companyName || `sua ${business}`, { realEstate })}
+              bodyText={sampleGreeting(form, companyName || `sua ${business}`, { realEstate, vertical: schedulingVertical })}
               contactName={companyName || (realEstate ? 'Sua imobiliária' : 'Sua loja')}
               companyLabel={form.assistant_name ? `Atendimento · ${form.assistant_name}` : 'Atendimento'}
             />

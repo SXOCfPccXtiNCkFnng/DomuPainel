@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import { useSchedulingCopy } from '@/hooks/useSchedulingCopy';
 import { formatPhoneBR } from '@/lib/validators';
 import {
   addDaysToKey,
@@ -80,6 +81,7 @@ export default function AppointmentsTab({
   services: ServiceItem[];
   onGoToServices: () => void;
 }) {
+  const { copy } = useSchedulingCopy();
   const todayKey = brtDateKey(new Date());
   const [date, setDate] = useState(todayKey);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -354,16 +356,18 @@ export default function AppointmentsTab({
                 className={agendaInputClass}
               />
             </label>
-            <label className="space-y-1.5">
-              <span className="block text-[11px] font-bold text-slate-600">Veículo</span>
-              <input
-                value={form.vehicle}
-                maxLength={VEHICLE_MAX}
-                onChange={(e) => setForm((f) => ({ ...f, vehicle: e.target.value }))}
-                placeholder="Ex.: Onix prata · ABC1D23"
-                className={agendaInputClass}
-              />
-            </label>
+            {copy.item && (
+              <label className="space-y-1.5">
+                <span className="block text-[11px] font-bold text-slate-600">Veículo</span>
+                <input
+                  value={form.vehicle}
+                  maxLength={VEHICLE_MAX}
+                  onChange={(e) => setForm((f) => ({ ...f, vehicle: e.target.value }))}
+                  placeholder="Ex.: Onix prata · ABC1D23"
+                  className={agendaInputClass}
+                />
+              </label>
+            )}
             <label className="space-y-1.5">
               <span className="block text-[11px] font-bold text-slate-600">Observações</span>
               <input

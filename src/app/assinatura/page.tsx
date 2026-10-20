@@ -27,9 +27,9 @@ import {
 import {
   BUSINESS_SEGMENT_OPTIONS,
   getSegmentFromStorage,
-  isAutomotiveSegment,
   isRealEstateSegment,
 } from '@/lib/segmentConfig';
+import { isSchedulingSegment } from '@/lib/schedulingVerticals';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
 
 type PlanFeature = { label: string; comingSoon?: boolean };
@@ -565,7 +565,7 @@ export default function AssinaturaPage() {
                       <span>Ativa as ferramentas do seu ramo</span>
                     </li>
                   )}
-                  {isAutomotiveSegment(segment) && (
+                  {isSchedulingSegment(segment) && (
                     <li className="flex items-start gap-2 text-xs text-slate-700 font-medium">
                       <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
                       <span>

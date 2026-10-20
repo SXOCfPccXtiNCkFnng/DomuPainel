@@ -22,8 +22,9 @@ import {
   getSegmentFromStorage,
   SEGMENT_WELCOME,
   isDispatchOnlySegment,
-  isAutomotiveSegment,
+  isRealEstateSegment,
 } from '@/lib/segmentConfig';
+import { isSchedulingSegment } from '@/lib/schedulingVerticals';
 import { getAuthItem } from '@/lib/authStorage';
 import FirstStepsChecklist from '@/components/dashboard/FirstStepsChecklist';
 import ComingSoonModal from '@/components/shared/ComingSoonModal';
@@ -140,7 +141,9 @@ export default function DashboardPage() {
 
   const welcomeMessage = SEGMENT_WELCOME[segment] || SEGMENT_WELCOME.geral;
   const dispatchOnly = isDispatchOnlySegment(segment);
-  const automotive = isAutomotiveSegment(segment);
+  // Ramos com agenda (lava rápido, saúde e beleza) e imobiliário têm atalhos próprios.
+  const scheduling = isSchedulingSegment(segment);
+  const realEstate = isRealEstateSegment(segment);
 
   // Números do painel atualizam sozinhos; o status da Meta só ao voltar para a
   // aba (consulta direto a Meta, que tem limite de chamadas).
@@ -237,7 +240,7 @@ export default function DashboardPage() {
               <FileText className="w-4 h-4" />
               Templates
             </Link>
-            {automotive ? (
+            {scheduling && (
               <Link
                 href="/agenda"
                 className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
@@ -245,35 +248,39 @@ export default function DashboardPage() {
                 <CalendarDays className="w-4 h-4" />
                 Ver agendamentos
               </Link>
-            ) : (
-            <button
-              type="button"
-              onClick={() => setComingSoonTitle('Leads e Respostas')}
-              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center justify-between gap-2 text-left"
-            >
-              <span className="inline-flex items-center gap-2">
-                <MessageSquareReply className="w-4 h-4" />
-                Ver quem respondeu
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-domu-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5">
-                Em breve
-              </span>
-            </button>
             )}
-            {!automotive && (
-            <button
-              type="button"
-              onClick={() => setComingSoonTitle('Imóveis')}
-              className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center justify-between gap-2 text-left"
-            >
-              <span className="inline-flex items-center gap-2">
-                <PlusCircle className="w-4 h-4" />
-                Cadastrar imóvel
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-domu-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5">
-                Em breve
-              </span>
-            </button>
+            {realEstate && (
+              <>
+                <Link
+                  href="/leads"
+                  className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
+                >
+                  <MessageSquareReply className="w-4 h-4" />
+                  Ver leads
+                </Link>
+                <Link
+                  href="/imoveis"
+                  className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-2"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Cadastrar imóvel
+                </Link>
+              </>
+            )}
+            {!scheduling && !realEstate && !dispatchOnly && (
+              <button
+                type="button"
+                onClick={() => setComingSoonTitle('Leads e Respostas')}
+                className="px-3 py-2.5 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center justify-between gap-2 text-left"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <MessageSquareReply className="w-4 h-4" />
+                  Ver quem respondeu
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-domu-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5">
+                  Em breve
+                </span>
+              </button>
             )}
             {dispatchOnly && (
               <Link

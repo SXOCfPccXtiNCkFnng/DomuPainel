@@ -364,17 +364,17 @@ export default function OnboardingPage() {
     {
       id: 'saude',
       title: 'Saúde, Clínicas e Beleza',
-      badge: 'Agenda e Retornos',
+      badge: 'Agenda e Lembretes',
       description:
-        'Confirmação de consultas, horários de barbearia e salão, lembretes de retorno e redução de faltas.',
+        'Barbearia, salão, manicure, estética, clínicas e dentistas: a atendente apresenta os serviços e marca horários pelo WhatsApp.',
       features: [
-        'Confirmação de agenda no WhatsApp',
-        'Lembretes de retorno e manutenção',
-        'Redução de faltas e no-shows',
+        'Agendamento automático pelo WhatsApp',
+        'Lembrete antes do horário (menos faltas)',
+        'Campanhas para o cliente voltar',
       ],
       color: 'text-amber-600',
       borderColor: 'border-amber-500',
-      available: false,
+      available: true,
     },
     {
       id: 'alimentacao',

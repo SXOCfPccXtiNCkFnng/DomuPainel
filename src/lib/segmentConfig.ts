@@ -1,5 +1,6 @@
 import { TenantSegment } from '@/types';
 import { getAuthItem } from '@/lib/authStorage';
+import { isSchedulingSegment, schedulingCopyFor } from '@/lib/schedulingVerticals';
 
 export const SEGMENT_LABELS: Record<TenantSegment, string> = {
   imobiliario: 'Imobiliário',
@@ -30,7 +31,7 @@ export const SEGMENT_WELCOME: Record<TenantSegment, string> = {
  */
 export const BUSINESS_SEGMENT_OPTIONS: { id: TenantSegment; label: string }[] = [
   { id: 'imobiliario', label: 'Imobiliário (imobiliárias e corretores)' },
-  { id: 'saude', label: 'Saúde e Beleza (barbearia, salão, clínica)' },
+  { id: 'saude', label: 'Saúde e Beleza (barbearia, salão, estética, clínicas, dentistas)' },
   { id: 'alimentacao', label: 'Alimentação (pizzaria, restaurante, delivery)' },
   { id: 'automotivo', label: 'Automotivo (lava rápido, estética automotiva)' },
   { id: 'ecommerce', label: 'E-commerce e Varejo' },
@@ -200,33 +201,36 @@ const REAL_ESTATE_NAV: NavSection[] = [
   },
 ];
 
-/** Lava rápido: menu pela rotina da loja (agenda e atendente primeiro). */
-const AUTOMOTIVE_NAV: NavSection[] = [
-  {
-    title: 'Atendimento',
-    items: [
-      { id: 'dashboard', name: 'Painel', href: '/', isComingSoon: false },
-      { id: 'agenda', name: 'Agenda', href: '/agenda', isComingSoon: false },
-      { id: 'atendente', name: 'Atendente IA', href: '/atendente', isComingSoon: false },
-      { id: 'servicos', name: 'Serviços e horários', href: '/servicos', isComingSoon: false },
-    ],
-  },
-  {
-    title: 'Marketing',
-    items: [
-      { id: 'disparos', name: 'Campanhas', href: '/disparos', isComingSoon: false },
-      { id: 'templates', name: 'Modelos de mensagem', href: '/templates', isComingSoon: false },
-      { id: 'contatos', name: 'Contatos', href: '/contatos', isComingSoon: false },
-    ],
-  },
-  REAL_ESTATE_NAV[2], // Resultados
-  REAL_ESTATE_NAV[3], // Conta
-];
+/** Ramos de agenda (lava rápido, saúde e beleza): menu pela rotina do dia (agenda e atendente primeiro). */
+function schedulingNav(segment: TenantSegment): NavSection[] {
+  const marketing: NavItemConfig[] = [
+    { id: 'disparos', name: 'Campanhas', href: '/disparos', isComingSoon: false },
+    ...(hasFollowUp(segment)
+      ? [{ id: 'followup' as const, name: 'Follow-up', href: '/follow-up', isComingSoon: false }]
+      : []),
+    { id: 'templates', name: 'Modelos de mensagem', href: '/templates', isComingSoon: false },
+    { id: 'contatos', name: 'Contatos', href: '/contatos', isComingSoon: false },
+  ];
+  return [
+    {
+      title: 'Atendimento',
+      items: [
+        { id: 'dashboard', name: 'Painel', href: '/', isComingSoon: false },
+        { id: 'agenda', name: 'Agenda', href: '/agenda', isComingSoon: false },
+        { id: 'atendente', name: 'Atendente IA', href: '/atendente', isComingSoon: false },
+        { id: 'servicos', name: 'Serviços e horários', href: '/servicos', isComingSoon: false },
+      ],
+    },
+    { title: 'Marketing', items: marketing },
+    REAL_ESTATE_NAV[2], // Resultados
+    REAL_ESTATE_NAV[3], // Conta
+  ];
+}
 
 /** Seções do menu lateral para o ramo da conta. */
 export function getNavSectionsForSegment(segment: TenantSegment): NavSection[] {
   if (isRealEstateSegment(segment)) return REAL_ESTATE_NAV;
-  if (isAutomotiveSegment(segment)) return AUTOMOTIVE_NAV;
+  if (isSchedulingSegment(segment)) return schedulingNav(segment);
   return [
     { title: 'Plataforma', items: getPlatformNavForSegment(segment) },
     { title: 'Administração', items: ADMIN_NAV },
@@ -240,7 +244,7 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
     if (item.segments && !item.segments.includes(segment)) return false;
     if (item.id === 'followup' && !hasFollowUp(segment)) return false;
     // No automotivo, a atendente do WhatsApp já funciona (página Atendente IA).
-    if (item.id === 'atendimento' && isAutomotiveSegment(segment)) return false;
+    if (item.id === 'atendimento' && isSchedulingSegment(segment)) return false;
     return true;
   }).map((item) => {
     if (dispatchOnly && item.id === 'metricas') {
@@ -347,10 +351,10 @@ const DISPATCH_ONLY_PAGE_TITLES: Record<string, { title: string; subtitle: strin
   },
 };
 
-const AUTOMOTIVE_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+const SCHEDULING_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/': {
     title: 'Painel',
-    subtitle: 'Disparos, respostas, clientes e lavagens agendadas',
+    subtitle: 'Disparos, respostas, clientes e horários marcados',
   },
   '/atendente': {
     title: 'Atendente IA',
@@ -366,11 +370,15 @@ const AUTOMOTIVE_PAGE_TITLES: Record<string, { title: string; subtitle: string }
   },
   '/contatos': {
     title: 'Contatos',
-    subtitle: 'Importação e listas por serviço, veículo e frequência de visita',
+    subtitle: 'Importação e listas por serviço e frequência de visita',
   },
   '/disparos': {
     title: 'Campanhas',
     subtitle: 'Promoção → público → agendar → enviar com status Meta',
+  },
+  '/follow-up': {
+    title: 'Follow-up',
+    subtitle: 'Mensagem automática para quem não respondeu',
   },
   '/templates': {
     title: 'Modelos de mensagem',
@@ -413,10 +421,15 @@ export function getPageTitle(
   pathname: string,
   segment?: TenantSegment | string | null
 ): { title: string; subtitle: string } {
+  const scheduling = isSchedulingSegment(segment);
   const override = isDispatchOnlySegment(segment || null)
     ? DISPATCH_ONLY_PAGE_TITLES
-    : isAutomotiveSegment(segment || null)
-      ? AUTOMOTIVE_PAGE_TITLES
+    : scheduling
+      ? {
+          ...SCHEDULING_PAGE_TITLES,
+          '/': { title: 'Painel', subtitle: schedulingCopyFor(segment).dashboardSubtitle },
+          '/contatos': { title: 'Contatos', subtitle: schedulingCopyFor(segment).contactsSubtitle },
+        }
       : isRealEstateSegment(segment || null)
         ? REAL_ESTATE_PAGE_TITLES
         : null;

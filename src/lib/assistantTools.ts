@@ -28,6 +28,7 @@ import {
 } from '@/lib/scheduling';
 import { createAppointment, loadBusyRanges } from '@/lib/schedulingServer';
 import { phoneLookupVariants } from '@/lib/phone';
+import { SCHEDULING_COPY, type SchedulingVertical } from '@/lib/schedulingVerticals';
 
 /**
  * Agendamentos deste cliente: os ligados ao contato e os marcados pelo painel
@@ -53,8 +54,10 @@ export type AssistantToolContext = {
 
 const STRING = 'STRING';
 
-/** Declarações no formato do Gemini (function calling). */
-export const ASSISTANT_TOOL_DECLARATIONS = [
+/** Declarações no formato do Gemini (function calling). O ramo decide se pede o carro. */
+export function assistantToolDeclarations(vertical: SchedulingVertical = 'automotivo') {
+  const item = SCHEDULING_COPY[vertical].item;
+  return [
   {
     name: 'consultar_horarios_livres',
     description:
@@ -70,8 +73,9 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
   },
   {
     name: 'agendar',
-    description:
-      'Marca o horário. Só use depois que o cliente confirmar o resumo (serviço, dia, horário e carro).',
+    description: `Marca o horário. Só use depois que o cliente confirmar o resumo (${
+      item ? `serviço, dia, horário e ${item.label}` : 'serviço, dia e horário'
+    }).`,
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -79,10 +83,10 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
         data: { type: STRING, description: 'Dia no formato AAAA-MM-DD.' },
         horario: { type: STRING, description: 'Horário de início no formato HH:MM, um dos horários livres.' },
         nome_cliente: { type: STRING, description: 'Nome do cliente.' },
-        veiculo: { type: STRING, description: 'Modelo do carro (e placa/cor, se o cliente disse).' },
+        ...(item ? { veiculo: { type: STRING, description: item.toolDescription } } : {}),
         observacoes: { type: STRING, description: 'Observações do cliente, se houver.' },
       },
-      required: ['servico', 'data', 'horario', 'nome_cliente', 'veiculo'],
+      required: ['servico', 'data', 'horario', 'nome_cliente', ...(item ? ['veiculo'] : [])],
     },
   },
   {
@@ -111,6 +115,7 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
     },
   },
 ];
+}
 
 type ToolResult = Record<string, unknown>;
 

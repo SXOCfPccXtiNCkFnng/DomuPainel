@@ -277,6 +277,17 @@ Comece conferindo o cartão em **WhatsApp Manager → Configurações de pagamen
 A campanha fica como **Agendada** e sai sozinha no horário, mesmo com o painel fechado. Se o horário já passou, aparece o botão **Disparar agora** na tela de progresso. Lembre: no plano Starter existe a trava de 200 disparos por dia.`,
   },
   {
+    id: 'saude_beleza_agenda',
+    question: 'Como funciona a agenda e a atendente para barbearia, salão, estética ou clínica?',
+    shortLabel: 'Agenda de saúde e beleza',
+    keywords: ['barbearia', 'barbeiro', 'salao', 'salão', 'manicure', 'estetica', 'estética', 'clinica', 'clínica', 'dentista', 'consultorio', 'consultório', 'cabeleireira'],
+    answer: `1. Em **Serviços e horários → Serviços**, cadastre cada serviço com nome, **duração** (o tempo que ocupa na agenda) e preço (opcional). Se precisar de avaliação antes, escreva isso na descrição.
+2. Na aba **Horários e lembretes**, defina o horário de funcionamento e, se atende mais de um cliente ao mesmo tempo (cadeiras, salas ou profissionais), ligue essa opção e diga quantos.
+3. Em **Atendente IA**, ajuste nome, tom e as regras do seu negócio (tolerância de atraso, cancelamento) e ligue.
+
+A atendente apresenta os serviços, mostra só horários livres, confirma antes de marcar e o cliente recebe lembrete antes do horário. Ela **não dá orientação de saúde**: diagnóstico, indicação de tratamento ou resultado ficam com o profissional, e em caso de urgência ela orienta procurar atendimento e avisa a equipe.`,
+  },
+  {
     id: 'imobiliaria_atendente',
     question: 'Como funciona a atendente de IA para imobiliária?',
     shortLabel: 'Atendente IA da imobiliária',

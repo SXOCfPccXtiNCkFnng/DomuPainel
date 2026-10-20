@@ -15,11 +15,13 @@ import {
 } from '@/lib/scheduling';
 import { REMINDER_SOON_OPTIONS } from '@/lib/appointmentReminderRules';
 import { agendaInputClass } from './agendaStyles';
+import { useSchedulingCopy } from '@/hooks/useSchedulingCopy';
 
 /** Segunda primeiro, domingo por último — como o dono pensa a semana. */
 const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export default function HoursTab() {
+  const { copy } = useSchedulingCopy();
   const [form, setForm] = useState<SchedulingSettings>(DEFAULT_SCHEDULING_SETTINGS);
   const [saved, setSaved] = useState<SchedulingSettings>(DEFAULT_SCHEDULING_SETTINGS);
   const [canEdit, setCanEdit] = useState(false);
@@ -164,10 +166,8 @@ export default function HoursTab() {
           <div className="flex items-start gap-2">
             <Car className="w-4 h-4 text-domu-blue mt-0.5" />
             <div>
-              <h2 className="text-sm font-black text-slate-900">Atender mais de um carro ao mesmo tempo</h2>
-              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                Ligue se você tem mais de um box ou equipe. Desligado, a agenda aceita um carro por vez.
-              </p>
+              <h2 className="text-sm font-black text-slate-900">{copy.capacityTitle}</h2>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{copy.capacityHint}</p>
             </div>
           </div>
           <input
@@ -176,13 +176,13 @@ export default function HoursTab() {
             disabled={!canEdit}
             onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.checked ? 2 : 1 }))}
             className="mt-1 rounded border-slate-300 text-domu-blue focus:ring-domu-blue"
-            aria-label="Atender mais de um carro ao mesmo tempo"
+            aria-label={copy.capacityTitle}
           />
         </div>
         {form.capacity > 1 && (
           <div className="space-y-2 pl-6">
             <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
-              Carros ao mesmo tempo:
+              {copy.capacityUnit.charAt(0).toUpperCase() + copy.capacityUnit.slice(1)} ao mesmo tempo:
               <input
                 type="number"
                 min={2}
@@ -196,10 +196,7 @@ export default function HoursTab() {
                 className={`${agendaInputClass} w-20`}
               />
             </label>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Exemplo com {form.capacity}: às 9h cabem {form.capacity} carros. Um polimento de 4h ocupa uma vaga das
-              9h às 13h, e as outras {form.capacity - 1} continuam livres para outros serviços.
-            </p>
+            <p className="text-[11px] text-slate-500 leading-relaxed">{copy.capacityExample(form.capacity)}</p>
           </div>
         )}
       </section>

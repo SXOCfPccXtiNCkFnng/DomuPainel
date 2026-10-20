@@ -16,6 +16,7 @@ import {
   type SchedulingSettings,
   type ServiceItem,
 } from '@/lib/scheduling';
+import { SCHEDULING_COPY, type SchedulingVertical } from '@/lib/schedulingVerticals';
 
 export type AssistantTone = 'AMIGAVEL' | 'PROFISSIONAL' | 'DESCONTRAIDO';
 
@@ -183,18 +184,23 @@ export function assistantSettingsFromRow(row: Record<string, unknown> | null | u
 }
 
 /** Primeira mensagem de exemplo — mostrada na tela para o dono sentir o tom. */
-export function sampleGreeting(settings: AssistantSettings, companyName: string, opts?: { realEstate?: boolean }): string {
+export function sampleGreeting(
+  settings: AssistantSettings,
+  companyName: string,
+  opts?: { realEstate?: boolean; vertical?: SchedulingVertical }
+): string {
   if (settings.greeting.trim()) return settings.greeting.trim();
   const who = settings.assistant_name ? `Aqui é ${settings.assistant_name}, da ${companyName}` : `Aqui é da ${companyName}`;
   const emoji = settings.use_emojis;
   const realEstate = Boolean(opts?.realEstate);
+  const copy = SCHEDULING_COPY[opts?.vertical || 'automotivo'];
   switch (settings.tone) {
     case 'PROFISSIONAL':
-      return `Olá, tudo bem? ${who}. Em que posso ajudar?${emoji ? (realEstate ? ' 🏡' : ' 🚗') : ''}`;
+      return `Olá, tudo bem? ${who}. Em que posso ajudar?${emoji ? (realEstate ? ' 🏡' : copy.greetingEmoji) : ''}`;
     case 'DESCONTRAIDO':
       return realEstate
         ? `E aí, tudo certo? ${who}${emoji ? ' 😄' : ''} Bora achar o seu próximo imóvel?`
-        : `E aí, tudo certo? ${who}${emoji ? ' 😄' : ''} Bora deixar esse carro brilhando?`;
+        : `E aí, tudo certo? ${who}${emoji ? ' 😄' : ''} ${copy.casualGreetingLine}`;
     default:
       return `Oi! ${who}${emoji ? ' 😊' : ''} Como posso te ajudar hoje?`;
   }
@@ -269,8 +275,13 @@ export function buildAssistantSystemPrompt(params: {
   now?: Date;
   /** Nome do perfil do WhatsApp do cliente (pode estar vazio ou ser apelido). */
   customerName?: string | null;
+  /** Ramo da agenda: muda o vocabulário (carro, saúde...). Padrão: lava rápido. */
+  vertical?: SchedulingVertical;
 }): string {
   const { services, scheduling } = params;
+  const copy = SCHEDULING_COPY[params.vertical || 'automotivo'];
+  const item = copy.item;
+  const extraRules = copy.extraRules.map((rule) => `- ${rule}\n`).join('');
   const settings = assistantSettingsFromRow(params.settings);
   const companyName = sanitizeOwnerText(params.companyName, 120, { singleLine: true }) || 'a loja';
   const name = settings.assistant_name || 'uma atendente';
@@ -297,7 +308,7 @@ export function buildAssistantSystemPrompt(params: {
     .filter(Boolean)
     .join('\n\n');
 
-  return `Você é ${name} e atende os clientes da ${companyName}, um lava rápido e estética automotiva, pelo WhatsApp.
+  return `Você é ${name} e atende os clientes da ${companyName}, ${copy.businessDescription}, pelo WhatsApp.
 
 COMO CONVERSAR
 - Escreva como uma pessoa real da equipe: português do Brasil natural, frases curtas, 1 a 3 frases por mensagem.
@@ -315,17 +326,17 @@ COMO CONVERSAR
 
 SEU PAPEL (e só ele)
 - Você ajuda com: serviços, ${settings.show_prices ? 'preços, ' : ''}duração, horário de funcionamento, endereço, formas de pagamento, as informações e regras da loja e agendamentos (marcar, remarcar, cancelar).
-- Assunto fora disso (piadas, notícias, futebol, política, receitas, dúvidas gerais, tarefas, perguntas sobre você ou sobre como funciona): não atenda. Diga com gentileza, em uma frase, que por aqui você só cuida do atendimento da loja e pergunte se pode ajudar com o carro.
-- Responda só com o que está nos DADOS DA LOJA. Se a resposta não estiver lá (ex.: estacionamento, leva e traz, marcas de produto, garantia, tempo de espera), não deduza nem complete com o que "parece provável": diga que não tem essa informação agora e que a equipe confirma. Nunca invente serviço, preço, desconto, promoção, horário, estrutura ou regra.
+- Assunto fora disso (piadas, notícias, futebol, política, receitas, dúvidas gerais, tarefas, perguntas sobre você ou sobre como funciona): não atenda. Diga com gentileza, em uma frase, que por aqui você só cuida do atendimento da loja e pergunte se pode ajudar com ${copy.helpWith}.
+- Responda só com o que está nos DADOS DA LOJA. Se a resposta não estiver lá (ex.: ${copy.unknownExamples}), não deduza nem complete com o que "parece provável": diga que não tem essa informação agora e que a equipe confirma. Nunca invente serviço, preço, desconto, promoção, horário, estrutura ou regra.
 - Promoção: só existe a que está nos DADOS, com as condições escritas lá. Comente uma vez por conversa, quando combinar com o assunto (cliente perguntou preço, o serviço da promoção ou o que tem de bom); não repita em toda mensagem. Se não houver promoção, diga que no momento não tem.
 - Não insista no agendamento: ofereça marcar quando fizer sentido, no máximo uma vez a cada duas ou três mensagens, e nunca repita a mesma oferta seguida.
-${settings.show_prices ? '' : '- Não informe valores. Se perguntarem preço, explique que o valor depende do carro e do estado dele e é passado pela equipe.\n'}- Reclamação, problema com o carro, pedido de reembolso, pedido para falar com uma pessoa ou algo que você não consegue resolver: acolha com empatia, peça desculpas quando fizer sentido, use a ferramenta chamar_equipe e diga que alguém da equipe vai responder em breve.
+${settings.show_prices ? '' : `- Não informe valores. Se perguntarem preço, explique que ${copy.priceHidden}.\n`}${extraRules}- ${copy.complaintExamples}, pedido para falar com uma pessoa ou algo que você não consegue resolver: acolha com empatia, peça desculpas quando fizer sentido, use a ferramenta chamar_equipe e diga que alguém da equipe vai responder em breve.
 
 AGENDAMENTO
-- Para agendar, descubra aos poucos: o serviço, o dia e horário que o cliente prefere, o modelo do carro e o nome dele. O telefone já é o deste WhatsApp; não pergunte.
+- Para agendar, descubra aos poucos: o serviço, o dia e horário que o cliente prefere${item ? `, ${item.ask}` : ''} e o nome dele. O telefone já é o deste WhatsApp; não pergunte.
 - Nome: se o perfil do WhatsApp tiver um nome de pessoa, não pergunte do zero; confirme junto com o resumo (ex.: "no nome de Maria, certo?"). Se não tiver, ou parecer apelido, pergunte.
 - Use consultar_horarios_livres antes de oferecer qualquer horário. Ofereça no máximo 3 opções, as mais próximas do que o cliente pediu. Se o dia estiver cheio ou fechado, sugira o dia livre mais próximo.
-- Antes de marcar, confirme o resumo (serviço, dia, horário e carro) e só use agendar depois que o cliente disser que está certo.
+- Antes de marcar, confirme o resumo (${item ? `serviço, dia, horário e ${item.label}` : 'serviço, dia e horário'}) e só use agendar depois que o cliente disser que está certo.
 - Depois de marcar, confirme de forma curta e calorosa.
 - Para remarcar ou cancelar, use ver_agendamentos_do_cliente; para remarcar, cancele o antigo só depois de conseguir marcar o novo.
 - Antes de cancelar, ofereça remarcar uma vez (ex.: "Quer que eu veja outro horário?"). Se o cliente quiser mesmo cancelar, confirme qual agendamento (serviço, dia e horário) e só use cancelar_agendamento depois que ele disser que sim. Mensagem vaga ("acho que não vou conseguir") não é pedido de cancelamento: pergunte antes.
@@ -334,7 +345,7 @@ AGENDAMENTO
 LEMBRETES E FIM DE CONVERSA
 - A loja manda lembretes automáticos antes do horário (1 hora antes e perto da hora). O cliente pode responder a eles.
 - Resposta curta de confirmação ao lembrete ("ok", "tô indo", "combinado", "👍"): agradeça em poucas palavras, sem pergunta e sem oferecer nada.
-- Cliente avisando que vai atrasar: diga que vai avisar a equipe e use chamar_equipe com o motivo (ex.: "cliente vai atrasar 15 min para o polimento das 10:00").
+- Cliente avisando que vai atrasar: diga que vai avisar a equipe e use chamar_equipe com o motivo (ex.: "cliente vai atrasar 15 min para o horário das 10:00").
 - Cliente que não vai conseguir ir: siga a regra de remarcar ou cancelar acima.
 - Quando o cliente agradece ou encerra ("obrigado", "valeu", "ok", "blz", um emoji) e não há nada pendente, despeça-se em uma frase curta, sem pergunta e sem nova oferta. Não reabra o assunto.
 - Nunca diga que marcou, cancelou ou chamou alguém sem a ferramenta ter confirmado.

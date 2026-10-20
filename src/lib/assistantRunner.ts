@@ -7,7 +7,8 @@
  */
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { logger } from '@/lib/logger';
-import { isAutomotiveSegment, isRealEstateSegment } from '@/lib/segmentConfig';
+import { isRealEstateSegment } from '@/lib/segmentConfig';
+import { schedulingVerticalOf, type SchedulingVertical } from '@/lib/schedulingVerticals';
 import { isOptOutMessage, sendMetaText } from '@/lib/metaClient';
 import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import { notifyTenantAdmins } from '@/lib/notify';
@@ -35,7 +36,7 @@ import {
   type ToolEffects,
 } from '@/lib/assistantRules';
 import {
-  ASSISTANT_TOOL_DECLARATIONS,
+  assistantToolDeclarations,
   executeAssistantTool,
   type AssistantToolContext,
   type HandoffContext,
@@ -311,11 +312,12 @@ async function loadLeadForAssistant(tenantId: string, leadId: string): Promise<{
   return { data: (full.data as LeadForAssistant | null) ?? null };
 }
 
-type Vertical = 'automotivo' | 'imobiliario';
+type Vertical = SchedulingVertical | 'imobiliario';
 
-/** Ramos que têm atendente de IA. */
+/** Ramos que têm atendente de IA: os de agenda (lava rápido, saúde e beleza) e o imobiliário. */
 export function assistantVertical(segment: string | null | undefined): Vertical | null {
-  if (isAutomotiveSegment(segment ?? null)) return 'automotivo';
+  const scheduling = schedulingVerticalOf(segment);
+  if (scheduling) return scheduling;
   if (isRealEstateSegment(segment ?? null)) return 'imobiliario';
   return null;
 }
@@ -327,7 +329,7 @@ type VerticalSetup = { systemPrompt: string; toolkit: ToolKit; knownPrices: numb
 async function prepareVertical(vertical: Vertical, input: VerticalInput): Promise<VerticalSetup> {
   const { settings, planTier, ...base } = input;
 
-  if (vertical === 'automotivo') {
+  if (vertical !== 'imobiliario') {
     const [servicesRes, scheduling] = await Promise.all([
       supabaseAdmin
         .from('services')
@@ -350,8 +352,12 @@ async function prepareVertical(vertical: Vertical, input: VerticalInput): Promis
         scheduling,
         now: base.now,
         customerName: base.leadName,
+        vertical,
       }),
-      toolkit: { declarations: ASSISTANT_TOOL_DECLARATIONS, execute: (name, args) => executeAssistantTool(name, args, ctx) },
+      toolkit: {
+        declarations: assistantToolDeclarations(vertical),
+        execute: (name, args) => executeAssistantTool(name, args, ctx),
+      },
       knownPrices: services.filter((s) => s.price != null).map((s) => s.price as number),
     };
   }
@@ -584,7 +590,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       knownPrices: setup.knownPrices,
       ownerText: `${settings.extra_info}\n${settings.about}\n${activePromo(settings, now) || ''}`,
       tools: toolLog,
-      checkScheduleTimes: vertical === 'automotivo',
+      checkScheduleTimes: vertical !== 'imobiliario',
     });
 
     // Chegou mensagem nova enquanto a IA pensava: a execução dela responde, com tudo no contexto.

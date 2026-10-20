@@ -8,10 +8,10 @@ import Header from '@/components/layout/Header';
 import {
   isRealEstateSegment,
   isDispatchOnlySegment,
-  isAutomotiveSegment,
   hasFollowUp,
   getSegmentFromStorage,
 } from '@/lib/segmentConfig';
+import { isSchedulingSegment } from '@/lib/schedulingVerticals';
 import { syncSessionToStorage, userIdentity } from '@/lib/sessionHelpers';
 import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
 import SupportChatbot from '@/components/shared/SupportChatbot';
@@ -145,7 +145,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         router.replace('/');
         return;
       }
-      if (pathname === '/atendimento' && isAutomotiveSegment(segment)) {
+      if (pathname === '/atendimento' && isSchedulingSegment(segment)) {
         router.replace('/atendente');
         return;
       }
@@ -154,11 +154,11 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         router.replace('/leads');
         return;
       }
-      if ((pathname === '/agenda' || pathname === '/servicos') && !isAutomotiveSegment(segment)) {
+      if ((pathname === '/agenda' || pathname === '/servicos') && !isSchedulingSegment(segment)) {
         router.replace('/');
         return;
       }
-      if (pathname === '/atendente' && !isAutomotiveSegment(segment) && !isRealEstateSegment(segment)) {
+      if (pathname === '/atendente' && !isSchedulingSegment(segment) && !isRealEstateSegment(segment)) {
         router.replace('/');
         return;
       }

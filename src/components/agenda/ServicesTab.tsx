@@ -10,6 +10,7 @@ import {
   type ServiceItem,
 } from '@/lib/scheduling';
 import { agendaInputClass } from './agendaStyles';
+import { useSchedulingCopy } from '@/hooks/useSchedulingCopy';
 
 /** price: número em texto com ponto decimal ("50.00") — formato que a API aceita. */
 type FormState = { name: string; duration_minutes: number; price: string; description: string };
@@ -22,13 +23,6 @@ function priceFromTyped(typed: string): string {
 
 const EMPTY_FORM: FormState = { name: '', duration_minutes: 30, price: '', description: '' };
 
-/** Sugestões para o lava rápido começar com um clique. */
-const SUGGESTIONS: FormState[] = [
-  { name: 'Lavagem simples', duration_minutes: 30, price: '40', description: '' },
-  { name: 'Lavagem completa', duration_minutes: 60, price: '70', description: 'Externa + interna e aspiração' },
-  { name: 'Higienização interna', duration_minutes: 180, price: '250', description: '' },
-  { name: 'Polimento', duration_minutes: 240, price: '350', description: '' },
-];
 
 export default function ServicesTab({
   services,
@@ -37,6 +31,9 @@ export default function ServicesTab({
   services: ServiceItem[];
   onChanged: () => void;
 }) {
+  const { copy } = useSchedulingCopy();
+  /** Sugestões do ramo para começar com um clique. */
+  const SUGGESTIONS: FormState[] = copy.serviceSuggestions;
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -143,7 +140,7 @@ export default function ServicesTab({
                 value={form.name}
                 maxLength={SERVICE_NAME_MAX}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Ex.: Lavagem completa"
+                placeholder={copy.servicePlaceholder}
                 className={agendaInputClass}
               />
             </label>
@@ -201,9 +198,20 @@ export default function ServicesTab({
         <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-domu-blue" />
-            <h2 className="text-sm font-black text-slate-900">Comece com uma sugestão</h2>
+            <h2 className="text-sm font-black text-slate-900">
+              {SUGGESTIONS.length ? 'Comece com uma sugestão' : 'Cadastre seus serviços'}
+            </h2>
           </div>
-          <p className="text-[11px] text-slate-500">Clique para preencher e ajuste preço e duração antes de salvar.</p>
+          <p className="text-[11px] text-slate-500">
+            {SUGGESTIONS.length
+              ? 'Clique para preencher e ajuste preço e duração antes de salvar.'
+              : 'Cada serviço tem nome, duração e preço (opcional). A duração é o tempo que ele ocupa na agenda. Se precisar de avaliação antes, escreva isso na descrição: a atendente vai oferecer a avaliação.'}
+          </p>
+          {!SUGGESTIONS.length && (
+            <button type="button" onClick={() => openNew()} className="btn-domu-primary text-xs py-2 px-4 w-fit flex items-center gap-1.5">
+              <Plus className="w-4 h-4" /> Cadastrar primeiro serviço
+            </button>
+          )}
           <div className="flex flex-wrap gap-2">
             {SUGGESTIONS.map((s) => (
               <button

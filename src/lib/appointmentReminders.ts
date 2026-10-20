@@ -18,6 +18,7 @@ import {
 import { phoneLookupVariants } from '@/lib/phone';
 import { DEFAULT_SCHEDULING_SETTINGS } from '@/lib/scheduling';
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
+import { schedulingCopyFor } from '@/lib/schedulingVerticals';
 import {
   dueReminder,
   isInsideServiceWindow,
@@ -37,6 +38,8 @@ type TemplateState =
 
 type TenantContext = {
   settings: ReminderSettings;
+  /** Emoji do ramo no texto do lembrete. */
+  emoji: string;
   blocked: string | null;
   credentials?: MetaCredentials;
   /** Carregado só quando algum cliente está fora da janela de 24h. */
@@ -155,11 +158,12 @@ export async function ensureReminderTemplate(tenantId: string): Promise<Template
 }
 
 async function loadTenantContext(tenantId: string): Promise<TenantContext> {
-  const [settings, { data: sub }] = await Promise.all([
+  const [settings, { data: sub }, { data: tenant }] = await Promise.all([
     loadSchedulingSettings(tenantId),
     supabaseAdmin.from('subscriptions').select('status').eq('tenant_id', tenantId).maybeSingle(),
+    supabaseAdmin.from('tenants').select('segment').eq('id', tenantId).maybeSingle(),
   ]);
-  const ctx: TenantContext = { settings, blocked: null };
+  const ctx: TenantContext = { settings, emoji: schedulingCopyFor(tenant?.segment).reminderEmoji, blocked: null };
   if (!isSubscriptionAllowedToDispatch(sub?.status)) {
     ctx.blocked = 'Assinatura inativa ou vencida.';
     return ctx;
@@ -321,7 +325,7 @@ export async function processDueReminders(options?: { limit?: number; deadlineMs
     let sent: { success: boolean; messageId?: string; error?: unknown };
     try {
       if (useText) {
-        body = reminderText(kind, params);
+        body = reminderText(kind, params, ctx.emoji);
         sent = await sendMetaText({ to, textBody: body, credentials: ctx.credentials! });
       } else {
         const tpl = ctx.template as Extract<TemplateState, { ok: true }>;
