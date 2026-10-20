@@ -37,7 +37,7 @@ export default function AgendaPage() {
           <AlertCircle className="w-4 h-4 shrink-0" /> {loadError}
         </p>
       )}
-      <AppointmentsTab services={services} onGoToServices={() => router.push('/atendente?aba=servicos')} />
+      <AppointmentsTab services={services} onGoToServices={() => router.push('/servicos')} />
     </div>
   );
 }

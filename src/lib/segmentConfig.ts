@@ -71,6 +71,7 @@ export type NavItemId =
   | 'dashboard'
   | 'agenda'
   | 'atendente'
+  | 'servicos'
   | 'disparos'
   | 'templates'
   | 'contatos'
@@ -104,7 +105,7 @@ export const PLATFORM_NAV: NavItemConfig[] = [
   },
   {
     id: 'atendente',
-    name: 'Atendente e Serviços',
+    name: 'Atendente IA',
     href: '/atendente',
     isComingSoon: false,
     segments: ['automotivo'],
@@ -199,9 +200,33 @@ const REAL_ESTATE_NAV: NavSection[] = [
   },
 ];
 
+/** Lava rápido: menu pela rotina da loja (agenda e atendente primeiro). */
+const AUTOMOTIVE_NAV: NavSection[] = [
+  {
+    title: 'Atendimento',
+    items: [
+      { id: 'dashboard', name: 'Painel', href: '/', isComingSoon: false },
+      { id: 'agenda', name: 'Agenda', href: '/agenda', isComingSoon: false },
+      { id: 'atendente', name: 'Atendente IA', href: '/atendente', isComingSoon: false },
+      { id: 'servicos', name: 'Serviços e horários', href: '/servicos', isComingSoon: false },
+    ],
+  },
+  {
+    title: 'Marketing',
+    items: [
+      { id: 'disparos', name: 'Campanhas', href: '/disparos', isComingSoon: false },
+      { id: 'templates', name: 'Modelos de mensagem', href: '/templates', isComingSoon: false },
+      { id: 'contatos', name: 'Contatos', href: '/contatos', isComingSoon: false },
+    ],
+  },
+  REAL_ESTATE_NAV[2], // Resultados
+  REAL_ESTATE_NAV[3], // Conta
+];
+
 /** Seções do menu lateral para o ramo da conta. */
 export function getNavSectionsForSegment(segment: TenantSegment): NavSection[] {
   if (isRealEstateSegment(segment)) return REAL_ESTATE_NAV;
+  if (isAutomotiveSegment(segment)) return AUTOMOTIVE_NAV;
   return [
     { title: 'Plataforma', items: getPlatformNavForSegment(segment) },
     { title: 'Administração', items: ADMIN_NAV },
@@ -214,7 +239,7 @@ export function getPlatformNavForSegment(segment: TenantSegment): NavItemConfig[
   return PLATFORM_NAV.filter((item) => {
     if (item.segments && !item.segments.includes(segment)) return false;
     if (item.id === 'followup' && !hasFollowUp(segment)) return false;
-    // No automotivo, a atendente do WhatsApp já funciona (página Atendente e Serviços).
+    // No automotivo, a atendente do WhatsApp já funciona (página Atendente IA).
     if (item.id === 'atendimento' && isAutomotiveSegment(segment)) return false;
     return true;
   }).map((item) => {
@@ -261,8 +286,12 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
     title: 'Agenda',
     subtitle: 'Agendamentos do dia',
   },
+  '/servicos': {
+    title: 'Serviços e horários',
+    subtitle: 'O que a loja oferece, quando atende e os lembretes para o cliente',
+  },
   '/atendente': {
-    title: 'Atendente e Serviços',
+    title: 'Atendente IA',
     subtitle: 'Atendente do WhatsApp, serviços e horário de funcionamento',
   },
   '/imoveis': {
@@ -320,20 +349,32 @@ const DISPATCH_ONLY_PAGE_TITLES: Record<string, { title: string; subtitle: strin
 
 const AUTOMOTIVE_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/': {
-    title: 'Dashboard',
+    title: 'Painel',
     subtitle: 'Disparos, respostas, clientes e lavagens agendadas',
   },
+  '/atendente': {
+    title: 'Atendente IA',
+    subtitle: 'Quem responde e agenda seus clientes no WhatsApp a qualquer hora',
+  },
   '/metricas': {
-    title: 'Métricas de ROI',
+    title: 'Resultados',
     subtitle: 'Atingidos, taxa de resposta, clientes que voltaram e agendamentos',
   },
+  '/relatorios': {
+    title: 'Relatório de envios',
+    subtitle: 'Histórico de campanhas e entregas',
+  },
   '/contatos': {
-    title: 'Contatos e Segmentação',
-    subtitle: 'Importação e tags por serviço, veículo e frequência de visita',
+    title: 'Contatos',
+    subtitle: 'Importação e listas por serviço, veículo e frequência de visita',
   },
   '/disparos': {
-    title: 'Disparo de Campanha',
-    subtitle: 'Promoção → segmento → agendar → enviar com status Meta',
+    title: 'Campanhas',
+    subtitle: 'Promoção → público → agendar → enviar com status Meta',
+  },
+  '/templates': {
+    title: 'Modelos de mensagem',
+    subtitle: 'Modelos aprovados pela Meta para suas campanhas',
   },
 };
 

@@ -297,7 +297,7 @@ Cada plano tem um limite de **imóveis ativos** no catálogo (disponíveis e lan
     question: 'O cliente recebe lembrete do horário marcado na agenda?',
     shortLabel: 'Lembrete do agendamento',
     keywords: ['lembrete', 'lembrar', 'esquecer', 'esqueceu', 'faltou', 'falta', 'aviso', 'antes do horario', 'antes do horário'],
-    answer: `Sim. Em **Agenda → Horários**, na parte **Lembretes para o cliente**:
+    answer: `Sim. Em **Serviços e horários → Horários e lembretes**, na parte **Lembretes para o cliente**:
 • **Lembrar 1 hora antes** (ligado por padrão).
 • **Lembrete em cima da hora:** 15 ou 30 minutos antes, ou desligado.
 
