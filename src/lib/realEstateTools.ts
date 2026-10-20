@@ -68,7 +68,7 @@ const BASE_DECLARATIONS = [
   {
     name: 'chamar_corretor',
     description:
-      'Passa a conversa para um corretor (interesse num imóvel, visita no plano de primeiro atendimento, negociação, financiamento, documentação, reclamação ou pedido para falar com alguém). Depois disso você para de responder esta conversa.',
+      'Passa a conversa para um corretor (interesse num imóvel, visita no plano de primeiro atendimento, negociação, financiamento, documentação, proprietário querendo vender/alugar/anunciar, cliente atual com boleto/contrato/manutenção, reclamação ou pedido para falar com alguém). Depois disso você para de responder esta conversa.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -209,7 +209,11 @@ async function chamarCorretor(args: Record<string, unknown>, ctx: RealEstateTool
   const motivo = text(args.motivo, 250) || 'Cliente precisa de um corretor';
   const reason = property ? `${motivo} (imóvel ${property.code} · ${property.title})` : motivo;
   const result = await handOffToTeam(ctx, reason, '/leads');
-  return { ...result, observacao: 'Corretor avisado. Diga ao cliente que um corretor vai continuar o atendimento por aqui em breve.' };
+  return {
+    ...result,
+    observacao:
+      'Corretor avisado. Diga ao cliente que um corretor continua o atendimento por aqui, seguindo a regra do horário de atendimento, e encerre sem novas perguntas.',
+  };
 }
 
 async function solicitarVisita(args: Record<string, unknown>, ctx: RealEstateToolContext): Promise<ToolResult> {

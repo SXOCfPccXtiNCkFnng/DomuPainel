@@ -160,6 +160,15 @@ describe('buildRealEstateSystemPrompt', () => {
     expect(prompt).toContain('solicitar_visita');
   });
 
+  it('encaminha proprietário e cliente atual em vez de recusar, e não pede documentos', () => {
+    const prompt = build('PRIMEIRO_ATENDIMENTO');
+    expect(prompt).toContain('Proprietário que quer vender, alugar, anunciar ou avaliar');
+    expect(prompt).toContain('Cliente atual (inquilino ou proprietário)');
+    expect(prompt).toContain('Nunca peça CPF, RG, renda');
+    expect(prompt).toContain('PASSAR PARA O CORRETOR');
+    expect(prompt).not.toMatch(/responder em breve/);
+  });
+
   it('catálogo resumido sem imóveis vendidos', () => {
     const overview = catalogOverview(catalog);
     expect(overview).toContain('5 imóveis disponíveis (1 lançamentos)');
