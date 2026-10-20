@@ -200,6 +200,26 @@ export function propertyFromRow(row: Record<string, unknown>): RealEstatePropert
   };
 }
 
+/**
+ * Máscara de dinheiro enquanto digita: "450000" → "450.000", "45050" → "45.050",
+ * "450,5" → "450,5" (até 2 casas depois da vírgula). O servidor lê esse formato.
+ */
+export function formatMoneyInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d,]/g, '');
+  const commaAt = cleaned.indexOf(',');
+  const intDigits = (commaAt >= 0 ? cleaned.slice(0, commaAt) : cleaned).replace(/^0+(?=\d)/, '');
+  const intPart = intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (commaAt < 0) return intPart;
+  const decimals = cleaned.slice(commaAt + 1).replace(/,/g, '').slice(0, 2);
+  return `${intPart || '0'},${decimals}`;
+}
+
+/** Valor salvo → texto do campo (450000 → "450.000"; 450.5 → "450,50"). */
+export function moneyInputValue(value: number | null | undefined): string {
+  if (!value) return '';
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: value % 1 ? 2 : 0, maximumFractionDigits: 2 });
+}
+
 export function formatBRL(value: number | null | undefined): string {
   if (value == null) return '';
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: value % 1 ? 2 : 0 });

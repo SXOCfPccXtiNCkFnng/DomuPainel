@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatMoneyInput,
   interestSummary,
+  moneyInputValue,
   normalizeLink,
   priceLabel,
   propertyForAI,
@@ -65,6 +67,33 @@ describe('validatePropertyInput', () => {
   it('tipo antigo "Lote" vira Terreno', () => {
     const r = validatePropertyInput({ title: 'Lote bom', type: 'Lote', price: 100000 });
     expect(r.ok && r.fields.type).toBe('Terreno');
+  });
+});
+
+describe('máscara de dinheiro', () => {
+  it('coloca pontos e vírgula enquanto digita', () => {
+    expect(formatMoneyInput('450000')).toBe('450.000');
+    expect(formatMoneyInput('1250000')).toBe('1.250.000');
+    expect(formatMoneyInput('45050')).toBe('45.050');
+    expect(formatMoneyInput('450,5')).toBe('450,5');
+    expect(formatMoneyInput('450,559')).toBe('450,55');
+    expect(formatMoneyInput('R$ 2.500,00')).toBe('2.500,00');
+    expect(formatMoneyInput(',5')).toBe('0,5');
+    expect(formatMoneyInput('abc')).toBe('');
+  });
+
+  it('o servidor entende o que a máscara gera, e o valor salvo volta igual', () => {
+    for (const [typed, value] of [
+      ['450000', 450000],
+      ['1250000', 1250000],
+      ['2500,5', 2500.5],
+    ] as const) {
+      const r = validatePropertyInput({ title: 'Casa nova', type: 'Casa', price: formatMoneyInput(typed) });
+      expect(r.ok && r.fields.price).toBe(value);
+    }
+    expect(moneyInputValue(450000)).toBe('450.000');
+    expect(moneyInputValue(450.5)).toBe('450,50');
+    expect(moneyInputValue(null)).toBe('');
   });
 });
 

@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, Building2, Loader2, X } from 'lucide-react';
 import { useBackdropClose, useModalA11y } from '@/hooks/useModalA11y';
 import { agendaInputClass } from '@/components/agenda/agendaStyles';
 import {
   DESCRIPTION_MAX,
+  formatMoneyInput,
+  moneyInputValue,
   PROPERTY_PURPOSES,
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
@@ -64,9 +67,9 @@ function fromProperty(p: RealEstateProperty): FormState {
     type: p.type,
     purpose: p.purpose,
     status: p.status,
-    price: numText(p.price),
-    rent_price: numText(p.rent_price),
-    condo_fee: numText(p.condo_fee),
+    price: moneyInputValue(p.price),
+    rent_price: moneyInputValue(p.rent_price),
+    condo_fee: moneyInputValue(p.condo_fee),
     neighborhood: p.neighborhood || '',
     city: p.city || '',
     bedrooms: numText(p.bedrooms),
@@ -115,7 +118,7 @@ export default function PropertyFormModal({
     setError(null);
   }, [isOpen, property, defaultCity]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const update = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -145,9 +148,9 @@ export default function PropertyFormModal({
 
   const priceLabel = form.purpose === 'ALUGUEL' ? 'Aluguel (R$/mês)' : 'Valor de venda (R$)';
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-[99999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
       {...backdropProps}
       role="presentation"
     >
@@ -245,8 +248,8 @@ export default function PropertyFormModal({
               <input
                 inputMode="decimal"
                 value={form.price}
-                onChange={(e) => update({ price: e.target.value })}
-                placeholder={form.purpose === 'ALUGUEL' ? 'Ex.: 2500' : 'Ex.: 450000'}
+                onChange={(e) => update({ price: formatMoneyInput(e.target.value) })}
+                placeholder={form.purpose === 'ALUGUEL' ? 'Ex.: 2.500' : 'Ex.: 450.000'}
                 className={agendaInputClass}
                 required
               />
@@ -256,8 +259,8 @@ export default function PropertyFormModal({
                 <input
                   inputMode="decimal"
                   value={form.rent_price}
-                  onChange={(e) => update({ rent_price: e.target.value })}
-                  placeholder="Ex.: 2500"
+                  onChange={(e) => update({ rent_price: formatMoneyInput(e.target.value) })}
+                  placeholder="Ex.: 2.500"
                   className={agendaInputClass}
                   required
                 />
@@ -267,7 +270,7 @@ export default function PropertyFormModal({
               <input
                 inputMode="decimal"
                 value={form.condo_fee}
-                onChange={(e) => update({ condo_fee: e.target.value })}
+                onChange={(e) => update({ condo_fee: formatMoneyInput(e.target.value) })}
                 placeholder="Ex.: 450"
                 className={agendaInputClass}
               />
@@ -357,6 +360,7 @@ export default function PropertyFormModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
