@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
         : status === 429
           ? 'Limite do Google atingido. Tente de novo em alguns minutos.'
           : 'O Google recusou a busca. No projeto da chave, ative a Places API (New), libere ela nas restrições da chave e confira se o faturamento está ativo.';
-    return NextResponse.json({ success: false, error: message }, { status });
+    const detail = error instanceof PlacesError ? error.message : String(error);
+    return NextResponse.json({ success: false, error: message, detail }, { status });
   }
 
   const byPlace = new Map<string, ProspectRow>();

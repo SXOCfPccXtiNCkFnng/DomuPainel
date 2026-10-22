@@ -136,6 +136,7 @@ export default function ProspectingMonitor() {
   const [extraCity, setExtraCity] = useState('');
   const [force, setForce] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number; label: string; newLeads: number } | null>(null);
+  const [searchError, setSearchError] = useState<{ message: string; detail?: string; failed: number; done: number } | null>(null);
 
   // Filtros da lista
   const [q, setQ] = useState('');
@@ -210,33 +211,48 @@ export default function ProspectingMonitor() {
   const runSearch = async () => {
     if (!combos.length || progress) return;
     setError('');
+    setSearchError(null);
     let newLeads = 0;
+    let failed = 0;
+    let lastError: { message: string; detail?: string } | null = null;
+    let done = 0;
     for (let i = 0; i < combos.length; i++) {
       const { kind, city } = combos[i];
-      setProgress({ done: i, total: combos.length, label: `${prospectKind(kind)?.label} em ${city}`, newLeads });
+      const label = `${prospectKind(kind)?.label} em ${city}`;
+      setProgress({ done: i, total: combos.length, label, newLeads });
       const started = Date.now();
+      let stop = false;
       try {
         const res = await fetch('/api/interno/prospects/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kind, city, force }),
         });
-        const json = await res.json();
-        if (!json.success) {
-          setError(json.error || 'Falha na busca.');
-          if (res.status === 503 || res.status === 429) break;
+        const json = await res.json().catch(() => null);
+        if (!json?.success) {
+          failed++;
+          lastError = {
+            message: json?.error || `O servidor respondeu ${res.status} em "${label}".`,
+            detail: json?.detail,
+          };
+          // Erro de configuração/limite se repete em todas: para logo.
+          stop = res.status === 503 || res.status === 429 || res.status === 502 || res.status === 404;
         } else {
           newLeads += json.inserted || 0;
         }
       } catch {
-        setError(`Falha ao buscar ${prospectKind(kind)?.label} em ${city}.`);
+        failed++;
+        lastError = { message: `Sem resposta do servidor em "${label}".` };
       }
+      done = i + 1;
+      if (stop) break;
       const wait = MIN_SEARCH_GAP_MS - (Date.now() - started);
       if (wait > 0 && i < combos.length - 1) await sleep(wait);
     }
-    setProgress({ done: combos.length, total: combos.length, label: 'Concluído', newLeads });
+    if (lastError) setSearchError({ ...lastError, failed, done });
+    setProgress({ done, total: combos.length, label: failed ? `${failed} busca(s) com erro` : 'Concluído', newLeads });
     await load();
-    setTimeout(() => setProgress(null), 6000);
+    setTimeout(() => setProgress(null), failed ? 15000 : 6000);
   };
 
   const filtered = useMemo(() => {
@@ -431,6 +447,20 @@ export default function ProspectingMonitor() {
             <p className="text-[11px] text-slate-500">
               {progress.done}/{progress.total} · {progress.label} · {progress.newLeads} lead(s) novo(s)
             </p>
+          </div>
+        ) : null}
+
+        {searchError ? (
+          <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+            <div className="space-y-0.5">
+              <p className="font-bold">
+                {searchError.failed} de {searchError.done} busca(s) falharam. {searchError.message}
+              </p>
+              {searchError.detail ? <p className="font-mono text-[11px] break-all">Google: {searchError.detail}</p> : null}
+            </div>
+            <button type="button" onClick={() => setSearchError(null)} aria-label="Fechar">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         ) : null}
       </section>
