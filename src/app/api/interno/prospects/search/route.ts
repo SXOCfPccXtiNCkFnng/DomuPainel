@@ -51,8 +51,10 @@ export async function POST(req: NextRequest) {
     places = (await searchPlaces(buildSearchQuery(kind, city))).places;
   } catch (error) {
     const status = error instanceof PlacesError ? error.status : 502;
-    const message =
-      status === 503
+    const keyNotAccepted = error instanceof Error && /API keys are not supported/i.test(error.message);
+    const message = keyNotAccepted
+      ? 'Essa chave (criada no AI Studio) não funciona no Maps. Crie uma chave comum no Google Cloud e coloque em GOOGLE_PLACES_API_KEY na Vercel.'
+      : status === 503
         ? 'Configure a GOOGLE_PLACES_API_KEY na Vercel.'
         : status === 429
           ? 'Limite do Google atingido. Tente de novo em alguns minutos.'
