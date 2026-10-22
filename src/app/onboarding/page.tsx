@@ -527,13 +527,17 @@ export default function OnboardingPage() {
         return;
       }
       setCouponDiscountLabel(
-        data.coupon.percentOff
-          ? `${data.coupon.percentOff}% off`
-          : `R$ ${data.coupon.amountOffBrl} off`
+        data.coupon.freeDays
+          ? `${data.coupon.freeDays} dias grátis`
+          : data.coupon.percentOff
+            ? `${data.coupon.percentOff}% off`
+            : `R$ ${data.coupon.amountOffBrl} off`
       );
       setCouponFinalPrice(data.price.finalPrice);
       setCouponMessage(
-        `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
+        data.coupon.freeDays
+          ? `Cupom ${data.coupon.code} aplicado · ${data.coupon.freeDays} dias grátis, depois R$ ${data.price.finalPrice}/mês`
+          : `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
       );
     } catch {
       setCouponMessage('Não foi possível validar o cupom.');

@@ -37,8 +37,8 @@ export async function GET(req: NextRequest) {
     const expiring = await withTransientRetry(async () => {
       const { data, error } = await supabaseAdmin
         .from('subscriptions')
-        .select('tenant_id, plan_tier, monthly_price_brl, current_period_end, payment_method, asaas_subscription_id')
-        .eq('status', 'ACTIVE')
+        .select('tenant_id, status, plan_tier, monthly_price_brl, current_period_end, payment_method, asaas_subscription_id')
+        .in('status', ['ACTIVE', 'TRIAL'])
         .gte('current_period_end', nowIso)
         .lte('current_period_end', windowEndIso)
         .is('expiry_reminder_sent_at', null);
@@ -75,26 +75,34 @@ export async function GET(req: NextRequest) {
           ? ` (${price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/mês)`
           : '';
       // Cartão com assinatura na Asaas renova sozinho: "renove" assustaria à toa.
-      const autoRenews = sub.payment_method === 'CREDIT_CARD' && Boolean(sub.asaas_subscription_id);
+      // Dias grátis (cupom): a primeira cobrança vence no fim do período e não é débito automático.
+      const isTrial = sub.status === 'TRIAL';
+      const autoRenews = !isTrial && sub.payment_method === 'CREDIT_CARD' && Boolean(sub.asaas_subscription_id);
       const company = tenant?.name || '';
+      const verb = isTrial ? 'termina' : autoRenews ? 'renova' : 'vence';
 
-      const subject = autoRenews
-        ? `Sua assinatura Domu Tech renova em ${expiresAt}`
-        : `Sua assinatura Domu Tech vence em breve (${expiresAt})`;
-      const nextStep = autoRenews
-        ? 'A renovação é cobrada automaticamente no cartão cadastrado — você não precisa fazer nada. Se quiser trocar o cartão ou o plano, acesse sua assinatura.'
-        : 'Para continuar disparando campanhas sem interrupção, renove antes dessa data.';
-      const text = `Olá!\n\nA assinatura do plano ${planName}${priceSuffix} da empresa ${company} ${
-        autoRenews ? 'renova' : 'vence'
-      } em ${expiresAt}.\n\n${nextStep}\n${renewUrl}\n\nEquipe Domu Tech${contactFooterText()}`;
+      const subject = isTrial
+        ? `Seus dias grátis na Domu Tech terminam em ${expiresAt}`
+        : autoRenews
+          ? `Sua assinatura Domu Tech renova em ${expiresAt}`
+          : `Sua assinatura Domu Tech vence em breve (${expiresAt})`;
+      const nextStep = isTrial
+        ? 'A primeira mensalidade vence nessa data e a cobrança chega por e-mail. Pague até lá para continuar disparando sem interrupção.'
+        : autoRenews
+          ? 'A renovação é cobrada automaticamente no cartão cadastrado — você não precisa fazer nada. Se quiser trocar o cartão ou o plano, acesse sua assinatura.'
+          : 'Para continuar disparando campanhas sem interrupção, renove antes dessa data.';
+      const subjectLine = isTrial
+        ? `O período grátis do plano ${planName}${priceSuffix} da empresa ${company} termina em ${expiresAt}.`
+        : `A assinatura do plano ${planName}${priceSuffix} da empresa ${company} ${verb} em ${expiresAt}.`;
+      const text = `Olá!\n\n${subjectLine}\n\n${nextStep}\n${renewUrl}\n\nEquipe Domu Tech${contactFooterText()}`;
       const html = brandedEmailHtml({
-        heading: autoRenews ? 'Sua assinatura renova em breve' : 'Sua assinatura vence em breve',
+        heading: isTrial ? 'Seus dias grátis estão acabando' : autoRenews ? 'Sua assinatura renova em breve' : 'Sua assinatura vence em breve',
         bodyHtml: `<p style="margin:0 0 12px;">Olá!</p>
-          <p style="margin:0 0 12px;">A assinatura do plano <strong>${escapeHtml(planName)}</strong>${priceSuffix} da empresa <strong>${escapeHtml(
+          <p style="margin:0 0 12px;">${isTrial ? 'O período grátis do plano' : 'A assinatura do plano'} <strong>${escapeHtml(planName)}</strong>${priceSuffix} da empresa <strong>${escapeHtml(
             company
-          )}</strong> ${autoRenews ? 'renova' : 'vence'} em <strong>${expiresAt}</strong>.</p>
+          )}</strong> ${verb} em <strong>${expiresAt}</strong>.</p>
           <p style="margin:0;">${nextStep}</p>`,
-        ctaLabel: autoRenews ? 'Ver assinatura' : 'Renovar assinatura',
+        ctaLabel: autoRenews || isTrial ? 'Ver assinatura' : 'Renovar assinatura',
         ctaUrl: renewUrl,
       });
 
@@ -108,10 +116,12 @@ export async function GET(req: NextRequest) {
           .update({ expiry_reminder_sent_at: new Date().toISOString() })
           .eq('tenant_id', sub.tenant_id);
         await notifyTenantAdmins(sub.tenant_id, {
-          title: 'Assinatura vence em breve',
-          message: autoRenews
-            ? `Seu plano ${planName} renova em ${expiresAt}, cobrado automaticamente no cartão.`
-            : `Seu plano ${planName} vence em ${expiresAt}. Renove pra não perder o acesso.`,
+          title: isTrial ? 'Dias grátis acabando' : 'Assinatura vence em breve',
+          message: isTrial
+            ? `Seus dias grátis do plano ${planName} terminam em ${expiresAt}. Pague a primeira mensalidade pra continuar.`
+            : autoRenews
+              ? `Seu plano ${planName} renova em ${expiresAt}, cobrado automaticamente no cartão.`
+              : `Seu plano ${planName} vence em ${expiresAt}. Renove pra não perder o acesso.`,
           type: 'WARNING',
         });
         notified += 1;

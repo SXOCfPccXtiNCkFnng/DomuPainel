@@ -268,11 +268,17 @@ export default function AssinaturaPage() {
         return;
       }
       setModalCouponDiscount(
-        data.coupon.percentOff
-          ? `${data.coupon.percentOff}% off`
-          : `R$ ${data.coupon.amountOffBrl} off`
+        data.coupon.freeDays
+          ? `${data.coupon.freeDays} dias grátis`
+          : data.coupon.percentOff
+            ? `${data.coupon.percentOff}% off`
+            : `R$ ${data.coupon.amountOffBrl} off`
       );
-      setModalCouponMsg(`Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`);
+      setModalCouponMsg(
+        data.coupon.freeDays
+          ? `Cupom ${data.coupon.code} aplicado · ${data.coupon.freeDays} dias grátis, depois R$ ${data.price.finalPrice}/mês`
+          : `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
+      );
       setModalPriceLabel(`R$ ${data.price.finalPrice}`);
     } catch {
       setModalCouponMsg('Não foi possível validar o cupom.');
@@ -322,7 +328,7 @@ export default function AssinaturaPage() {
         return;
       }
 
-      if (json.mock || json.status === 'ACTIVE') {
+      if (json.mock || json.status === 'ACTIVE' || json.status === 'TRIAL') {
         closeModal();
         return;
       }

@@ -65,7 +65,10 @@ export type PlatformOverview = {
   totals: {
     tenants: number;
     users: number;
+    /** Plano ativo com valor > 0. */
     paying: number;
+    /** Plano ativo sem cobrança (cortesia/teste). */
+    courtesy: number;
     trial: number;
     pendingPayment: number;
     pastDue: number;
@@ -187,6 +190,7 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
     tenants: rows.length,
     users: userCount || 0,
     paying: 0,
+    courtesy: 0,
     trial: 0,
     pendingPayment: 0,
     pastDue: 0,
@@ -195,7 +199,10 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
   };
 
   for (const row of rows) {
-    if (row.subscriptionStatus === 'ACTIVE') totals.paying += 1;
+    if (row.subscriptionStatus === 'ACTIVE') {
+      if ((row.monthlyPrice ?? 0) > 0) totals.paying += 1;
+      else totals.courtesy += 1;
+    }
     else if (row.subscriptionStatus === 'TRIAL') totals.trial += 1;
     else if (row.subscriptionStatus === 'PENDING_PAYMENT') totals.pendingPayment += 1;
     else if (row.subscriptionStatus === 'PAST_DUE') totals.pastDue += 1;

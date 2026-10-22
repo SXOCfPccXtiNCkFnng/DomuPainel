@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/requireAuth';
-import { computeSubscriptionPrice, findActiveCoupon } from '@/lib/billing';
+import { canUseFreeDaysCoupon, computeSubscriptionPrice, couponFreeDays, findActiveCoupon } from '@/lib/billing';
+import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getTenantPlanPrice } from '@/lib/planPricing';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: found.error }, { status: 400 });
     }
 
+    if (couponFreeDays(found.coupon) > 0) {
+      const { data: sub } = await supabaseAdmin
+        .from('subscriptions')
+        .select('status, current_period_start')
+        .eq('tenant_id', auth.session.tenantId)
+        .maybeSingle();
+      if (!canUseFreeDaysCoupon(sub)) {
+        return NextResponse.json(
+          { success: false, error: 'Cupom de dias grátis vale só para a primeira assinatura da empresa.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const basePrice = await getTenantPlanPrice(auth.session.tenantId, planTier, {
       segment: typeof body.segment === 'string' ? body.segment : null,
       businessSegment: typeof body.businessSegment === 'string' ? body.businessSegment : null,
@@ -38,6 +53,7 @@ export async function POST(req: NextRequest) {
         code: found.coupon.code,
         percentOff: found.coupon.percent_off,
         amountOffBrl: found.coupon.amount_off_brl,
+        freeDays: couponFreeDays(found.coupon) || null,
         description: found.coupon.description,
       },
       price,

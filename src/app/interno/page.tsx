@@ -30,10 +30,12 @@ import PlanPricingEditor from '@/components/interno/PlanPricingEditor';
 import UsersMonitor from '@/components/interno/UsersMonitor';
 import InsightsMonitor from '@/components/interno/InsightsMonitor';
 import ProspectingMonitor from '@/components/interno/ProspectingMonitor';
+import ProfitCard from '@/components/interno/ProfitCard';
 
 type CouponRow = {
   code: string;
   percent_off: number | null;
+  free_days?: number | null;
   active: boolean;
   max_redemptions: number | null;
   redemption_count: number;
@@ -196,6 +198,8 @@ export default function InternoPage() {
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
   const [couponCode, setCouponCode] = useState('');
   const [couponPercent, setCouponPercent] = useState('100');
+  const [couponKind, setCouponKind] = useState<'percent' | 'days'>('percent');
+  const [couponDays, setCouponDays] = useState('15');
   const [couponMax, setCouponMax] = useState('5');
   const [couponMsg, setCouponMsg] = useState('');
   const [grantBusy, setGrantBusy] = useState<string | null>(null);
@@ -278,12 +282,16 @@ export default function InternoPage() {
     const res = await fetch('/api/interno/coupons', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: couponCode,
-        percentOff: Number(couponPercent),
-        maxRedemptions: couponMax === '' ? null : Number(couponMax),
-        description: Number(couponPercent) >= 100 ? 'Cortesia / teste' : undefined,
-      }),
+      body: JSON.stringify(
+        couponKind === 'days'
+          ? { code: couponCode, freeDays: Number(couponDays), maxRedemptions: couponMax === '' ? null : Number(couponMax) }
+          : {
+              code: couponCode,
+              percentOff: Number(couponPercent),
+              maxRedemptions: couponMax === '' ? null : Number(couponMax),
+              description: Number(couponPercent) >= 100 ? 'Cortesia / teste' : undefined,
+            }
+      ),
     });
     const json = await res.json();
     if (!json.success) {
@@ -491,8 +499,13 @@ export default function InternoPage() {
             <p className="text-[11px] font-bold uppercase tracking-wider text-domu-blue mb-2">Negócio</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard label="Empresas" value={t.tenants} hint={`${t.users} usuários · ${overview.growth.signups7d} novas em 7d`} tone="navy" />
-              <StatCard label="Pagando" value={t.paying} hint={`${t.trial} em trial`} tone="green" />
-              <StatCard label="MRR" value={brl(overview.mrr)} hint={t.paying ? `Ticket médio ${brl(overview.mrr / t.paying)}` : 'Receita recorrente'} tone="green" />
+              <StatCard
+                label="Assinantes"
+                value={t.paying + t.courtesy + t.trial}
+                hint={`${t.paying} pagando · ${t.courtesy} cortesia · ${t.trial} em trial`}
+                tone="green"
+              />
+              <ProfitCard revenue={overview.mrr} paying={t.paying} />
               <StatCard
                 label="Precisam de atenção"
                 value={t.pastDue + t.pendingPayment}
@@ -982,7 +995,10 @@ export default function InternoPage() {
           <section className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
             <div>
               <h2 className="text-sm font-black text-slate-900">Cupons</h2>
-              <p className="text-[11px] text-slate-500 mt-0.5">100% libera o plano na hora, sem PIX. A pessoa cola o código no onboarding/assinatura.</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                100% libera o plano na hora, sem PIX. Dias grátis libera o plano por X dias e a primeira cobrança vence no fim do
+                período (só vale na primeira assinatura da empresa). A pessoa cola o código no onboarding/assinatura.
+              </p>
             </div>
             <form onSubmit={createCoupon} className="flex flex-wrap gap-2 items-end">
               <label className="text-xs font-bold text-slate-600">
@@ -995,18 +1011,43 @@ export default function InternoPage() {
                 />
               </label>
               <label className="text-xs font-bold text-slate-600">
-                % desconto
+                Tipo
                 <select
-                  value={couponPercent}
-                  onChange={(e) => setCouponPercent(e.target.value)}
-                  className="mt-1 block w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  value={couponKind}
+                  onChange={(e) => setCouponKind(e.target.value as 'percent' | 'days')}
+                  className="mt-1 block w-36 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
                 >
-                  <option value="100">100% (grátis)</option>
-                  <option value="50">50%</option>
-                  <option value="20">20%</option>
-                  <option value="10">10%</option>
+                  <option value="percent">% de desconto</option>
+                  <option value="days">Dias grátis</option>
                 </select>
               </label>
+              {couponKind === 'percent' ? (
+                <label className="text-xs font-bold text-slate-600">
+                  % desconto
+                  <select
+                    value={couponPercent}
+                    onChange={(e) => setCouponPercent(e.target.value)}
+                    className="mt-1 block w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  >
+                    <option value="100">100% (grátis)</option>
+                    <option value="50">50%</option>
+                    <option value="20">20%</option>
+                    <option value="10">10%</option>
+                  </select>
+                </label>
+              ) : (
+                <label className="text-xs font-bold text-slate-600">
+                  Dias grátis
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={couponDays}
+                    onChange={(e) => setCouponDays(e.target.value)}
+                    className="mt-1 block w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  />
+                </label>
+              )}
               <label className="text-xs font-bold text-slate-600">
                 Usos máx.
                 <input
@@ -1036,7 +1077,9 @@ export default function InternoPage() {
                   {coupons.map((c) => (
                     <tr key={c.code} className="border-t border-slate-100">
                       <td className="py-2 font-mono font-bold">{c.code}</td>
-                      <td className="py-2">{c.percent_off != null ? `${c.percent_off}%` : '—'}</td>
+                      <td className="py-2">
+                        {c.free_days ? `${c.free_days} dias grátis` : c.percent_off != null ? `${c.percent_off}%` : '—'}
+                      </td>
                       <td className="py-2 text-slate-600">
                         {c.redemption_count}
                         {c.max_redemptions != null ? ` / ${c.max_redemptions}` : ''}

@@ -5,6 +5,7 @@ import {
   computeSubscriptionPrice,
   findActiveCoupon,
   activateTenantSubscription,
+  canUseFreeDaysCoupon,
   isActiveSubscription,
   type SubscriptionRow,
 } from '@/lib/billing';
@@ -149,6 +150,13 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+    }
+
+    if (price.freeDays > 0 && !canUseFreeDaysCoupon(existingSub)) {
+      return NextResponse.json(
+        { success: false, error: 'Cupom de dias grátis vale só para a primeira assinatura da empresa.' },
+        { status: 400 }
+      );
     }
 
     const { data: tenant } = await supabaseAdmin
@@ -323,7 +331,8 @@ export async function POST(req: NextRequest) {
         monthlyPrice: price.finalPrice,
         paymentMethod,
         couponCode: price.couponCode,
-        status: 'ACTIVE',
+        status: price.freeDays > 0 ? 'TRIAL' : 'ACTIVE',
+        periodDays: price.freeDays || undefined,
         asaasCustomerId: 'mock_cus',
         asaasSubscriptionId: 'mock_sub',
       });
@@ -333,7 +342,7 @@ export async function POST(req: NextRequest) {
         mock: true,
         message: 'Billing mock: assinatura ativada (configure ASAAS_API_KEY para cobrança real).',
         price,
-        status: 'ACTIVE',
+        status: price.freeDays > 0 ? 'TRIAL' : 'ACTIVE',
         isOnboarded: true,
       });
     }
@@ -394,10 +403,34 @@ export async function POST(req: NextRequest) {
       customer: customer.id,
       billingType: paymentMethod,
       value: price.finalPrice,
-      nextDueDate: todayPlusDaysIsoDate(0),
+      // Dias grátis: a primeira cobrança só vence no fim do período.
+      nextDueDate: todayPlusDaysIsoDate(price.freeDays),
       description: `Domu Tech — Plano ${price.planTier} (mensal)`,
       externalReference: tenantId,
     });
+
+    if (price.freeDays > 0) {
+      await activateTenantSubscription({
+        tenantId,
+        planTier: price.planTier,
+        monthlyPrice: price.finalPrice,
+        paymentMethod,
+        asaasCustomerId: customer.id,
+        asaasSubscriptionId: subscription.id,
+        couponCode: price.couponCode,
+        status: 'TRIAL',
+        periodDays: price.freeDays,
+      });
+      return NextResponse.json({
+        success: true,
+        mock: false,
+        trial: true,
+        price,
+        status: 'TRIAL',
+        isOnboarded: true,
+        message: `Cupom aplicado: ${price.freeDays} dias grátis. A primeira cobrança vence só no fim do período.`,
+      });
+    }
 
     const payments = await asaasListSubscriptionPayments(subscription.id);
     const payment = payments[0];

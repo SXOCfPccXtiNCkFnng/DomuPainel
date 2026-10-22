@@ -19,6 +19,8 @@ export type CouponRow = {
   expires_at: string | null;
   plan_tiers: string[] | null;
   first_invoice_only: boolean;
+  /** Cupom de dias grátis (sem desconto no valor). */
+  free_days?: number | null;
   description?: string | null;
 };
 
@@ -29,8 +31,27 @@ export type PriceBreakdown = {
   couponCode: string | null;
   couponPercent: number;
   couponAmount: number;
+  /** Dias grátis antes da primeira cobrança (0 = cobra hoje). */
+  freeDays: number;
   finalPrice: number;
 };
+
+export function couponFreeDays(coupon: Pick<CouponRow, 'free_days'> | null | undefined): number {
+  const days = Math.floor(Number(coupon?.free_days || 0));
+  return days >= 1 && days <= 365 ? days : 0;
+}
+
+/**
+ * Dias grátis só na primeira assinatura da empresa: quem já teve plano
+ * (ativo, teste, vencido ou cancelado) não ganha outro período grátis.
+ */
+export function canUseFreeDaysCoupon(
+  sub: { status?: string | null; current_period_start?: string | null } | null | undefined
+): boolean {
+  if (!sub) return true;
+  if (sub.current_period_start) return false;
+  return !sub.status || sub.status === 'PENDING_PAYMENT';
+}
 
 /**
  * PIX: 5% off no valor base (antes ou depois do cupom — aplicamos cupom primeiro, depois PIX).
@@ -40,7 +61,7 @@ export type PriceBreakdown = {
 export function computeSubscriptionPrice(input: {
   planTier: string;
   paymentMethod: 'PIX' | 'CREDIT_CARD';
-  coupon?: Pick<CouponRow, 'code' | 'percent_off' | 'amount_off_brl'> | null;
+  coupon?: Pick<CouponRow, 'code' | 'percent_off' | 'amount_off_brl' | 'free_days'> | null;
   basePrice?: number;
 }): PriceBreakdown {
   const planTier = normalizePlanTier(input.planTier);
@@ -49,10 +70,13 @@ export function computeSubscriptionPrice(input: {
   let couponPercent = 0;
   let couponAmount = 0;
   let couponCode: string | null = null;
+  const freeDays = couponFreeDays(input.coupon);
 
   if (input.coupon) {
     couponCode = input.coupon.code.toUpperCase();
-    if (input.coupon.percent_off && input.coupon.percent_off > 0) {
+    if (freeDays > 0) {
+      // Dias grátis: o valor da mensalidade não muda.
+    } else if (input.coupon.percent_off && input.coupon.percent_off > 0) {
       couponPercent = Number(input.coupon.percent_off);
       price = price * (1 - couponPercent / 100);
     } else if (input.coupon.amount_off_brl && input.coupon.amount_off_brl > 0) {
@@ -73,6 +97,7 @@ export function computeSubscriptionPrice(input: {
     couponCode,
     couponPercent,
     couponAmount,
+    freeDays,
     finalPrice: Math.round(price * 100) / 100,
   };
 }
@@ -179,10 +204,12 @@ export async function activateTenantSubscription(input: {
   asaasSubscriptionId?: string | null;
   couponCode?: string | null;
   status?: 'ACTIVE' | 'TRIAL' | 'PENDING_PAYMENT' | 'PAST_DUE' | 'CANCELED';
+  /** Duração do período (padrão 30 dias; cupom de dias grátis usa os dias dele). */
+  periodDays?: number;
 }) {
   const planTier = normalizePlanTier(input.planTier);
   const periodStart = new Date();
-  const periodEnd = new Date(periodStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const periodEnd = new Date(periodStart.getTime() + (input.periodDays || 30) * 24 * 60 * 60 * 1000);
   const status = input.status || 'ACTIVE';
 
   const { data: previousSub } = await supabaseAdmin
@@ -244,7 +271,7 @@ export async function activateTenantSubscription(input: {
     });
   }
 
-  if (input.couponCode && status === 'ACTIVE') {
+  if (input.couponCode && (status === 'ACTIVE' || status === 'TRIAL')) {
     const code = input.couponCode.toUpperCase();
     const { data: coupon } = await supabaseAdmin
       .from('billing_coupons')
@@ -279,6 +306,7 @@ export type SubscriptionRow = {
   payment_method?: string | null;
   coupon_code?: string | null;
   status?: string | null;
+  current_period_start?: string | null;
   asaas_customer_id?: string | null;
   asaas_subscription_id?: string | null;
   pending_plan_tier?: string | null;
@@ -323,8 +351,8 @@ export function resolvePaidPlan(
     monthlyPrice: Number(sub?.monthly_price_brl) || 0,
     paymentMethod: sub?.payment_method || 'PIX',
     asaasSubscriptionId: sub?.asaas_subscription_id || paymentSubscriptionId || null,
-    // Cupom só conta na primeira ativação, não em renovação.
-    couponCode: sub?.status === 'ACTIVE' ? null : sub?.coupon_code || null,
+    // Cupom só conta na primeira ativação (ou no início dos dias grátis), não em renovação.
+    couponCode: isActiveSubscription(sub) ? null : sub?.coupon_code || null,
     isPlanChange: false,
   };
 }

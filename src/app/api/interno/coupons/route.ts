@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9_-]/g, '');
+    const isFreeDays = body.freeDays != null && body.freeDays !== '';
+    const freeDays = Number(body.freeDays);
     const percentOff = Number(body.percentOff);
     const maxRedemptions =
       body.maxRedemptions == null || body.maxRedemptions === ''
@@ -45,7 +47,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (!Number.isFinite(percentOff) || percentOff < 1 || percentOff > 100) {
+    if (isFreeDays && (!Number.isInteger(freeDays) || freeDays < 1 || freeDays > 365)) {
+      return NextResponse.json(
+        { success: false, error: 'Dias grátis deve ser entre 1 e 365.' },
+        { status: 400 }
+      );
+    }
+    if (!isFreeDays && (!Number.isFinite(percentOff) || percentOff < 1 || percentOff > 100)) {
       return NextResponse.json(
         { success: false, error: 'Desconto deve ser entre 1% e 100%.' },
         { status: 400 }
@@ -56,14 +64,21 @@ export async function POST(req: NextRequest) {
       .from('billing_coupons')
       .insert({
         code,
-        percent_off: percentOff,
+        percent_off: isFreeDays ? null : percentOff,
         amount_off_brl: null,
+        ...(isFreeDays ? { free_days: freeDays } : {}),
         active: true,
         max_redemptions: Number.isFinite(maxRedemptions) ? maxRedemptions : null,
         redemption_count: 0,
         expires_at: expiresAt,
-        first_invoice_only: percentOff < 100,
-        description: description || (percentOff >= 100 ? 'Cortesia / teste (100%)' : `Cupom ${percentOff}%`),
+        first_invoice_only: isFreeDays ? false : percentOff < 100,
+        description:
+          description ||
+          (isFreeDays
+            ? `${freeDays} dias grátis`
+            : percentOff >= 100
+              ? 'Cortesia / teste (100%)'
+              : `Cupom ${percentOff}%`),
       })
       .select('*')
       .single();
@@ -71,7 +86,9 @@ export async function POST(req: NextRequest) {
     if (error) {
       const msg = error.message?.includes('duplicate')
         ? 'Já existe um cupom com este código.'
-        : 'Não foi possível criar o cupom (rode a migration de cupons no Supabase).';
+        : isFreeDays && error.message?.includes('free_days')
+          ? 'Rode a migration 20261021_coupon_free_days.sql no Supabase para criar cupom de dias.'
+          : 'Não foi possível criar o cupom (rode a migration de cupons no Supabase).';
       return NextResponse.json({ success: false, error: msg }, { status: 400 });
     }
 
