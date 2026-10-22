@@ -73,6 +73,7 @@ export type NavItemId =
   | 'agenda'
   | 'atendente'
   | 'servicos'
+  | 'financeiro'
   | 'disparos'
   | 'templates'
   | 'contatos'
@@ -222,7 +223,13 @@ function schedulingNav(segment: TenantSegment): NavSection[] {
       ],
     },
     { title: 'Marketing', items: marketing },
-    REAL_ESTATE_NAV[2], // Resultados
+    {
+      title: 'Resultados',
+      items: [
+        { id: 'financeiro', name: 'Financeiro', href: '/financeiro', isComingSoon: false },
+        ...REAL_ESTATE_NAV[2].items,
+      ],
+    },
     REAL_ESTATE_NAV[3], // Conta
   ];
 }
@@ -289,6 +296,10 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   '/agenda': {
     title: 'Agenda',
     subtitle: 'Agendamentos do dia',
+  },
+  '/financeiro': {
+    title: 'Financeiro',
+    subtitle: 'Faturamento da agenda, gastos e lucro do mês',
   },
   '/servicos': {
     title: 'Serviços e horários',

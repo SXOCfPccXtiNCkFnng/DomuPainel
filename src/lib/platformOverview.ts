@@ -25,6 +25,9 @@ export type TenantOpsRow = {
   whatsappConnected: boolean;
   sent7d: number;
   lastActivityAt: string | null;
+  /** Faturamento pela agenda nos últimos 30 dias (ramos com agenda); null = sem agenda ou migration pendente. */
+  revenue30d: number | null;
+  appointments30d: number;
 };
 
 export type OverdueCampaign = {
@@ -183,8 +186,33 @@ export async function loadPlatformOverview(): Promise<PlatformOverview> {
       whatsappConnected: false,
       sent7d: 0,
       lastActivityAt: null,
+      revenue30d: null,
+      appointments30d: 0,
     };
   });
+
+  // Faturamento de cada conta pela agenda (mesma regra da tela Financeiro).
+  const { data: revenueRows, error: revenueErr } = await supabaseAdmin.rpc('finance_revenue_by_tenant', {
+    p_since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    p_until: nowIso,
+  });
+  if (!revenueErr) {
+    const byTenant = new Map(
+      ((revenueRows || []) as { tenant_id: string; revenue: number | string; appointments: number | string }[]).map((r) => [
+        r.tenant_id,
+        r,
+      ])
+    );
+    for (const row of rows) {
+      const r = byTenant.get(row.tenantId);
+      if (r) {
+        row.revenue30d = Number(r.revenue) || 0;
+        row.appointments30d = Number(r.appointments) || 0;
+      } else if (row.segment === 'automotivo' || row.segment === 'saude') {
+        row.revenue30d = 0;
+      }
+    }
+  }
 
   const totals = {
     tenants: rows.length,

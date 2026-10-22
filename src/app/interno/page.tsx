@@ -939,6 +939,15 @@ export default function InternoPage() {
                           {row.planTier || '—'}
                           {row.monthlyPrice != null ? ` · ${row.monthlyPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
                         </p>
+                        {row.revenue30d != null && (
+                          <p className="text-[11px] text-slate-500 mt-0.5" title="Faturamento pela agenda nos últimos 30 dias">
+                            Agenda 30d:{' '}
+                            <strong className="text-slate-800">
+                              {row.revenue30d.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </strong>{' '}
+                            · {row.appointments30d} atend.
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-xs">
                         {row.whatsappConnected ? (

@@ -277,6 +277,18 @@ Comece conferindo o cartão em **WhatsApp Manager → Configurações de pagamen
 A campanha fica como **Agendada** e sai sozinha no horário, mesmo com o painel fechado. Se o horário já passou, aparece o botão **Disparar agora** na tela de progresso. Lembre: no plano Starter existe a trava de 200 disparos por dia.`,
   },
   {
+    id: 'financeiro',
+    question: 'Como vejo quanto faturei e o meu lucro?',
+    shortLabel: 'Financeiro',
+    keywords: ['financeiro', 'faturamento', 'faturei', 'lucro', 'gasto', 'gastos', 'despesa', 'despesas', 'receita', 'caixa'],
+    answer: `Em **Financeiro** (lava rápido e saúde e beleza), escolha o mês:
+• **Faturamento pela agenda:** soma o preço dos atendimentos feitos (concluídos, ou confirmados cujo horário já passou). Marque na Agenda quem **faltou** ou **cancelou** para o número ficar certo.
+• **Lançar gasto:** produtos, aluguel, comissões, contas, marketing...
+• **Lançar entrada:** vendas fora da agenda, como produtos.
+
+O **lucro** é o faturamento + entradas − gastos. Também aparecem o ticket médio, o previsto até o fim do mês e quanto se perdeu com faltas. Só administradores veem o financeiro.`,
+  },
+  {
     id: 'saude_beleza_agenda',
     question: 'Como funciona a agenda e a atendente para barbearia, salão, estética ou clínica?',
     shortLabel: 'Agenda de saúde e beleza',

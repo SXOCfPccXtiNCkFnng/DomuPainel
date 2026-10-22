@@ -15,6 +15,7 @@ import {
   Settings,
   ShoppingBag,
   UserRoundSearch,
+  Wallet,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
@@ -88,8 +89,9 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
     );
   }
 
-  if (id === 'leads' || id === 'visitas' || id === 'servicos') {
-    const Icon = id === 'leads' ? UserRoundSearch : id === 'visitas' ? CalendarCheck : Wrench;
+  if (id === 'leads' || id === 'visitas' || id === 'servicos' || id === 'financeiro') {
+    const Icon =
+      id === 'leads' ? UserRoundSearch : id === 'visitas' ? CalendarCheck : id === 'financeiro' ? Wallet : Wrench;
     return (
       <span
         className={`inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 ${className || ''}`}
