@@ -69,6 +69,7 @@ const checks = [
   { key: 'GEMINI_API_KEY', min: 8, required: false },
   { key: 'VAPID_PUBLIC_KEY', min: 40, required: false },
   { key: 'VAPID_PRIVATE_KEY', min: 20, required: false },
+  { key: 'GOOGLE_PLACES_API_KEY', min: 20, required: false },
   { key: 'CRON_SECRET', min: 16, required: false },
   { key: 'PLATFORM_ADMIN_EMAILS', min: 5, required: false },
   { key: 'NEXT_PUBLIC_APP_URL', min: 8, required: false },

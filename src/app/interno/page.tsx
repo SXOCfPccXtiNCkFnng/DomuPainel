@@ -13,6 +13,7 @@ import {
   CircleAlert,
   Filter,
   LayoutDashboard,
+  MapPin,
   RefreshCw,
   Search,
   Stethoscope,
@@ -28,6 +29,7 @@ import AssistantMonitor from '@/components/interno/AssistantMonitor';
 import PlanPricingEditor from '@/components/interno/PlanPricingEditor';
 import UsersMonitor from '@/components/interno/UsersMonitor';
 import InsightsMonitor from '@/components/interno/InsightsMonitor';
+import ProspectingMonitor from '@/components/interno/ProspectingMonitor';
 
 type CouponRow = {
   code: string;
@@ -40,7 +42,7 @@ type CouponRow = {
 };
 
 type HealthData = { checkedAt: string; summary: Record<HealthStatus, number>; checks: HealthCheck[] };
-type Tab = 'overview' | 'users' | 'insights' | 'health' | 'errors' | 'tenants' | 'assistant' | 'commercial';
+type Tab = 'overview' | 'users' | 'insights' | 'prospects' | 'health' | 'errors' | 'tenants' | 'assistant' | 'commercial';
 
 function statusLabel(status: SubscriptionStatus) {
   switch (status) {
@@ -385,6 +387,7 @@ export default function InternoPage() {
     { id: 'overview', label: 'Visão geral', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'users', label: 'Cadastros', icon: <Users className="w-4 h-4" /> },
     { id: 'insights', label: 'Funil e risco', icon: <Filter className="w-4 h-4" /> },
+    { id: 'prospects', label: 'Prospecção', icon: <MapPin className="w-4 h-4" /> },
     { id: 'health', label: 'Saúde do sistema', icon: <Stethoscope className="w-4 h-4" />, badge: healthFails || healthWarns, badgeTone: healthFails ? 'bg-red-600' : 'bg-amber-500' },
     { id: 'errors', label: 'Erros', icon: <AlertTriangle className="w-4 h-4" />, badge: openErrors, badgeTone: 'bg-red-600' },
     { id: 'tenants', label: 'Empresas', icon: <Building2 className="w-4 h-4" /> },
@@ -967,6 +970,7 @@ export default function InternoPage() {
 
       {tab === 'users' ? <UsersMonitor /> : null}
       {tab === 'insights' ? <InsightsMonitor /> : null}
+      {tab === 'prospects' ? <ProspectingMonitor /> : null}
 
       {/* ───────── Comercial ───────── */}
       {tab === 'assistant' ? <AssistantMonitor /> : null}
