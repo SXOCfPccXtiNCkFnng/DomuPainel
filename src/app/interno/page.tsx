@@ -11,11 +11,13 @@ import {
   ChevronDown,
   ChevronRight,
   CircleAlert,
+  Filter,
   LayoutDashboard,
   RefreshCw,
   Search,
   Stethoscope,
   Tag,
+  Users,
   XCircle,
 } from 'lucide-react';
 import type { PlatformOverview, SubscriptionStatus } from '@/lib/platformOverview';
@@ -24,6 +26,8 @@ import type { HealthCheck, HealthStatus } from '@/lib/platformHealth';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import AssistantMonitor from '@/components/interno/AssistantMonitor';
 import PlanPricingEditor from '@/components/interno/PlanPricingEditor';
+import UsersMonitor from '@/components/interno/UsersMonitor';
+import InsightsMonitor from '@/components/interno/InsightsMonitor';
 
 type CouponRow = {
   code: string;
@@ -36,7 +40,7 @@ type CouponRow = {
 };
 
 type HealthData = { checkedAt: string; summary: Record<HealthStatus, number>; checks: HealthCheck[] };
-type Tab = 'overview' | 'health' | 'errors' | 'tenants' | 'assistant' | 'commercial';
+type Tab = 'overview' | 'users' | 'insights' | 'health' | 'errors' | 'tenants' | 'assistant' | 'commercial';
 
 function statusLabel(status: SubscriptionStatus) {
   switch (status) {
@@ -379,6 +383,8 @@ export default function InternoPage() {
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number; badgeTone?: string }[] = [
     { id: 'overview', label: 'Visão geral', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: 'users', label: 'Cadastros', icon: <Users className="w-4 h-4" /> },
+    { id: 'insights', label: 'Funil e risco', icon: <Filter className="w-4 h-4" /> },
     { id: 'health', label: 'Saúde do sistema', icon: <Stethoscope className="w-4 h-4" />, badge: healthFails || healthWarns, badgeTone: healthFails ? 'bg-red-600' : 'bg-amber-500' },
     { id: 'errors', label: 'Erros', icon: <AlertTriangle className="w-4 h-4" />, badge: openErrors, badgeTone: 'bg-red-600' },
     { id: 'tenants', label: 'Empresas', icon: <Building2 className="w-4 h-4" /> },
@@ -958,6 +964,9 @@ export default function InternoPage() {
           </div>
         </Section>
       ) : null}
+
+      {tab === 'users' ? <UsersMonitor /> : null}
+      {tab === 'insights' ? <InsightsMonitor /> : null}
 
       {/* ───────── Comercial ───────── */}
       {tab === 'assistant' ? <AssistantMonitor /> : null}
