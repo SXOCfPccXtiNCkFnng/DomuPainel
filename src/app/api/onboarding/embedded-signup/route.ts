@@ -328,7 +328,13 @@ export async function POST(req: NextRequest) {
     const warnings: string[] = [];
 
     const registerResult = await registerPhoneNumber(resolvedPhoneNumberId, accessToken);
-    if (!registerResult.ok) {
+    // Coexistência: o número já está registrado pelo app WhatsApp Business do
+    // celular e a Meta recusa o register ("not available for SMB businesses").
+    // É o esperado, não é falha.
+    const coexistenceNumber = /not available for SMB/i.test(registerResult.error || '');
+    if (coexistenceNumber) {
+      logger.info('onboarding.embedded_signup_coexistence_number', { tenantId });
+    } else if (!registerResult.ok) {
       warnings.push(`Registro do número: ${registerResult.error}`);
       logger.warn('onboarding.embedded_signup_register_warning', {
         tenantId,

@@ -2,8 +2,9 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getPlatformAdminEmails } from '@/lib/platformAdmin';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import { sendEmail, appBaseUrl } from '@/lib/email';
-import { escapeHtml } from '@/lib/emailTemplates';
+import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 
 export type OpsAlert = {
   id: string;
@@ -22,6 +23,10 @@ export type OpsAlert = {
 
 /** No máx. 1 e-mail por origem a cada 30 min — evita spam quando um erro se repete. */
 const ALERT_EMAIL_WINDOW_MS = 30 * 60 * 1000;
+/** Teto de e-mails de erro novo por hora (uma avalanche de erros diferentes não vira 200 e-mails). */
+const NEW_ERROR_EMAILS_PER_HOUR = 20;
+/** Erros do próprio envio de e-mail não geram e-mail (seria um laço). */
+const NO_EMAIL_SOURCES = /^email\./;
 /** Mesmo erro aberto dentro desse intervalo soma no contador em vez de criar linha nova. */
 const GROUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -75,7 +80,7 @@ export async function recordOpsEvent(input: {
   tenantId?: string | null;
   meta?: Record<string, unknown>;
   count?: number;
-}): Promise<void> {
+}): Promise<{ created: boolean }> {
   try {
     const source = input.source.slice(0, 80);
     const message = String(input.message || 'Erro').slice(0, 2000);
@@ -99,7 +104,7 @@ export async function recordOpsEvent(input: {
     // Migration de observabilidade ainda não aplicada: grava no formato antigo.
     if (findError?.code === '42703') {
       await supabaseAdmin.from('ops_alerts').insert({ source, level, message, tenant_id: tenantId, meta });
-      return;
+      return { created: false };
     }
 
     if (open) {
@@ -114,10 +119,10 @@ export async function recordOpsEvent(input: {
           ...(tenantId ? { tenant_id: tenantId } : {}),
         })
         .eq('id', open.id);
-      return;
+      return { created: false };
     }
 
-    await supabaseAdmin.from('ops_alerts').insert({
+    const { error: insertError } = await supabaseAdmin.from('ops_alerts').insert({
       source,
       level,
       message,
@@ -127,9 +132,59 @@ export async function recordOpsEvent(input: {
       occurrences: count,
       last_seen_at: nowIso,
     });
+    if (insertError) throw insertError;
+
+    // Erro novo (ou que voltou depois de resolvido): avisa a operação por e-mail.
+    // Repetições do mesmo erro só somam no contador, sem novo e-mail.
+    if (level === 'error' && !NO_EMAIL_SOURCES.test(source)) {
+      await notifyNewError({ source, message, tenantId, occurrences: count });
+    }
+    return { created: true };
   } catch (err) {
     // console direto (não logger): o logger grava aqui, e isso viraria um laço.
     console.error('[opsAlert] falha ao gravar alerta', err instanceof Error ? err.message : err);
+    return { created: false };
+  }
+}
+
+/** E-mail de erro novo para quem está na lista do /interno (PLATFORM_ADMIN_EMAILS). */
+async function notifyNewError(input: { source: string; message: string; tenantId: string | null; occurrences: number }) {
+  const admins = getPlatformAdminEmails();
+  if (admins.length === 0) return;
+  const limit = await checkRateLimitDurable('opsalert:new-error-email', NEW_ERROR_EMAILS_PER_HOUR, 60 * 60 * 1000);
+  if (!limit.ok) return;
+
+  let tenantName: string | null = null;
+  if (input.tenantId) {
+    const { data } = await supabaseAdmin.from('tenants').select('name').eq('id', input.tenantId).maybeSingle();
+    tenantName = data?.name || null;
+  }
+
+  const dashboardUrl = `${appBaseUrl()}/interno`;
+  const company = tenantName ? `${tenantName} (${input.tenantId})` : input.tenantId;
+  const subject = `[Domu Tech] Erro novo: ${input.source}${tenantName ? ` · ${tenantName}` : ''}`.slice(0, 160);
+  const text = `Apareceu um erro novo no painel /interno.\n\nOrigem: ${input.source}\n${
+    company ? `Empresa: ${company}\n` : ''
+  }Mensagem: ${input.message}\n\nSe ele se repetir, só soma no contador do painel (sem novo e-mail).\nVer detalhes: ${dashboardUrl}`;
+  const bodyHtml = `<p style="margin:0 0 12px;">Apareceu um erro novo no painel /interno.</p>
+<p style="margin:0 0 6px;"><strong>Origem:</strong> ${escapeHtml(input.source)}</p>${
+    company ? `<p style="margin:0 0 6px;"><strong>Empresa:</strong> ${escapeHtml(company)}</p>` : ''
+  }<p style="margin:0 0 12px;"><strong>Mensagem:</strong> ${escapeHtml(input.message.slice(0, 600))}</p>
+<p style="margin:0;color:#64748b;font-size:13px;">Se ele se repetir, só soma no contador do painel, sem novo e-mail. Ao marcar como resolvido, um novo e-mail chega se ele voltar.</p>`;
+
+  try {
+    await Promise.all(
+      admins.map((to) =>
+        sendEmail({
+          to,
+          subject,
+          text,
+          html: brandedEmailHtml({ heading: 'Erro novo no sistema', bodyHtml, ctaLabel: 'Abrir o painel interno', ctaUrl: dashboardUrl }),
+        })
+      )
+    );
+  } catch (err) {
+    console.error('[opsAlert] e-mail de erro novo falhou', err instanceof Error ? err.message : err);
   }
 }
 
@@ -164,8 +219,8 @@ export async function logOpsAlert(input: {
   tenantId?: string | null;
   meta?: Record<string, unknown>;
 }): Promise<void> {
-  await recordOpsEvent(input);
-  if ((input.level || 'error') === 'error') {
+  const { created } = await recordOpsEvent(input);
+  if (!created && (input.level || 'error') === 'error') {
     await notifyPlatformAdmins({
       source: input.source,
       message: input.message,
