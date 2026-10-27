@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import AuthShell from '@/components/auth/AuthShell';
+import Captcha, { captchaConfigured } from '@/components/auth/Captcha';
 
 const inputClass =
   'block w-full px-3 py-3 border border-slate-200 bg-white text-slate-900 text-base placeholder-slate-400 focus:outline-none focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 transition-colors';
@@ -13,18 +14,26 @@ export default function RecuperarSenhaPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [done, setDone] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    if (captchaConfigured && !captchaToken) {
+      setErrorMessage('Aguarde a verificação anti-robô terminar e tente de novo.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, captchaToken }),
       });
       const data = await res.json();
+      setCaptchaReset((n) => n + 1);
       if (!res.ok || !data.success) {
         setErrorMessage(data.error || 'Não foi possível enviar o e-mail.');
         return;
@@ -80,6 +89,7 @@ export default function RecuperarSenhaPage() {
               placeholder="seu@email.com"
             />
           </div>
+          <Captcha onToken={setCaptchaToken} resetKey={captchaReset} />
           <button
             type="submit"
             disabled={isLoading}

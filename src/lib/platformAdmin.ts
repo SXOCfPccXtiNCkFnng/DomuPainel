@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, type AuthSession } from '@/lib/requireAuth';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { loadTwoFactorState } from '@/lib/twoFactor';
 
 function notFound() {
   return NextResponse.json(
     { success: false, error: 'Not Found' },
     { status: 404 }
   );
+}
+
+/** Admin da plataforma sem a segunda etapa: SETUP = ainda não ligou; LOGIN = entrou só com senha. */
+function mfaRequired(kind: 'SETUP' | 'LOGIN', error: string) {
+  return NextResponse.json({ success: false, error, mfaRequired: kind }, { status: 403 });
 }
 
 export function parsePlatformAdminEmails(raw?: string | null): string[] {
@@ -64,6 +70,28 @@ export async function requirePlatformAdmin(
 
   if (!isPlatformAdminEmail(user.email)) {
     return { error: notFound() };
+  }
+
+  // O /interno exige verificação em duas etapas: ligada na conta e usada neste login.
+  // (Sem a migration ainda não dá para ligar: não trava, a Saúde do sistema avisa.)
+  const twoFactor = await loadTwoFactorState(user.id);
+  if (twoFactor.available) {
+    if (!twoFactor.enabled) {
+      return {
+        error: mfaRequired(
+          'SETUP',
+          'O painel interno exige verificação em duas etapas. Ative em Configurações → Perfil e entre de novo.'
+        ),
+      };
+    }
+    if (!auth.session.mfa) {
+      return {
+        error: mfaRequired(
+          'LOGIN',
+          'Saia e entre de novo usando o código do aplicativo autenticador para acessar o painel interno.'
+        ),
+      };
+    }
   }
 
   return { session: auth.session, email: String(user.email) };

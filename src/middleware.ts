@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
 ];
 const PUBLIC_API_PREFIXES = [
   '/api/auth/login',
+  '/api/auth/mfa/verify',
   '/api/auth/register',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',

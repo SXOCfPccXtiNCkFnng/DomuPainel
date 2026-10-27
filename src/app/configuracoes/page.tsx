@@ -22,6 +22,7 @@ import CoexistenceWidget from '@/components/dashboard/CoexistenceWidget';
 import Disclosure from '@/components/shared/Disclosure';
 import TeamSettingsPanel from '@/components/configuracoes/TeamSettingsPanel';
 import ProfileSettingsPanel from '@/components/configuracoes/ProfileSettingsPanel';
+import TwoFactorSettings from '@/components/configuracoes/TwoFactorSettings';
 import { MetaConnectButton, MetaConnectResult } from '@/components/shared/MetaConnectButton';
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
 import { reopenFirstSteps } from '@/lib/firstSteps';
@@ -235,6 +236,9 @@ export default function ConfiguracoesPage() {
         <div className="space-y-6">
           <div className={activeSection === 'profile' ? 'block' : 'hidden'}>
             <ProfileSettingsPanel />
+            <div className="mt-6">
+              <TwoFactorSettings />
+            </div>
           </div>
 
           <div className={activeSection === 'meta' ? 'block space-y-8' : 'hidden'}>

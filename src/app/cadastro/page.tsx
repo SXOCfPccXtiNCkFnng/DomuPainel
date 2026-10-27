@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
 import AuthShell from '@/components/auth/AuthShell';
+import Captcha, { captchaConfigured } from '@/components/auth/Captcha';
 import { clearAuthSession } from '@/lib/authStorage';
 import {
   formatPhoneBR,
@@ -42,6 +43,8 @@ export default function CadastroPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [legalModalDoc, setLegalModalDoc] = useState<LegalDoc | null>(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   // Field level validations
   const nameVal = validateFullName(name);
@@ -99,6 +102,11 @@ export default function CadastroPage() {
       return;
     }
 
+    if (captchaConfigured && !captchaToken) {
+      setErrorMessage('Aguarde a verificação anti-robô terminar e tente de novo.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -112,10 +120,12 @@ export default function CadastroPage() {
           companyName: companyName.trim(),
           whatsapp: phoneVal.digits,
           acceptedTerms,
+          captchaToken,
         }),
       });
 
       const data = await res.json();
+      setCaptchaReset((n) => n + 1);
 
       if (!res.ok || !data.success) {
         setErrorMessage(data.error || 'Erro ao realizar cadastro.');
@@ -381,6 +391,8 @@ export default function CadastroPage() {
             da Domu Tech.
           </span>
         </label>
+
+        <Captcha onToken={setCaptchaToken} resetKey={captchaReset} />
 
         <button
           type="submit"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { CAPTCHA_ERROR, verifyCaptchaToken } from '@/lib/captcha';
 import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import {
   appBaseUrl,
@@ -26,6 +27,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    if (!(await verifyCaptchaToken(body?.captchaToken, ip))) {
+      return NextResponse.json({ success: false, error: CAPTCHA_ERROR, captcha: true }, { status: 400 });
+    }
     const email = String(body.email || '')
       .toLowerCase()
       .trim();

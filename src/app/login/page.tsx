@@ -3,11 +3,13 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, AlertCircle, Eye, EyeOff, CheckCircle2, Check } from 'lucide-react';
+import { ArrowRight, AlertCircle, Eye, EyeOff, CheckCircle2, Check, ShieldCheck } from 'lucide-react';
 import AuthShell from '@/components/auth/AuthShell';
+import Captcha, { captchaConfigured } from '@/components/auth/Captcha';
 import { syncSessionToStorage } from '@/lib/sessionHelpers';
 import { persistLoginSession } from '@/lib/authStorage';
 import { validateEmail } from '@/lib/validators';
+import type { TenantSegment } from '@/types';
 
 const baseInputClass =
   'block w-full px-3 py-3 border bg-white text-slate-900 text-base placeholder-slate-400 focus:outline-none transition-colors';
@@ -24,6 +26,12 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaReset, setCaptchaReset] = useState(0);
+  // Segunda etapa (quem tem verificação em duas etapas ligada).
+  const [mfaStep, setMfaStep] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
 
   const emailVal = validateEmail(email);
   const isPasswordProvided = password.trim().length > 0;
@@ -55,6 +63,11 @@ function LoginForm() {
       return;
     }
 
+    if (captchaConfigured && !captchaToken) {
+      setErrorMessage('Aguarde a verificação anti-robô terminar e tente de novo.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -65,10 +78,13 @@ function LoginForm() {
           email: email.trim().toLowerCase(),
           password,
           rememberMe,
+          captchaToken,
         }),
       });
 
       const data = await res.json();
+      // Cada token do captcha vale uma vez: prepara outro para a próxima tentativa.
+      setCaptchaReset((n) => n + 1);
 
       if (!res.ok || !data.success) {
         setErrorMessage(data.error || 'E-mail ou senha incorretos.');
@@ -76,27 +92,74 @@ function LoginForm() {
         return;
       }
 
-      persistLoginSession(
-        {
-          domu_is_logged_in: 'true',
-          domu_user_email: data.user.email,
-          domu_user_name: data.user.name,
-          domu_tenant_id: data.user.tenantId,
-          domu_is_onboarded: data.user.isOnboarded ? 'true' : 'false',
-          domu_selected_segment: data.user.segment,
-          domu_company_name: data.user.companyName,
-        },
-        rememberMe
-      );
+      if (data.mfaRequired) {
+        setMfaStep(true);
+        setMfaCode('');
+        setUseRecovery(false);
+        setIsLoading(false);
+        return;
+      }
 
-      syncSessionToStorage({
-        isOnboarded: Boolean(data.user.isOnboarded),
-        segment: data.user.segment,
-        companyName: data.user.companyName,
-        tenantId: data.user.tenantId,
+      finishLogin(data.user);
+    } catch {
+      setErrorMessage('Erro ao conectar ao servidor. Tente novamente.');
+      setIsLoading(false);
+    }
+  };
+
+  /** Guarda a sessão no navegador e entra no painel (senha, ou senha + código). */
+  const finishLogin = (user: {
+    email: string;
+    name: string;
+    tenantId: string;
+    isOnboarded: boolean;
+    segment: TenantSegment;
+    companyName: string;
+  }) => {
+    persistLoginSession(
+      {
+        domu_is_logged_in: 'true',
+        domu_user_email: user.email,
+        domu_user_name: user.name,
+        domu_tenant_id: user.tenantId,
+        domu_is_onboarded: user.isOnboarded ? 'true' : 'false',
+        domu_selected_segment: user.segment,
+        domu_company_name: user.companyName,
+      },
+      rememberMe
+    );
+
+    syncSessionToStorage({
+      isOnboarded: Boolean(user.isOnboarded),
+      segment: user.segment,
+      companyName: user.companyName,
+      tenantId: user.tenantId,
+    });
+
+    router.push(user.isOnboarded ? '/' : '/onboarding');
+  };
+
+  const handleMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+    const value = mfaCode.trim();
+    if (!value) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(useRecovery ? { recoveryCode: value } : { code: value }),
       });
-
-      router.push(data.user.isOnboarded ? '/' : '/onboarding');
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'Código incorreto.');
+        setMfaCode('');
+        setIsLoading(false);
+        if (data.expired) setMfaStep(false);
+        return;
+      }
+      finishLogin(data.user);
     } catch {
       setErrorMessage('Erro ao conectar ao servidor. Tente novamente.');
       setIsLoading(false);
@@ -137,6 +200,63 @@ function LoginForm() {
         </div>
       )}
 
+      {mfaStep ? (
+        <form onSubmit={handleMfa} className="space-y-4" noValidate>
+          <div className="flex items-start gap-2 text-sm text-slate-600">
+            <ShieldCheck className="w-5 h-5 text-domu-blue shrink-0 mt-0.5" />
+            <p>
+              {useRecovery
+                ? 'Digite um dos códigos de recuperação que você guardou ao ativar a verificação. Cada um vale uma vez.'
+                : 'Abra o aplicativo autenticador no celular e digite o código de 6 dígitos da Domu Tech.'}
+            </p>
+          </div>
+          <input
+            type="text"
+            inputMode={useRecovery ? 'text' : 'numeric'}
+            autoComplete="one-time-code"
+            autoFocus
+            maxLength={useRecovery ? 12 : 6}
+            value={mfaCode}
+            onChange={(e) =>
+              setMfaCode(useRecovery ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 6))
+            }
+            className={`${baseInputClass} border-slate-200 focus:border-domu-blue focus:ring-1 focus:ring-domu-blue/30 text-center tracking-[0.4em] font-mono`}
+            placeholder={useRecovery ? 'xxxx-xxxx' : '000000'}
+            aria-label={useRecovery ? 'Código de recuperação' : 'Código do aplicativo autenticador'}
+          />
+          <button
+            type="submit"
+            disabled={isLoading || (useRecovery ? mfaCode.trim().length < 8 : mfaCode.length !== 6)}
+            className="w-full btn-domu-primary text-base py-3 justify-center disabled:opacity-40 transition-all"
+          >
+            {isLoading ? 'Conferindo...' : 'Confirmar e entrar'}
+          </button>
+          <div className="flex items-center justify-between text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setUseRecovery((v) => !v);
+                setMfaCode('');
+                setErrorMessage('');
+              }}
+              className="font-medium text-domu-blue hover:underline"
+            >
+              {useRecovery ? 'Usar o aplicativo autenticador' : 'Perdi o celular: usar código de recuperação'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMfaStep(false);
+                setMfaCode('');
+                setErrorMessage('');
+              }}
+              className="text-slate-500 hover:underline"
+            >
+              Voltar
+            </button>
+          </div>
+        </form>
+      ) : (
       <form onSubmit={handleLogin} className="space-y-4" noValidate>
         {/* E-mail */}
         <div>
@@ -209,6 +329,8 @@ function LoginForm() {
           Lembrar meu acesso
         </label>
 
+        <Captcha onToken={setCaptchaToken} resetKey={captchaReset} />
+
         <button
           type="submit"
           disabled={isLoading || !isFormValid}
@@ -222,6 +344,7 @@ function LoginForm() {
           )}
         </button>
       </form>
+      )}
     </AuthShell>
   );
 }

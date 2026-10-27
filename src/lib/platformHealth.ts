@@ -31,6 +31,8 @@ const REQUIRED_COLUMNS: { table: string; columns: string; migration: string }[] 
   { table: 'campaign_logs', columns: 'recipient_name, recipient_phone', migration: '20261013_campaign_logs_keep_history.sql' },
   { table: 'ops_alerts', columns: 'fingerprint, occurrences', migration: '20261013_ops_observability.sql' },
   { table: 'system_heartbeats', columns: 'name', migration: '20261013_ops_observability.sql' },
+  { table: 'users', columns: 'totp_enabled_at, totp_recovery_hashes', migration: '20261027_two_factor.sql' },
+  { table: 'finance_entries', columns: 'kind, amount', migration: '20261022_finance.sql' },
   { table: 'plan_prices', columns: 'plan_tier', migration: '20260908_plan_prices.sql' },
   { table: 'subscription_price_changes', columns: 'id', migration: '20260908_subscription_price_changes.sql' },
   { table: 'assistant_runs', columns: 'cost_usd, flags, review_status', migration: '20261019_assistant_runs.sql' },
@@ -86,6 +88,7 @@ const REQUIRED_ENV: { keys: string[]; label: string; why: string; minLength?: nu
   { keys: ['ASAAS_API_KEY', 'ASAAS_WEBHOOK_TOKEN'], label: 'Asaas', why: 'cobrança das assinaturas' },
   { keys: ['GEMINI_API_KEY'], label: 'GEMINI_API_KEY', why: 'checagem de contexto do follow-up e chat de suporte' },
   { keys: ['PLATFORM_ADMIN_EMAILS'], label: 'PLATFORM_ADMIN_EMAILS', why: 'acesso a este painel e e-mails de alerta' },
+  { keys: ['NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'], label: 'Captcha (Cloudflare Turnstile)', why: 'proteção anti-robô no login, cadastro e recuperação de senha' },
 ];
 
 function envValue(spec: string): string {

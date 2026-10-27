@@ -13,6 +13,8 @@ export type SessionPayload = {
   rem?: boolean;
   /** Impressão do password_hash: troca/reset de senha derruba sessões antigas. */
   pv?: string;
+  /** Sessão aberta com o código da verificação em duas etapas (exigido no /interno). */
+  mfa?: boolean;
 };
 
 export type AuthSession = {
@@ -20,6 +22,8 @@ export type AuthSession = {
   tenantId: string;
   role: string;
   rememberMe?: boolean;
+  /** Entrou passando pela verificação em duas etapas. */
+  mfa?: boolean;
 };
 
 function b64urlEncode(input: string | Buffer): string {
@@ -56,6 +60,7 @@ export function createSessionToken(
     role: payload.role,
     rem: payload.rem,
     pv: payload.pv,
+    ...(payload.mfa ? { mfa: true } : {}),
     exp: payload.exp ?? Math.floor(Date.now() / 1000) + maxAgeSeconds,
   };
   const encoded = b64urlEncode(JSON.stringify(body));
@@ -139,6 +144,7 @@ export async function requireAuth(
       tenantId: payload.tid,
       role: String(user.role || 'ATTENDANT').toUpperCase(),
       rememberMe: payload.rem,
+      mfa: Boolean(payload.mfa),
     },
   };
 }
@@ -203,7 +209,7 @@ export function sessionMaxAgeSeconds(rememberMe: boolean): number {
 
 export function applySessionCookie(
   res: NextResponse,
-  session: { userId: string; tenantId: string; role: string; passwordHash: string },
+  session: { userId: string; tenantId: string; role: string; passwordHash: string; mfa?: boolean },
   rememberMe: boolean
 ): void {
   const maxAge = sessionMaxAgeSeconds(rememberMe);
@@ -214,6 +220,7 @@ export function applySessionCookie(
       role: session.role,
       rem: rememberMe,
       pv: passwordFingerprint(session.passwordHash),
+      mfa: session.mfa,
     },
     maxAge
   );
@@ -228,6 +235,70 @@ export function applySessionCookie(
     sameSite: 'lax',
     path: '/',
     ...(rememberMe ? { maxAge } : {}),
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Verificação em duas etapas: passe entre a senha e o código          */
+/* ------------------------------------------------------------------ */
+
+export const MFA_COOKIE = 'domu_mfa';
+const MFA_CHALLENGE_SECONDS = 5 * 60;
+
+export type MfaChallenge = { uid: string; tid: string; role: string; pv: string; rem: boolean; exp: number };
+
+/** Assinatura separada da sessão: o passe nunca vale como sessão, e vice-versa. */
+function signMfa(data: string): string {
+  return sign(`mfa.${data}`);
+}
+
+/** Senha certa de quem tem duas etapas: guarda quem é por 5 min, até digitar o código. */
+export function applyMfaChallengeCookie(
+  res: NextResponse,
+  input: { userId: string; tenantId: string; role: string; passwordHash: string; rememberMe: boolean }
+): void {
+  const body: MfaChallenge = {
+    uid: input.userId,
+    tid: input.tenantId,
+    role: input.role,
+    pv: passwordFingerprint(input.passwordHash),
+    rem: input.rememberMe,
+    exp: Math.floor(Date.now() / 1000) + MFA_CHALLENGE_SECONDS,
+  };
+  const encoded = b64urlEncode(JSON.stringify(body));
+  res.cookies.set(MFA_COOKIE, `${encoded}.${signMfa(encoded)}`, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+    maxAge: MFA_CHALLENGE_SECONDS,
+  });
+}
+
+export function readMfaChallenge(req: NextRequest): MfaChallenge | null {
+  const token = req.cookies.get(MFA_COOKIE)?.value;
+  if (!token || !token.includes('.')) return null;
+  const [encoded, signature] = token.split('.');
+  const expected = signMfa(encoded);
+  const a = Buffer.from(signature || '');
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try {
+    const payload = JSON.parse(b64urlDecode(encoded).toString('utf8')) as MfaChallenge;
+    if (!payload?.uid || !payload?.tid || !payload?.pv || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export function clearMfaChallengeCookie(res: NextResponse): void {
+  res.cookies.set(MFA_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+    maxAge: 0,
   });
 }
 

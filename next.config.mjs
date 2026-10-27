@@ -18,8 +18,8 @@ const nextConfig = {
     // a CSP contra XSS sem ganho nenhum.
     const isDev = process.env.NODE_ENV !== 'production';
     const scriptSrc = isDev
-      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net"
-      : "script-src 'self' 'unsafe-inline' https://connect.facebook.net";
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://challenges.cloudflare.com"
+      : "script-src 'self' 'unsafe-inline' https://connect.facebook.net https://challenges.cloudflare.com";
 
     const csp = [
       "default-src 'self'",
@@ -31,8 +31,8 @@ const nextConfig = {
       "font-src 'self' data: https:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       scriptSrc,
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.asaas.com https://api-sandbox.asaas.com https://graph.facebook.com https://api.resend.com https://connect.facebook.net https://*.facebook.com",
-      "frame-src 'self' https://*.facebook.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.asaas.com https://api-sandbox.asaas.com https://graph.facebook.com https://api.resend.com https://connect.facebook.net https://*.facebook.com https://challenges.cloudflare.com",
+      "frame-src 'self' https://*.facebook.com https://challenges.cloudflare.com",
     ].join('; ');
 
     return [

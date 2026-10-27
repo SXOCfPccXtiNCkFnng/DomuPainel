@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { hashPassword, verifyPassword } from '@/lib/authHelpers';
-import { isTenantOnboarded } from '@/lib/sessionHelpers';
-import { applySessionCookie } from '@/lib/requireAuth';
-import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { applyMfaChallengeCookie, applySessionCookie, clearMfaChallengeCookie } from '@/lib/requireAuth';
+import { clientIpFromRequest } from '@/lib/rateLimit';
 import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
-import { TenantSegment } from '@/types';
+import { CAPTCHA_ERROR, verifyCaptchaToken } from '@/lib/captcha';
+import { hasTwoFactorEnabled } from '@/lib/twoFactor';
+import { buildLoginUser } from '@/lib/loginResponse';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,13 +25,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, rememberMe = true } = body;
+    const { email, password, rememberMe = true, captchaToken } = body;
 
     if (!email || !password) {
       return NextResponse.json(
         { success: false, error: 'E-mail e senha são obrigatórios.' },
         { status: 400 }
       );
+    }
+
+    if (!(await verifyCaptchaToken(captchaToken, ip))) {
+      return NextResponse.json({ success: false, error: CAPTCHA_ERROR, captcha: true }, { status: 400 });
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -65,39 +70,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const patch: Record<string, unknown> = {
-      last_login_at: new Date().toISOString(),
-    };
     let currentPasswordHash: string = user.password_hash;
     if (verify.needsRehash) {
       currentPasswordHash = await hashPassword(password);
-      patch.password_hash = currentPasswordHash;
+      await supabaseAdmin.from('users').update({ password_hash: currentPasswordHash }).eq('id', user.id);
     }
 
-    await supabaseAdmin.from('users').update(patch).eq('id', user.id);
+    // Duas etapas ligadas: a senha certa só libera a tela do código (5 min).
+    if (hasTwoFactorEnabled(user)) {
+      const res = NextResponse.json({ success: true, mfaRequired: true });
+      applyMfaChallengeCookie(res, {
+        userId: user.id,
+        tenantId: user.tenant_id,
+        role: user.role || 'ADMIN',
+        passwordHash: currentPasswordHash,
+        rememberMe: Boolean(rememberMe),
+      });
+      return res;
+    }
 
-    const { data: subscription } = await supabaseAdmin
-      .from('subscriptions')
-      .select('status')
-      .eq('tenant_id', user.tenant_id)
-      .maybeSingle();
-
-    const tenant = user.tenants;
-    const isOnboarded = isTenantOnboarded(subscription, tenant);
+    await supabaseAdmin.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id);
 
     const res = NextResponse.json({
       success: true,
       message: 'Autenticado com sucesso!',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        tenantId: user.tenant_id,
-        companyName: tenant?.name || 'Domu Tech Empresa',
-        segment: (tenant?.segment as TenantSegment) || 'geral',
-        isOnboarded,
-      },
+      user: await buildLoginUser(user),
     });
 
     applySessionCookie(
@@ -110,6 +107,7 @@ export async function POST(req: NextRequest) {
       },
       Boolean(rememberMe)
     );
+    clearMfaChallengeCookie(res);
 
     return res;
   } catch (error: any) {

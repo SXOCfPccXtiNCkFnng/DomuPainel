@@ -161,6 +161,8 @@ export async function PATCH(req: NextRequest) {
         tenantId: auth.session.tenantId,
         role: auth.session.role,
         passwordHash: updates.password_hash,
+        // Quem já tinha entrado com o código continua com a segunda etapa feita.
+        mfa: auth.session.mfa,
       },
       auth.session.rememberMe ?? true
     );

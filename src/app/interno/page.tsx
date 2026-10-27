@@ -29,6 +29,8 @@ import AssistantMonitor from '@/components/interno/AssistantMonitor';
 import PlanPricingEditor from '@/components/interno/PlanPricingEditor';
 import UsersMonitor from '@/components/interno/UsersMonitor';
 import InsightsMonitor from '@/components/interno/InsightsMonitor';
+import InternoMfaGate from '@/components/interno/InternoMfaGate';
+import SupportMfaReset from '@/components/interno/SupportMfaReset';
 import ProspectingMonitor from '@/components/interno/ProspectingMonitor';
 import ProfitCard from '@/components/interno/ProfitCard';
 
@@ -182,6 +184,7 @@ const HEALTH_ICON: Record<HealthStatus, React.ReactNode> = {
 export default function InternoPage() {
   const [tab, setTab] = useState<Tab>('overview');
   const [blocked, setBlocked] = useState(false);
+  const [mfaGate, setMfaGate] = useState<{ kind: 'SETUP' | 'LOGIN'; message: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overview, setOverview] = useState<PlatformOverview | null>(null);
@@ -216,6 +219,10 @@ export default function InternoPage() {
         return;
       }
       const json = await res.json();
+      if (res.status === 403 && (json.mfaRequired === 'SETUP' || json.mfaRequired === 'LOGIN')) {
+        setMfaGate({ kind: json.mfaRequired, message: json.error });
+        return;
+      }
       if (!json.success || !json.overview) {
         setBlocked(true);
         return;
@@ -370,6 +377,8 @@ export default function InternoPage() {
     if (!q) return list;
     return list.filter((t) => t.name.toLowerCase().includes(q) || t.tenantId.startsWith(q));
   }, [overview?.tenants, tenantSearch]);
+
+  if (mfaGate) return <InternoMfaGate kind={mfaGate.kind} message={mfaGate.message} />;
 
   if (blocked) {
     return (
@@ -893,6 +902,8 @@ export default function InternoPage() {
       ) : null}
 
       {/* ───────── Empresas ───────── */}
+      {tab === 'tenants' ? <SupportMfaReset /> : null}
+
       {tab === 'tenants' && overview ? (
         <Section
           title={`Empresas (${overview.tenants.length})`}

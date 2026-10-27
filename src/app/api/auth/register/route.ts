@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer';
 import { isPasswordStrong, hashPassword } from '@/lib/authHelpers';
 import { clearSessionCookie } from '@/lib/requireAuth';
 import { checkRateLimit, clientIpFromRequest } from '@/lib/rateLimit';
+import { CAPTCHA_ERROR, verifyCaptchaToken } from '@/lib/captcha';
 import { checkRateLimitDurable } from '@/lib/rateLimitDurable';
 import {
   validateEmail,
@@ -33,6 +34,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    if (!(await verifyCaptchaToken(body?.captchaToken, ip))) {
+      return NextResponse.json({ success: false, error: CAPTCHA_ERROR, captcha: true }, { status: 400 });
+    }
     const { name, email, password, companyName, whatsapp, acceptedTerms } = body;
 
     if (!acceptedTerms) {
