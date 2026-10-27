@@ -219,7 +219,7 @@ export default function LeadsPage() {
             const interest = interestSummary(l);
             const state = l.assistant_state || 'ACTIVE';
             return (
-              <div key={l.id} className="p-4 flex flex-col md:flex-row md:items-start gap-3">
+              <div key={l.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3">
                 <div className="flex-1 min-w-0 space-y-1">
                   <p className="text-sm font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                     {l.name}
@@ -254,7 +254,8 @@ export default function LeadsPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 md:flex-col md:items-end shrink-0">
+                {/* Ações lado a lado (quebram linha só se faltar espaço, como no celular). */}
+                <div className="flex flex-wrap items-center gap-2 md:justify-end shrink-0">
                   <select
                     value={current}
                     onChange={(e) => setLeadStage(l, e.target.value as LeadStage)}
@@ -276,7 +277,7 @@ export default function LeadsPage() {
                     <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                   </a>
                   {controlAvailable && (
-                    <div className="flex flex-wrap gap-1 md:justify-end">
+                    <div className="flex flex-wrap gap-1">
                       {state !== 'ACTIVE' && (
                         <button
                           type="button"

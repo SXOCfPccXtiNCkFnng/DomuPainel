@@ -37,7 +37,8 @@ import {
   validateCityState,
   validateWhatsAppPhone,
 } from '@/lib/onboardingValidation';
-import { PLAN_DISPATCH_LIMITS, PLAN_PRICES_BRL, PLAN_USER_LIMITS, isPlanAllowedForSegment } from '@/lib/planLimits';
+import { PLAN_PRICES_BRL, isPlanAllowedForSegment } from '@/lib/planLimits';
+import { planBlurb, planFeatures } from '@/lib/planFeatures';
 
 const STEPS = [
   { id: 1, label: 'Segmento' },
@@ -47,82 +48,21 @@ const STEPS = [
   { id: 5, label: 'Plano' },
 ] as const;
 
-type PlanFeature = { label: string; comingSoon?: boolean };
-
+/** Nome, rótulo e preço padrão dos cards. Texto e recursos vêm de planFeatures (por ramo, iguais à Assinatura). */
 const PLAN_OPTIONS: {
   id: 'STARTER' | 'PRO' | 'ENTERPRISE';
   name: string;
   tagline: string;
-  audience: string;
   price: number;
   highlight: boolean;
-  features: PlanFeature[];
 }[] = [
-  {
-    id: 'STARTER',
-    name: 'Starter',
-    tagline: 'MVP completo',
-    audience: 'Tudo que o corretor precisa para disparar, qualificar e medir ROI no WhatsApp.',
-    price: PLAN_PRICES_BRL.STARTER,
-    highlight: false,
-    features: [
-      { label: 'Cadastro de imóveis (foto, preço, região, status)' },
-      { label: 'Contatos + tags (interesse, região, faixa)' },
-      { label: 'Campanha: imóvel → segmento → envio' },
-      { label: PLAN_DISPATCH_LIMITS.STARTER.labelMonthly },
-      { label: PLAN_DISPATCH_LIMITS.STARTER.labelDaily! },
-      { label: 'Leads que responderam + métricas de ROI' },
-    ],
-  },
-  {
-    id: 'PRO',
-    name: 'Pro',
-    tagline: 'Mais popular',
-    audience: 'Para imobiliárias e equipes que precisam de mais volume e operação diária.',
-    price: PLAN_PRICES_BRL.PRO,
-    highlight: true,
-    features: [
-      { label: 'Tudo do Starter' },
-      { label: PLAN_DISPATCH_LIMITS.PRO.labelMonthly },
-      { label: 'Sem teto diário na plataforma' },
-      { label: `Até ${PLAN_USER_LIMITS.PRO} usuários na conta` },
-      { label: 'Relatórios avançados de campanha' },
-      { label: 'CRM e atendimento', comingSoon: true },
-      { label: 'Suporte prioritário DOMU' },
-    ],
-  },
-  {
-    id: 'ENTERPRISE',
-    name: 'Enterprise',
-    tagline: 'Alta escala',
-    audience: 'Para redes, franquias e operações com volume alto e acompanhamento dedicado.',
-    price: PLAN_PRICES_BRL.ENTERPRISE,
-    highlight: false,
-    features: [
-      { label: 'Tudo do Pro' },
-      { label: PLAN_DISPATCH_LIMITS.ENTERPRISE.labelMonthly },
-      { label: 'Multi-operadores no mesmo canal', comingSoon: true },
-      { label: 'API direta / número dedicado' },
-      { label: 'Onboarding assistido pela DOMU' },
-      { label: 'Gerente de conta e SLA' },
-    ],
-  },
+  { id: 'STARTER', name: 'Starter', tagline: 'Começar', price: PLAN_PRICES_BRL.STARTER, highlight: false },
+  { id: 'PRO', name: 'Pro', tagline: 'Mais popular', price: PLAN_PRICES_BRL.PRO, highlight: true },
+  { id: 'ENTERPRISE', name: 'Enterprise', tagline: 'Alta escala', price: PLAN_PRICES_BRL.ENTERPRISE, highlight: false },
 ];
 
-/** Somente Disparos = só Starter, com a lista de recursos do que ele realmente usa. */
-const DISPATCH_ONLY_STARTER: (typeof PLAN_OPTIONS)[number] = {
-  ...PLAN_OPTIONS[0],
-  tagline: 'Somente Disparos',
-  audience: 'Campanhas pelo WhatsApp oficial, sem cadastros complexos. Quando crescer, faça upgrade para o modo completo.',
-  features: [
-    { label: 'Campanhas e ofertas em massa com template aprovado' },
-    { label: 'Contatos + tags e gestão de opt-out' },
-    { label: 'Agendamento e acompanhamento de entrega' },
-    { label: PLAN_DISPATCH_LIMITS.STARTER.labelMonthly },
-    { label: PLAN_DISPATCH_LIMITS.STARTER.labelDaily! },
-    { label: 'Upgrade para Pro a qualquer momento, sem perder dados' },
-  ],
-};
+/** Somente Disparos = só Starter. */
+const DISPATCH_ONLY_STARTER: (typeof PLAN_OPTIONS)[number] = { ...PLAN_OPTIONS[0], tagline: 'Somente Disparos' };
 
 interface SegmentOption {
   id: TenantSegment;
@@ -1408,7 +1348,13 @@ export default function OnboardingPage() {
         {/* STEP 5: Pricing Plan & Payment Selection */}
         {currentStep === 5 && (() => {
           const dispatchOnly = !isPlanAllowedForSegment(selectedSegment, 'PRO');
-          const visiblePlans = dispatchOnly ? [DISPATCH_ONLY_STARTER] : PLAN_OPTIONS;
+          // Recursos do ramo escolhido (a mesma lista da tela Assinatura).
+          const planSegment = dispatchOnly ? 'marketing_apenas' : selectedSegment;
+          const visiblePlans = (dispatchOnly ? [DISPATCH_ONLY_STARTER] : PLAN_OPTIONS).map((p) => ({
+            ...p,
+            audience: planBlurb(planSegment, p.id),
+            features: planFeatures(planSegment, p.id),
+          }));
           const basePlan =
             visiblePlans.find((p) => p.id === selectedPlan) || visiblePlans[dispatchOnly ? 0 : 1];
           const activePlan = { ...basePlan, price: livePrices[basePlan.id] ?? basePlan.price };
@@ -1512,7 +1458,7 @@ export default function OnboardingPage() {
                       >
                         {plan.features.map((feature) => (
                           <li
-                            key={feature.label}
+                            key={feature}
                             className={`flex items-start gap-2 text-sm ${
                               isPro ? 'text-slate-200' : 'text-slate-600'
                             }`}
@@ -1522,14 +1468,7 @@ export default function OnboardingPage() {
                                 isPro ? 'text-blue-400' : 'text-emerald-600'
                               }`}
                             />
-                            <span className="flex items-center gap-1.5 flex-wrap">
-                              {feature.label}
-                              {feature.comingSoon && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wide">
-                                  Em breve
-                                </span>
-                              )}
-                            </span>
+                            <span>{feature}</span>
                           </li>
                         ))}
                       </ul>

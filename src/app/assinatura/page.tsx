@@ -16,73 +16,20 @@ import {
 } from 'lucide-react';
 import { getAuthItem, setAuthItem } from '@/lib/authStorage';
 import {
-  PLAN_ASSISTANT_CONVERSATION_LIMITS,
-  PLAN_PROPERTY_LIMITS,
   PLAN_DISPATCH_LIMITS,
   PLAN_PRICES_BRL,
-  PLAN_USER_LIMITS,
   PlanTier,
   isPlanAllowedForSegment,
 } from '@/lib/planLimits';
-import {
-  BUSINESS_SEGMENT_OPTIONS,
-  getSegmentFromStorage,
-  isRealEstateSegment,
-} from '@/lib/segmentConfig';
-import { isSchedulingSegment } from '@/lib/schedulingVerticals';
+import { BUSINESS_SEGMENT_OPTIONS, getSegmentFromStorage } from '@/lib/segmentConfig';
 import { LegalDocumentModal, LegalDoc } from '@/components/shared/LegalDocumentModal';
+import { planBlurb, planFeatures } from '@/lib/planFeatures';
 
-type PlanFeature = { label: string; comingSoon?: boolean };
-
-const PLANS: {
-  tier: PlanTier;
-  name: string;
-  eyebrow: string;
-  blurb: string;
-  features: PlanFeature[];
-  popular?: boolean;
-}[] = [
-  {
-    tier: 'STARTER',
-    name: 'Starter',
-    eyebrow: 'Começar',
-    blurb: 'Disparos oficiais via WhatsApp da Meta, com trava diária de segurança.',
-    features: [
-      { label: PLAN_DISPATCH_LIMITS.STARTER.labelMonthly },
-      { label: PLAN_DISPATCH_LIMITS.STARTER.labelDaily! },
-      { label: `Até ${PLAN_USER_LIMITS.STARTER} usuários na conta` },
-      { label: 'WhatsApp oficial da Meta' },
-      { label: 'Coexistência Celular + Web' },
-    ],
-  },
-  {
-    tier: 'PRO',
-    name: 'Pro',
-    eyebrow: 'Mais popular',
-    blurb: 'Mais volume, equipe e suporte prioritário para operações em crescimento.',
-    popular: true,
-    features: [
-      { label: PLAN_DISPATCH_LIMITS.PRO.labelMonthly },
-      { label: 'Sem teto diário na plataforma' },
-      { label: `Até ${PLAN_USER_LIMITS.PRO} usuários na conta` },
-      { label: 'Coexistência Celular + Web' },
-      { label: 'CRM e atendimento', comingSoon: true },
-      { label: 'Suporte prioritário DOMU' },
-    ],
-  },
-  {
-    tier: 'ENTERPRISE',
-    name: 'Enterprise',
-    eyebrow: 'Escala',
-    blurb: 'Volume alto, API dedicada e acompanhamento próximo da operação.',
-    features: [
-      { label: PLAN_DISPATCH_LIMITS.ENTERPRISE.labelMonthly },
-      { label: `Até ${PLAN_USER_LIMITS.ENTERPRISE} usuários na conta` },
-      { label: 'API direta / número dedicado' },
-      { label: 'Multi-operadores no mesmo canal', comingSoon: true },
-      { label: 'Gerente de conta dedicado' },
-    ],
-  },
+/** Nome e rótulo dos cards. Texto e recursos vêm de planFeatures (por ramo, iguais ao onboarding). */
+const PLANS: { tier: PlanTier; name: string; eyebrow: string; popular?: boolean }[] = [
+  { tier: 'STARTER', name: 'Starter', eyebrow: 'Começar' },
+  { tier: 'PRO', name: 'Pro', eyebrow: 'Mais popular', popular: true },
+  { tier: 'ENTERPRISE', name: 'Enterprise', eyebrow: 'Escala' },
 ];
 
 const PIX_DISCOUNT = 0.05;
@@ -558,55 +505,17 @@ export default function AssinaturaPage() {
                 </p>
                 <h4 className="text-lg font-black text-slate-900 mt-1">{plan.name}</h4>
                 <p className="text-xs text-slate-500 mt-1.5 leading-relaxed min-h-[40px]">
-                  {plan.blurb}
+                  {planBlurb(segment, plan.tier)}
                 </p>
                 <p className="mt-4 mb-5">
                   <span className="text-3xl font-black text-slate-900">R$ {price}</span>
                   <span className="text-xs text-slate-400 font-semibold">/mês</span>
                 </p>
                 <ul className="space-y-2.5 flex-1 mb-6">
-                  {dispatchOnly && plan.tier !== 'STARTER' && (
-                    <li className="flex items-start gap-2 text-xs text-domu-blue font-bold">
-                      <Zap className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>Ativa as ferramentas do seu ramo</span>
-                    </li>
-                  )}
-                  {isSchedulingSegment(segment) && (
-                    <li className="flex items-start gap-2 text-xs text-slate-700 font-medium">
+                  {planFeatures(segment, plan.tier).map((label) => (
+                    <li key={label} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
                       <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
-                      <span>
-                        Atendente IA: {PLAN_ASSISTANT_CONVERSATION_LIMITS[plan.tier].toLocaleString('pt-BR')} conversas/mês
-                      </span>
-                    </li>
-                  )}
-                  {isRealEstateSegment(segment) && (
-                    <li className="flex items-start gap-2 text-xs text-slate-700 font-medium">
-                      <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
-                      <span>
-                        {plan.tier === 'STARTER'
-                          ? 'Atendente IA de primeiro atendimento (entende o cliente, mostra os imóveis e passa para o corretor)'
-                          : 'Atendente IA completa: tira dúvidas e anota pedidos de visita'}
-                        : {PLAN_ASSISTANT_CONVERSATION_LIMITS[plan.tier].toLocaleString('pt-BR')} conversas/mês
-                      </span>
-                    </li>
-                  )}
-                  {isRealEstateSegment(segment) && (
-                    <li className="flex items-start gap-2 text-xs text-slate-700 font-medium">
-                      <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
-                      <span>Até {PLAN_PROPERTY_LIMITS[plan.tier].toLocaleString('pt-BR')} imóveis ativos no catálogo</span>
-                    </li>
-                  )}
-                  {plan.features.map((f) => (
-                    <li key={f.label} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
-                      <CheckCircle2 className="w-4 h-4 text-domu-blue shrink-0 mt-0.5" />
-                      <span className="flex items-center gap-1.5 flex-wrap">
-                        {f.label}
-                        {f.comingSoon && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wide">
-                            Em breve
-                          </span>
-                        )}
-                      </span>
+                      <span>{label}</span>
                     </li>
                   ))}
                 </ul>

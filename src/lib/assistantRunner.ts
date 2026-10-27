@@ -12,6 +12,7 @@ import { schedulingVerticalOf, type SchedulingVertical } from '@/lib/schedulingV
 import { isOptOutMessage, sendMetaText } from '@/lib/metaClient';
 import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import { notifyTenantAdmins } from '@/lib/notify';
+import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import {
   activePromo,
   assistantSettingsFromRow,
@@ -424,6 +425,17 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     ]);
     const vertical = tenant ? assistantVertical(tenant.segment) : null;
     if (!tenant || !vertical || !settingsRow?.enabled) return;
+
+    // Assinatura cancelada, vencida ou sem pagamento: a atendente para (mesma regra dos disparos e lembretes).
+    const { data: subscription } = await supabaseAdmin
+      .from('subscriptions')
+      .select('status')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!isSubscriptionAllowedToDispatch(subscription?.status)) {
+      logger.info('assistant.subscription_inactive', { tenantId, status: subscription?.status ?? null });
+      return;
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
