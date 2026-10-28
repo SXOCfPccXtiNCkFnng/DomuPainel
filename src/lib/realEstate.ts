@@ -396,10 +396,17 @@ export type VisitRequest = {
   property_label: string | null;
   customer_name: string;
   customer_phone: string;
-  preferred_time: string;
+  /** Preferência que o cliente disse para a atendente (visita marcada pelo corretor não tem). */
+  preferred_time: string | null;
   notes: string | null;
   status: VisitStatus;
   created_at: string;
+  /** Data e hora combinadas e o lembrete ao cliente (migration 20261028). */
+  scheduled_at?: string | null;
+  reminder_minutes?: number | null;
+  reminder_sent_at?: string | null;
+  reminder_status?: 'SENT' | 'FAILED' | 'SKIPPED' | null;
+  reminder_note?: string | null;
 };
 
 /** Perfil de interesse num texto curto (lista de leads e prompt). */

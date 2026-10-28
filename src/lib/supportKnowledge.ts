@@ -313,6 +313,10 @@ O que ela faz depende do plano:
 
 Em **Leads** fica o que cada cliente contou que procura e em que etapa está. Negociação, proposta e financiamento ela sempre passa para o corretor.
 
+No Pro, ao confirmar uma visita (em **Visitas**, ou pelo botão **Agendar visita** em Leads), você informa a data e a hora e escolhe com quanto tempo antes o cliente recebe um **aviso pelo WhatsApp** (ex.: 1 hora, 1 dia ou o tempo que quiser).
+
+A atendente também entende **áudios**: ela transcreve e responde ao que o cliente falou.
+
 Cada plano tem um limite de **imóveis ativos** no catálogo (disponíveis e lançamentos): Starter 30, Pro 150 e Enterprise 500. Vendidos, alugados e reservados não contam.`,
   },
   {

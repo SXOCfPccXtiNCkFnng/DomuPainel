@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CalendarCheck, Clock, Loader2, Lock, MessageCircle } from 'lucide-react';
+import { AlertCircle, Bell, CalendarCheck, CalendarClock, Clock, Loader2, Lock, MessageCircle } from 'lucide-react';
+import VisitScheduleModal, { type VisitScheduleValues } from '@/components/imoveis/VisitScheduleModal';
+import { reminderLabel } from '@/lib/visitReminderRules';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { formatPhoneBR } from '@/lib/validators';
 import { VISIT_STATUS_LABELS, type VisitRequest, type VisitStatus } from '@/lib/realEstate';
@@ -27,6 +29,9 @@ export default function VisitasPage() {
   const [planAllows, setPlanAllows] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scheduleAvailable, setScheduleAvailable] = useState(true);
+  // Visita sendo confirmada ou remarcada (abre a janela de data e aviso).
+  const [scheduling, setScheduling] = useState<VisitRequest | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -38,6 +43,7 @@ export default function VisitasPage() {
       }
       setVisits(json.visits || []);
       setPlanAllows(json.planAllowsVisits !== false);
+      setScheduleAvailable(json.scheduleAvailable !== false);
       setError(null);
     } catch {
       setError('Não foi possível carregar as visitas.');
@@ -63,6 +69,20 @@ export default function VisitasPage() {
       return;
     }
     setVisits((list) => list.map((v) => (v.id === visit.id ? { ...v, status } : v)));
+  };
+
+  /** Confirma (ou remarca) com a data combinada e o aviso ao cliente. */
+  const confirmWithSchedule = async (values: VisitScheduleValues): Promise<string | null> => {
+    if (!scheduling) return null;
+    const res = await fetch('/api/real-estate/visits', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: scheduling.id, status: 'CONFIRMED', ...values }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!json.success) return json.error || 'Não foi possível salvar a visita.';
+    await load();
+    return null;
   };
 
   if (isLoading) {
@@ -137,9 +157,27 @@ export default function VisitasPage() {
                       </span>
                     </p>
                     <p className="text-xs text-slate-700 font-semibold">{v.property_label || 'Imóvel removido'}</p>
-                    <p className="text-[11px] text-slate-600 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" /> Prefere: {v.preferred_time}
-                    </p>
+                    {v.scheduled_at ? (
+                      <p className="text-[11px] text-slate-800 font-bold flex items-center gap-1">
+                        <CalendarClock className="w-3.5 h-3.5" /> Marcada para {dateFormatter.format(new Date(v.scheduled_at))}
+                      </p>
+                    ) : v.preferred_time ? (
+                      <p className="text-[11px] text-slate-600 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" /> Prefere: {v.preferred_time}
+                      </p>
+                    ) : null}
+                    {v.scheduled_at && v.status === 'CONFIRMED' && (
+                      <p
+                        className={`text-[11px] flex items-center gap-1 ${
+                          v.reminder_status === 'FAILED' ? 'text-red-600' : v.reminder_status === 'SENT' ? 'text-emerald-700' : 'text-slate-500'
+                        }`}
+                      >
+                        <Bell className="w-3.5 h-3.5" />
+                        {v.reminder_minutes == null
+                          ? 'Sem aviso ao cliente'
+                          : v.reminder_note || `Aviso ao cliente ${reminderLabel(v.reminder_minutes)} antes`}
+                      </p>
+                    )}
                     {v.notes && <p className="text-[11px] text-slate-500">{v.notes}</p>}
                     <p className="text-[10.5px] text-slate-400">
                       {formatPhoneBR(v.customer_phone) || v.customer_phone} · pedido em {dateFormatter.format(new Date(v.created_at))}
@@ -157,10 +195,19 @@ export default function VisitasPage() {
                     {v.status === 'PENDING' && (
                       <button
                         type="button"
-                        onClick={() => setStatus(v, 'CONFIRMED')}
+                        onClick={() => (scheduleAvailable && planAllows ? setScheduling(v) : setStatus(v, 'CONFIRMED'))}
                         className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-domu-blue text-white hover:bg-blue-700"
                       >
-                        Confirmada
+                        Confirmar
+                      </button>
+                    )}
+                    {v.status === 'CONFIRMED' && scheduleAvailable && planAllows && (
+                      <button
+                        type="button"
+                        onClick={() => setScheduling(v)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-domu-blue hover:bg-blue-50"
+                      >
+                        {v.scheduled_at ? 'Remarcar' : 'Definir horário'}
                       </button>
                     )}
                     {v.status === 'CONFIRMED' && (
@@ -187,6 +234,17 @@ export default function VisitasPage() {
             </div>
           </section>
         ))}
+
+      <VisitScheduleModal
+        isOpen={Boolean(scheduling)}
+        title={scheduling?.status === 'CONFIRMED' ? 'Remarcar visita' : 'Confirmar visita'}
+        customerName={scheduling?.customer_name || ''}
+        hint={scheduling?.preferred_time}
+        initialScheduledAt={scheduling?.scheduled_at}
+        initialReminderMinutes={scheduling?.scheduled_at ? scheduling.reminder_minutes : undefined}
+        onClose={() => setScheduling(null)}
+        onSubmit={confirmWithSchedule}
+      />
     </div>
   );
 }

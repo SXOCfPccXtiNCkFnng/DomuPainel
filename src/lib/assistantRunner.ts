@@ -13,6 +13,7 @@ import { isOptOutMessage, sendMetaText } from '@/lib/metaClient';
 import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
+import { transcribePendingAudios } from '@/lib/audioTranscription';
 import {
   activePromo,
   assistantSettingsFromRow,
@@ -447,6 +448,20 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     // Cliente costuma mandar várias mensagens seguidas: só a última responde, com todas no contexto.
     await sleep(DEBOUNCE_MS);
     if ((await latestInboundId(tenantId, leadId)) !== trigger.messageId) return;
+
+    // Áudio do cliente: transcreve antes de ler o histórico (a IA responde ao que foi falado).
+    await transcribePendingAudios({
+      tenantId,
+      leadId,
+      apiKey,
+      model: GEMINI_MODEL,
+      usage,
+      deadline: runStartedAt + 25_000,
+      getAccessToken: async () => {
+        const wa = await requireVerifiedWhatsApp(tenantId);
+        return wa.ok ? wa.credentials.accessToken : null;
+      },
+    });
 
     const now = new Date();
     const [leadRes, historyRes, humanRes, botCountRes] = await Promise.all([

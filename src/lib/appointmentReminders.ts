@@ -8,8 +8,6 @@ import { logger } from '@/lib/logger';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
 import {
-  createMetaMessageTemplate,
-  fetchMetaTemplateStatus,
   formatMetaError,
   sendMetaTemplate,
   sendMetaText,
@@ -18,6 +16,7 @@ import {
 import { phoneLookupVariants } from '@/lib/phone';
 import { DEFAULT_SCHEDULING_SETTINGS } from '@/lib/scheduling';
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
+import { ensureUtilityTemplate, type TemplateState } from '@/lib/utilityTemplate';
 import { schedulingCopyFor } from '@/lib/schedulingVerticals';
 import {
   dueReminder,
@@ -31,10 +30,6 @@ import {
   type ReminderKind,
   type ReminderSettings,
 } from '@/lib/appointmentReminderRules';
-
-type TemplateState =
-  | { ok: true; name: string; language: string }
-  | { ok: false; reason: string };
 
 type TenantContext = {
   settings: ReminderSettings;
@@ -72,89 +67,36 @@ const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
  * Chamado ao salvar a agenda e, se faltar, pelo cron.
  */
 export async function ensureReminderTemplate(tenantId: string): Promise<TemplateState> {
-  const { data: row, error } = await supabaseAdmin
-    .from('scheduling_settings')
-    .select('reminder_template_id')
-    .eq('tenant_id', tenantId)
-    .maybeSingle();
-  if (error) {
-    if (error.code === '42703') return { ok: false, reason: 'Lembretes ainda não ativados no banco (migration pendente).' };
-    throw error;
-  }
-
-  if (row?.reminder_template_id) {
-    const { data: tpl } = await supabaseAdmin
-      .from('hsm_templates')
-      .select('id, name, language, status, meta_template_id')
-      .eq('id', row.reminder_template_id)
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-    if (tpl) {
-      let status = tpl.status;
-      if (status === 'PENDING' && tpl.meta_template_id) {
-        const meta = await fetchMetaTemplateStatus(tenantId, tpl.meta_template_id);
-        if (meta.ok && meta.status !== 'PENDING') {
-          status = meta.status;
-          await supabaseAdmin
-            .from('hsm_templates')
-            .update({ status, updated_at: new Date().toISOString() })
-            .eq('id', tpl.id)
-            .eq('tenant_id', tenantId);
-          if (status === 'REJECTED') {
-            logger.warn('reminders.template_rejected', { tenantId, reason: meta.reason });
-          }
-        }
+  let hasRow = false;
+  return ensureUtilityTemplate(tenantId, {
+    prefix: REMINDER_TEMPLATE_PREFIX,
+    body: REMINDER_TEMPLATE_BODY,
+    variables: ['nome', 'servico', 'horario'],
+    label: 'do lembrete',
+    loadId: async () => {
+      const { data, error } = await supabaseAdmin
+        .from('scheduling_settings')
+        .select('reminder_template_id')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (error) {
+        if (error.code === '42703') return 'missing';
+        throw error;
       }
-      if (status === 'APPROVED') return { ok: true, name: tpl.name, language: tpl.language || 'pt_BR' };
-      if (status === 'PENDING') return { ok: false, reason: 'Modelo do lembrete em análise na Meta.' };
-      return { ok: false, reason: 'A Meta reprovou o modelo do lembrete.' };
-    }
-  }
-
-  const name = `${REMINDER_TEMPLATE_PREFIX}${Date.now().toString(36)}`;
-  const meta = await createMetaMessageTemplate({
-    tenantId,
-    name,
-    category: 'UTILITY',
-    language: 'pt_BR',
-    bodyText: REMINDER_TEMPLATE_BODY,
+      hasRow = Boolean(data);
+      return data?.reminder_template_id ?? null;
+    },
+    saveId: async (templateId) => {
+      // Conta que nunca salvou a agenda ainda não tem linha: cria com o padrão.
+      const { error } = await supabaseAdmin.from('scheduling_settings').upsert(
+        hasRow
+          ? { tenant_id: tenantId, reminder_template_id: templateId, updated_at: new Date().toISOString() }
+          : { tenant_id: tenantId, ...DEFAULT_SCHEDULING_SETTINGS, reminder_template_id: templateId },
+        { onConflict: 'tenant_id' }
+      );
+      if (error) throw error;
+    },
   });
-  if (!meta.success) {
-    logger.warn('reminders.template_create_failed', { tenantId, message: meta.error });
-    return { ok: false, reason: `Não foi possível criar o modelo do lembrete na Meta: ${meta.error || 'erro desconhecido'}.` };
-  }
-
-  const status = String(meta.status || 'PENDING').toUpperCase();
-  const finalStatus = status === 'APPROVED' ? 'APPROVED' : status === 'REJECTED' ? 'REJECTED' : 'PENDING';
-  const { data: inserted, error: insertError } = await supabaseAdmin
-    .from('hsm_templates')
-    .insert({
-      tenant_id: tenantId,
-      name,
-      category: 'UTILITY',
-      language: 'pt_BR',
-      status: finalStatus,
-      meta_template_id: meta.metaTemplateId || null,
-      header_type: 'NONE',
-      body_text: REMINDER_TEMPLATE_BODY,
-      variables: meta.variables || ['nome', 'servico', 'horario'],
-    })
-    .select('id')
-    .single();
-  if (insertError || !inserted) throw insertError || new Error('Falha ao salvar o modelo do lembrete.');
-
-  // Conta que nunca salvou a agenda ainda não tem linha: cria com o padrão.
-  const { error: linkError } = await supabaseAdmin.from('scheduling_settings').upsert(
-    row
-      ? { tenant_id: tenantId, reminder_template_id: inserted.id, updated_at: new Date().toISOString() }
-      : { tenant_id: tenantId, ...DEFAULT_SCHEDULING_SETTINGS, reminder_template_id: inserted.id },
-    { onConflict: 'tenant_id' }
-  );
-  if (linkError) throw linkError;
-
-  logger.info('reminders.template_created', { tenantId, status: finalStatus });
-  if (finalStatus === 'APPROVED') return { ok: true, name, language: 'pt_BR' };
-  return { ok: false, reason: 'Modelo do lembrete em análise na Meta.' };
 }
 
 async function loadTenantContext(tenantId: string): Promise<TenantContext> {

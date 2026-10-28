@@ -349,6 +349,8 @@ export function toMetaPositionalBody(bodyText: string): {
     texto: 'cliente',
     empresa: 'Sua Empresa',
     servico: 'Lavagem completa',
+    imovel: 'Apartamento 2 quartos no Centro',
+    quando: 'amanhã às 10:00',
   };
 
   const metaBody = bodyText.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_full, rawName: string) => {

@@ -10,6 +10,7 @@ import { handleFollowUpReply, loadFollowUpSettings, scheduleConversationFollowUp
 import type { FollowUpSettings } from '@/lib/followUpRules';
 import { recordHeartbeat } from '@/lib/heartbeat';
 import { runAssistantForTrigger, type AssistantTrigger } from '@/lib/assistantRunner';
+import { META_MEDIA_PREFIX } from '@/lib/audioTranscription';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -281,6 +282,10 @@ async function handleInboundMessage(
     sender_type: 'CUSTOMER',
     message_type: (message.type || 'TEXT').toUpperCase(),
     body: bodyText,
+    // Áudio: guarda o id da mídia na Meta para a atendente transcrever depois.
+    ...(message.type === 'audio' && message.audio?.id
+      ? { media_url: `${META_MEDIA_PREFIX}${message.audio.id}|${message.audio.mime_type || 'audio/ogg'}` }
+      : {}),
     wamid: message.id || null,
     status: 'DELIVERED',
   };

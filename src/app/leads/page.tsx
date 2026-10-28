@@ -1,11 +1,19 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Bot, BotOff, Building2, Loader2, MessageCircle, Search, UserRound } from 'lucide-react';
+import { AlertCircle, Bot, BotOff, Building2, CalendarPlus, Loader2, MessageCircle, Search, UserRound } from 'lucide-react';
+import VisitScheduleModal, { type VisitScheduleValues } from '@/components/imoveis/VisitScheduleModal';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { agendaInputClass } from '@/components/agenda/agendaStyles';
 import { formatPhoneBR } from '@/lib/validators';
-import { interestSummary, LEAD_STAGE_LABELS, LEAD_STAGES, type LeadStage } from '@/lib/realEstate';
+import {
+  interestSummary,
+  LEAD_STAGE_LABELS,
+  LEAD_STAGES,
+  OFFERABLE_STATUSES,
+  type LeadStage,
+  type RealEstateProperty,
+} from '@/lib/realEstate';
 
 type LeadRow = {
   id: string;
@@ -66,6 +74,9 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('');
   const [controlAvailable, setControlAvailable] = useState(true);
   const [busyLead, setBusyLead] = useState<string | null>(null);
+  // Agendar visita direto pelo lead (data, imóvel e aviso ao cliente).
+  const [visitLead, setVisitLead] = useState<LeadRow | null>(null);
+  const [propertyOptions, setPropertyOptions] = useState<{ id: string; label: string }[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -119,6 +130,37 @@ export default function LeadsPage() {
       setLeads((list) => list.map((l) => (l.id === lead.id ? { ...l, status: previous } : l)));
       setError(json.error || 'Não foi possível mudar a etapa.');
     }
+  };
+
+  const openVisit = async (lead: LeadRow) => {
+    setVisitLead(lead);
+    if (propertyOptions.length) return;
+    try {
+      const res = await fetch('/api/properties');
+      const json = await res.json();
+      if (json.success) {
+        setPropertyOptions(
+          (json.properties as RealEstateProperty[])
+            .filter((p) => OFFERABLE_STATUSES.includes(p.status))
+            .map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))
+        );
+      }
+    } catch {
+      /* agenda sem imóvel, se a lista não carregar */
+    }
+  };
+
+  const scheduleVisit = async (values: VisitScheduleValues): Promise<string | null> => {
+    if (!visitLead) return null;
+    const res = await fetch('/api/real-estate/visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: visitLead.id, ...values }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!json.success) return json.error || 'Não foi possível agendar a visita.';
+    await load();
+    return null;
   };
 
   const controlAssistant = async (lead: LeadRow, action: 'resume' | 'disable') => {
@@ -276,6 +318,13 @@ export default function LeadsPage() {
                   >
                     <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => openVisit(l)}
+                    className="px-3 py-2 rounded-xl text-[11px] font-bold border border-slate-200 text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-1.5"
+                  >
+                    <CalendarPlus className="w-3.5 h-3.5" /> Agendar visita
+                  </button>
                   {controlAvailable && (
                     <div className="flex flex-wrap gap-1">
                       {state !== 'ACTIVE' && (
@@ -307,6 +356,15 @@ export default function LeadsPage() {
           })}
         </div>
       )}
+
+      <VisitScheduleModal
+        isOpen={Boolean(visitLead)}
+        title="Agendar visita"
+        customerName={visitLead?.name || ''}
+        properties={propertyOptions}
+        onClose={() => setVisitLead(null)}
+        onSubmit={scheduleVisit}
+      />
     </div>
   );
 }
