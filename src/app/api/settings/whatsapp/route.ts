@@ -3,6 +3,7 @@ import { internalErrorResponse } from '@/lib/errors';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { decryptData, encryptData } from '@/lib/crypto';
 import { subscribeAppToWaba, verifyMetaPhoneOwnership } from '@/lib/metaClient';
+import { scheduleSegmentTemplates } from '@/lib/segmentTemplates';
 import { requireAuth, requireAdmin } from '@/lib/requireAuth';
 import { generateSecureToken } from '@/lib/email';
 
@@ -174,6 +175,9 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', tenantId);
       if (tenantError) throw tenantError;
+
+      // WhatsApp conectado: cria na Meta os modelos do ramo (se a assinatura já estiver ativa).
+      scheduleSegmentTemplates(tenantId);
 
       // Igual ao login da Meta: inscreve o app do token na conta WhatsApp, senão
       // as mensagens dos clientes não chegam na Domu. Falha não desfaz o salvamento.

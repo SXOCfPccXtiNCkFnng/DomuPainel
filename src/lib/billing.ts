@@ -8,6 +8,7 @@ import {
 import { getTenantPlanPrice } from '@/lib/planPricing';
 import { notifyTenantAdmins } from '@/lib/notify';
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { after } from 'next/server';
 
 export type CouponRow = {
   code: string;
@@ -261,6 +262,19 @@ export async function activateTenantSubscription(input: {
         updated_at: new Date().toISOString(),
       })
       .eq('id', input.tenantId);
+
+    // Plano ativo (ou ramo novo no upgrade): cria na Meta os modelos do ramo,
+    // se o WhatsApp já estiver conectado. Depois da resposta, sem atrasar o pagamento.
+    const tenantId = input.tenantId;
+    const provision = () =>
+      import('@/lib/segmentTemplates')
+        .then((m) => m.provisionSegmentTemplates(tenantId))
+        .catch((err) => console.warn('[billing] modelos do ramo:', err instanceof Error ? err.message : err));
+    try {
+      after(provision);
+    } catch {
+      void provision();
+    }
   }
 
   if (status === 'ACTIVE' && !wasAlreadyActive) {

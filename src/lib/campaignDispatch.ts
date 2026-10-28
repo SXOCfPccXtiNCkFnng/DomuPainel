@@ -50,7 +50,7 @@ export async function dispatchCampaignPending(
   let query = supabaseAdmin
     .from('campaigns')
     // '*' (e não colunas fixas): inclui template_params sem quebrar se a migration não rodou.
-    .select('*, hsm_templates(name, language, variables, body_text)')
+    .select('*, hsm_templates(name, language, variables, body_text, header_type, header_content)')
     .eq('id', campaignId);
 
   if (options?.tenantId) {
@@ -142,8 +142,14 @@ export async function dispatchCampaignPending(
             : templateObj.language || 'pt_BR',
         variables: templateObj.variables || [],
         bodyText: templateObj.body_text || '',
+        headerType: templateObj.header_type || 'NONE',
+        headerContent: templateObj.header_content || null,
       }
     : await resolveTemplateDetails(campaign.template_id, campaign.tenant_id);
+
+  // Modelo com imagem no topo: a imagem da campanha (ou a do modelo) vai em cada envio.
+  const headerImageUrl: string | null =
+    templateMeta?.headerType === 'IMAGE' ? (campaign as any).header_image_url || templateMeta.headerContent || null : null;
 
   const templateName = templateMeta?.name || null;
   const languageCode =
@@ -403,6 +409,9 @@ export async function dispatchCampaignPending(
             companyName,
           });
         }
+        if (headerImageUrl) {
+          components = [{ type: 'header', parameters: [{ type: 'image', image: { link: headerImageUrl } }] }, ...(components || [])];
+        }
 
         const result = await sendMetaTemplate({
           to: phone,
@@ -504,11 +513,18 @@ export async function dispatchCampaignPending(
 async function resolveTemplateDetails(
   templateId: string | null,
   tenantId: string
-): Promise<{ name: string; language: string; variables?: string[]; bodyText?: string } | null> {
+): Promise<{
+  name: string;
+  language: string;
+  variables?: string[];
+  bodyText?: string;
+  headerType?: string;
+  headerContent?: string | null;
+} | null> {
   if (!templateId) return null;
   const { data } = await supabaseAdmin
     .from('hsm_templates')
-    .select('name, language, variables, body_text')
+    .select('name, language, variables, body_text, header_type, header_content')
     .eq('id', templateId)
     .eq('tenant_id', tenantId)
     .maybeSingle();
@@ -519,6 +535,8 @@ async function resolveTemplateDetails(
       language: data.language || (data.name.startsWith('jaspers_') ? 'en_US' : 'pt_BR'),
       variables: data.variables || [],
       bodyText: data.body_text || '',
+      headerType: data.header_type || 'NONE',
+      headerContent: data.header_content || null,
     };
   }
 

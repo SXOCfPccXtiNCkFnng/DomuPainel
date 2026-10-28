@@ -35,6 +35,7 @@ const REQUIRED_COLUMNS: { table: string; columns: string; migration: string }[] 
   { table: 'finance_entries', columns: 'kind, amount', migration: '20261022_finance.sql' },
   { table: 'visit_requests', columns: 'scheduled_at, reminder_minutes', migration: '20261028_visit_reminders.sql' },
   { table: 'tenants', columns: 'visit_reminder_template_id', migration: '20261028_visit_reminders.sql' },
+  { table: 'tenants', columns: 'templates_provisioned_at', migration: '20261028_segment_templates.sql' },
   { table: 'plan_prices', columns: 'plan_tier', migration: '20260908_plan_prices.sql' },
   { table: 'subscription_price_changes', columns: 'id', migration: '20260908_subscription_price_changes.sql' },
   { table: 'assistant_runs', columns: 'cost_usd, flags, review_status', migration: '20261019_assistant_runs.sql' },

@@ -245,7 +245,9 @@ export default function CampaignWizardModal({
           (t: any) =>
             t.status === 'APPROVED' &&
             !t.name.startsWith('jaspers_') &&
-            t.name !== 'hello_world'
+            t.name !== 'hello_world' &&
+            // Modelos dos lembretes automáticos não são para campanha.
+            !t.system_use
         );
         setTemplates(approvedOnly);
         if (approvedOnly.length > 0) {
@@ -322,10 +324,8 @@ export default function CampaignWizardModal({
   const isMetaLimitReached = rawTargetCount > dailyTierLimit;
   const targetCount = rawTargetCount;
 
-  const hasImageHeader =
-    selectedTemplate?.header_type === 'IMAGE' ||
-    Boolean(selectedTemplate?.header_content) ||
-    Boolean(campaignImageUrl && selectedTemplate?.name?.includes('imagem'));
+  // Modelo com imagem no topo: cada campanha escolhe a imagem que vai no disparo.
+  const hasImageHeader = selectedTemplate?.header_type === 'IMAGE';
 
   const paramsValidation = validateTemplateParams(templateVariables, templateParams);
 
@@ -368,6 +368,7 @@ export default function CampaignWizardModal({
           templateName: selectedTemplate.name,
           templateId: selectedTemplate.id,
           templateParams: paramsValidation.params,
+          ...(hasImageHeader ? { headerImageUrl: campaignImageUrl.trim() } : {}),
           leadIds,
           propertyId: propertyId || null,
           scheduledAt: finalScheduledAt,
@@ -937,7 +938,7 @@ export default function CampaignWizardModal({
                         value={campaignImageUrl}
                         onChange={setCampaignImageUrl}
                         label="Imagem do banner da campanha"
-                        hint="Cole uma URL ou faça upload. A Meta usa essa imagem no disparo."
+                        hint="Obrigatória: este modelo tem imagem no topo. Faça upload (JPG ou PNG) ou cole um link https. Vai em todas as mensagens desta campanha."
                       />
                     )}
 

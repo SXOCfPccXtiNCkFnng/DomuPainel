@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { internalErrorResponse } from '@/lib/errors';
+import { isValidCampaignImageUrl } from '@/lib/templateImages';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth, requireDispatcher } from '@/lib/requireAuth';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
@@ -212,7 +213,7 @@ export async function POST(req: NextRequest) {
 
     const { data: templateRow } = await supabaseAdmin
       .from('hsm_templates')
-      .select('status, body_text')
+      .select('status, body_text, header_type')
       .eq('id', resolvedTemplateId)
       .eq('tenant_id', tenantId)
       .maybeSingle();
@@ -240,6 +241,15 @@ export async function POST(req: NextRequest) {
     }
     const templateParams = paramsCheck.params;
 
+    // Modelo com imagem no topo: a campanha precisa da imagem (a Meta baixa o link em cada envio).
+    const needsImage = templateRow?.header_type === 'IMAGE';
+    if (needsImage && !isValidCampaignImageUrl(body.headerImageUrl)) {
+      return NextResponse.json(
+        { success: false, error: 'Este modelo tem imagem no topo: escolha a imagem da campanha (upload ou link https).' },
+        { status: 400 }
+      );
+    }
+
     const campaignPayload: Record<string, unknown> = {
       tenant_id: tenantId,
       template_id: resolvedTemplateId,
@@ -254,6 +264,7 @@ export async function POST(req: NextRequest) {
       read_count: 0,
       failed_count: 0,
       template_params: templateParams,
+      ...(needsImage ? { header_image_url: body.headerImageUrl } : {}),
     };
     if (propertyId) {
       // Confirma que o imóvel é do próprio tenant antes de gravar a referência —

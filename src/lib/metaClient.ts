@@ -351,6 +351,11 @@ export function toMetaPositionalBody(bodyText: string): {
     servico: 'Lavagem completa',
     imovel: 'Apartamento 2 quartos no Centro',
     quando: 'amanhã às 10:00',
+    bairro: 'Centro',
+    descricao: 'apartamento 2 quartos com varanda',
+    promocao: 'lavagem completa por R$ 70',
+    novidade: 'novos horários aos sábados',
+    nome_comprador: 'Juliana',
   };
 
   const metaBody = bodyText.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_full, rawName: string) => {
@@ -367,6 +372,51 @@ export function toMetaPositionalBody(bodyText: string): {
   return { metaBody, variables, examples };
 }
 
+/** Imagem do topo de modelo: a Meta aceita JPG e PNG até 5 MB. */
+export const TEMPLATE_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+export const TEMPLATE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Envia a imagem de exemplo pelo upload retomável da Meta (sessão no app →
+ * envio do arquivo) e devolve o "handle" que vai no modelo.
+ */
+export async function uploadTemplateExampleImage(
+  accessToken: string,
+  data: Buffer,
+  mimeType: string
+): Promise<{ ok: true; handle: string } | { ok: false; error: string }> {
+  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+  if (!appId) return { ok: false, error: 'NEXT_PUBLIC_META_APP_ID não configurado para enviar imagem à Meta.' };
+  if (!TEMPLATE_IMAGE_TYPES.includes(mimeType)) return { ok: false, error: 'A imagem do modelo precisa ser JPG ou PNG.' };
+  if (data.length > TEMPLATE_IMAGE_MAX_BYTES) return { ok: false, error: 'A imagem do modelo pode ter no máximo 5 MB.' };
+
+  try {
+    const sessionUrl = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${appId}/uploads?${new URLSearchParams({
+      file_name: mimeType === 'image/png' ? 'exemplo.png' : 'exemplo.jpg',
+      file_length: String(data.length),
+      file_type: mimeType,
+    })}`;
+    const sessionRes = await metaFetch(sessionUrl, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } });
+    const session = await sessionRes.json();
+    if (!sessionRes.ok || !session?.id) {
+      return { ok: false, error: session?.error?.message || 'A Meta não abriu o envio da imagem.' };
+    }
+
+    const fileRes = await metaFetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${session.id}`, {
+      method: 'POST',
+      headers: { Authorization: `OAuth ${accessToken}`, file_offset: '0' },
+      body: new Uint8Array(data),
+    });
+    const file = await fileRes.json();
+    if (!fileRes.ok || !file?.h) {
+      return { ok: false, error: file?.error?.message || 'A Meta não recebeu a imagem.' };
+    }
+    return { ok: true, handle: String(file.h) };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Erro ao enviar a imagem para a Meta.' };
+  }
+}
+
 /** Cria um template HSM na WABA do cliente via Graph API. */
 export async function createMetaMessageTemplate(options: {
   tenantId: string;
@@ -375,6 +425,8 @@ export async function createMetaMessageTemplate(options: {
   language?: string;
   bodyText: string;
   headerType?: 'NONE' | 'IMAGE';
+  /** Imagem de exemplo do topo (JPG/PNG): a Meta exige para aprovar modelo com imagem. */
+  headerImage?: { data: Buffer; mimeType: string };
 }): Promise<{
   success: boolean;
   metaTemplateId?: string;
@@ -416,12 +468,16 @@ export async function createMetaMessageTemplate(options: {
     },
   ];
 
-  // HEADER IMAGE exige media handle (upload resumable). Por enquanto enviamos
-  // só o texto à Meta e mantemos a imagem no Domu para preview local.
+  // Imagem no topo: a Meta pede uma imagem de exemplo (enviada antes, vira um "handle").
+  // Cada disparo depois manda a imagem da campanha.
   let warning: string | undefined;
   if (options.headerType === 'IMAGE') {
-    warning =
-      'A imagem foi salva no Domu para preview; a Meta recebeu o template só com o texto (upload de mídia em breve).';
+    if (!options.headerImage) {
+      return { success: false, error: 'Escolha a imagem de exemplo do modelo (JPG ou PNG).' };
+    }
+    const upload = await uploadTemplateExampleImage(creds.accessToken, options.headerImage.data, options.headerImage.mimeType);
+    if (!upload.ok) return { success: false, error: upload.error };
+    components.unshift({ type: 'HEADER', format: 'IMAGE', example: { header_handle: [upload.handle] } });
   }
 
   const url = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${wabaId}/message_templates`;

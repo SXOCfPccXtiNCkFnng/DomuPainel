@@ -7,6 +7,7 @@ import { generateSecureToken } from '@/lib/email';
 import { isValidBrazilianPhone } from '@/lib/validators';
 import { getMetaAppSecret } from '@/lib/envSecrets';
 import { logger } from '@/lib/logger';
+import { scheduleSegmentTemplates } from '@/lib/segmentTemplates';
 import { pickOnboardedPhone, type ListedWhatsappPhone } from '@/lib/metaSignupPhone';
 import { META_GRAPH_API_VERSION, metaFetch, subscribeAppToWaba } from '@/lib/metaClient';
 
@@ -407,6 +408,9 @@ export async function POST(req: NextRequest) {
         .eq('tenant_id', tenantId)
         .eq('role', 'ADMIN');
     }
+
+    // WhatsApp conectado: cria na Meta os modelos do ramo (se a assinatura já estiver ativa).
+    scheduleSegmentTemplates(tenantId);
 
     logger.info('onboarding.embedded_signup_connected', {
       tenantId,

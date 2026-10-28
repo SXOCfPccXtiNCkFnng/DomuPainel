@@ -247,7 +247,15 @@ export default function TemplatesPage() {
                   <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700 font-mono">
                     {tpl.language || 'pt_BR'}
                   </span>
-                  {tpl.is_generic || tpl.is_global ? (
+                  {tpl.system_use ? (
+                    <span className="px-2 py-0.5 bg-violet-50 text-violet-700 border border-violet-200 rounded font-black tracking-wide">
+                      {String(tpl.system_use).toUpperCase()}
+                    </span>
+                  ) : tpl.is_domu ? (
+                    <span className="px-2 py-0.5 bg-blue-50 text-domu-blue border border-blue-200 rounded font-black tracking-wide">
+                      CRIADO PELA DOMU
+                    </span>
+                  ) : tpl.is_generic || tpl.is_global ? (
                     <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-black tracking-wide">
                       MODELO GENÉRICO
                     </span>
@@ -284,7 +292,11 @@ export default function TemplatesPage() {
                   Variáveis: {tpl.variables?.join(', ') || '1'}
                 </span>
 
-                {isApproved ? (
+                {tpl.system_use ? (
+                  <span className="text-violet-700 font-extrabold text-[11px]">
+                    {isApproved ? 'Ativo nos lembretes' : tpl.status === 'PENDING' ? 'Aguardando Meta' : 'Reprovado pela Meta'}
+                  </span>
+                ) : isApproved ? (
                   <span className="text-emerald-700 font-extrabold text-[11px]">
                     Pronto p/ Disparo
                   </span>

@@ -15,7 +15,6 @@ import { LEGAL_DOCS_VERSION } from '@/lib/legal';
 import { appBaseUrl, sendEmail } from '@/lib/email';
 import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
-import { seedGenericTemplatesForTenant } from '@/lib/globalTemplates';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,8 +111,8 @@ export async function POST(req: NextRequest) {
       throw new Error('Falha ao registrar dados da empresa no banco de dados.');
     }
 
-    // Provisiona automaticamente os 6 templates genéricos universais para a nova conta
-    await seedGenericTemplatesForTenant(newTenant.id);
+    // Os modelos de mensagem do ramo são criados na Meta quando a conta conecta o
+    // WhatsApp e ativa o plano (segmentTemplates), não aqui no cadastro.
 
     const passwordHash = await hashPassword(password);
 
