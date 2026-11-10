@@ -28,7 +28,8 @@ export type SkipReason =
   | 'HUMAN_REPLIED'
   | 'RATE_LIMIT'
   | 'OPT_OUT'
-  | 'DISABLED_FOR_CONTACT';
+  | 'DISABLED_FOR_CONTACT'
+  | 'NOT_APPROACHED';
 
 export function shouldAssistantReply(input: {
   enabled: boolean;
@@ -42,13 +43,23 @@ export function shouldAssistantReply(input: {
   disabledForContact?: boolean;
   /** "Devolver para a atendente": resposta da equipe antes disso não pausa mais. */
   resumedAt?: Date | null;
+  /** Atendente de vendas: só responde quem a gente abordou primeiro. */
+  requireApproach?: boolean;
+  /** A conversa começou com mensagem nossa (abordagem). */
+  approached?: boolean;
+  /** Mensagem da equipe até aqui foi a abordagem (antes de o contato responder): não pausa. */
+  humanIgnoredUntil?: Date | null;
 }): { reply: true } | { reply: false; reason: SkipReason } {
   if (!input.automotive) return { reply: false, reason: 'WRONG_SEGMENT' };
   if (!input.enabled) return { reply: false, reason: 'DISABLED' };
   if (input.disabledForContact) return { reply: false, reason: 'DISABLED_FOR_CONTACT' };
   if (input.isOptOut) return { reply: false, reason: 'OPT_OUT' };
+  if (input.requireApproach && !input.approached) return { reply: false, reason: 'NOT_APPROACHED' };
   if (input.pausedUntil && input.pausedUntil > input.now) return { reply: false, reason: 'PAUSED_BY_HANDOFF' };
-  const humanCounts = input.lastHumanReplyAt && (!input.resumedAt || input.lastHumanReplyAt > input.resumedAt);
+  const humanCounts =
+    input.lastHumanReplyAt &&
+    (!input.resumedAt || input.lastHumanReplyAt > input.resumedAt) &&
+    (!input.humanIgnoredUntil || input.lastHumanReplyAt > input.humanIgnoredUntil);
   if (humanCounts && input.now.getTime() - input.lastHumanReplyAt!.getTime() < HUMAN_PAUSE_MS) {
     return { reply: false, reason: 'HUMAN_REPLIED' };
   }

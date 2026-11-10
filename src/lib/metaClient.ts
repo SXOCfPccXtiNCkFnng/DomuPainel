@@ -356,6 +356,7 @@ export function toMetaPositionalBody(bodyText: string): {
     promocao: 'lavagem completa por R$ 70',
     novidade: 'novos horários aos sábados',
     nome_comprador: 'Juliana',
+    aviso: 'Barbearia do João assinou o plano Starter',
   };
 
   const metaBody = bodyText.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_full, rawName: string) => {

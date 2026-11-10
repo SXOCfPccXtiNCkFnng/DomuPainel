@@ -136,8 +136,8 @@ export async function provisionSegmentTemplates(tenantId: string): Promise<Provi
     supabaseAdmin.from('subscriptions').select('status').eq('tenant_id', tenantId).maybeSingle(),
   ]);
   if (!tenant) return { ...result, reason: 'Conta não encontrada.' };
-  if (await isPlatformAdminTenant(tenantId)) {
-    // Conta da própria Domu (e-mails do /interno): não recebe modelos automáticos.
+  if (tenantId === String(process.env.DOMU_SALES_TENANT_ID || '').trim() || (await isPlatformAdminTenant(tenantId))) {
+    // Conta da própria Domu (e-mails do /interno ou a de vendas): não recebe modelos automáticos.
     await supabaseAdmin.from('tenants').update({ templates_provisioned_at: new Date().toISOString() }).eq('id', tenantId);
     return { ...result, reason: 'Conta da Domu.' };
   }

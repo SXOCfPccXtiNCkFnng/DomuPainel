@@ -498,7 +498,18 @@ export default function ProspectingMonitor() {
             </p>
             {MODULES.map((module) => (
               <label key={module} className="block">
-                <span className="text-[11px] font-bold text-slate-600">{SEGMENT_LABELS[module]}</span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-slate-600">{SEGMENT_LABELS[module]}</span>
+                  {templates[module] && templates[module] !== DEFAULT_TEMPLATES[module] ? (
+                    <button
+                      type="button"
+                      onClick={() => saveTemplate(module, '')}
+                      className="text-[10px] font-bold text-domu-blue hover:underline"
+                    >
+                      Voltar ao texto padrão
+                    </button>
+                  ) : null}
+                </span>
                 <textarea
                   value={templateFor(module)}
                   onChange={(e) => saveTemplate(module, e.target.value)}

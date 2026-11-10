@@ -46,6 +46,10 @@ import {
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import type { ServiceItem } from '@/lib/scheduling';
 import { loadAssistantQuota } from '@/lib/assistantQuota';
+import { isSalesTenant, loadSalesCoupon, loadSalesPlans } from '@/lib/salesAgent';
+import { buildSalesSystemPrompt, couponText, plansText } from '@/lib/salesPrompt';
+import { executeSalesTool, salesToolDeclarations, SALES_HANDOFF_TOOL } from '@/lib/salesTools';
+import { appBaseUrl } from '@/lib/email';
 import {
   addUsage,
   checkAssistantQuota,
@@ -92,7 +96,7 @@ type ToolKit = {
 
 /** Ferramentas que agem de verdade (o cliente precisa saber o resultado). */
 const BOOKING_TOOLS = ['agendar', 'solicitar_visita'];
-const HANDOFF_TOOLS = ['chamar_equipe', 'chamar_corretor'];
+const HANDOFF_TOOLS = ['chamar_equipe', 'chamar_corretor', SALES_HANDOFF_TOOL];
 
 async function callGemini(
   apiKey: string,
@@ -294,6 +298,29 @@ async function recordRun(trigger: AssistantTrigger, run: RunRecord): Promise<voi
   }
 }
 
+/**
+ * A conversa começou com mensagem nossa (abordagem pelo celular, painel ou
+ * campanha)? E quando o contato respondeu pela primeira vez: mensagens da
+ * equipe antes disso são a abordagem e não pausam a atendente.
+ */
+async function loadApproach(tenantId: string, leadId: string): Promise<{ approached: boolean; firstReplyAt: Date | null }> {
+  const first = (inboundOnly: boolean) => {
+    let q = supabaseAdmin
+      .from('chat_messages')
+      .select('direction, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('lead_id', leadId);
+    if (inboundOnly) q = q.eq('direction', 'INBOUND');
+    return q.order('created_at', { ascending: true }).limit(1);
+  };
+  const [firstRes, replyRes] = await Promise.all([first(false), first(true)]);
+  const reply = replyRes.data?.[0]?.created_at;
+  return {
+    approached: firstRes.data?.[0]?.direction === 'OUTBOUND',
+    firstReplyAt: reply ? new Date(reply) : null,
+  };
+}
+
 type LeadForAssistant = {
   name: string;
   phone: string;
@@ -314,7 +341,8 @@ async function loadLeadForAssistant(tenantId: string, leadId: string): Promise<{
   return { data: (full.data as LeadForAssistant | null) ?? null };
 }
 
-type Vertical = SchedulingVertical | 'imobiliario';
+/** 'vendas': a atendente que vende a própria Domu (conta DOMU_SALES_TENANT_ID). */
+type Vertical = SchedulingVertical | 'imobiliario' | 'vendas';
 
 /** Ramos que têm atendente de IA: os de agenda (lava rápido, saúde e beleza) e o imobiliário. */
 export function assistantVertical(segment: string | null | undefined): Vertical | null {
@@ -325,11 +353,33 @@ export function assistantVertical(segment: string | null | undefined): Vertical 
 }
 
 type VerticalInput = HandoffContext & { settings: AssistantSettings; planTier: string | null };
-type VerticalSetup = { systemPrompt: string; toolkit: ToolKit; knownPrices: number[] };
+type VerticalSetup = {
+  systemPrompt: string;
+  toolkit: ToolKit;
+  knownPrices: number[];
+  /** Texto que a IA pode repetir sem virar alerta de valor inventado. */
+  ownerText?: string;
+};
 
 /** Carrega o que cada ramo precisa e monta o prompt e as ferramentas. */
 async function prepareVertical(vertical: Vertical, input: VerticalInput): Promise<VerticalSetup> {
   const { settings, planTier, ...base } = input;
+
+  if (vertical === 'vendas') {
+    const [plans, coupon] = await Promise.all([loadSalesPlans(), loadSalesCoupon()]);
+    return {
+      systemPrompt: buildSalesSystemPrompt({
+        customerName: base.leadName,
+        now: base.now,
+        signupUrl: `${appBaseUrl()}/cadastro`,
+        plans,
+        coupon,
+      }),
+      toolkit: { declarations: salesToolDeclarations(), execute: (name, args) => executeSalesTool(name, args, base) },
+      knownPrices: plans.flatMap((g) => g.plans.flatMap((p) => [p.price, Math.round(p.price * 0.95)])),
+      ownerText: `${couponText(coupon)}\n${plansText(plans)}`,
+    };
+  }
 
   if (vertical !== 'imobiliario') {
     const [servicesRes, scheduling] = await Promise.all([
@@ -424,18 +474,22 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       supabaseAdmin.from('tenants').select('name, segment').eq('id', tenantId).maybeSingle(),
       supabaseAdmin.from('assistant_settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
     ]);
-    const vertical = tenant ? assistantVertical(tenant.segment) : null;
-    if (!tenant || !vertical || !settingsRow?.enabled) return;
+    // Conta de vendas da Domu: liga pela variável de ambiente, sem assinatura nem cota.
+    const sales = isSalesTenant(tenantId);
+    const vertical: Vertical | null = tenant ? (sales ? 'vendas' : assistantVertical(tenant.segment)) : null;
+    if (!tenant || !vertical || (!sales && !settingsRow?.enabled)) return;
 
-    // Assinatura cancelada, vencida ou sem pagamento: a atendente para (mesma regra dos disparos e lembretes).
-    const { data: subscription } = await supabaseAdmin
-      .from('subscriptions')
-      .select('status')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-    if (!isSubscriptionAllowedToDispatch(subscription?.status)) {
-      logger.info('assistant.subscription_inactive', { tenantId, status: subscription?.status ?? null });
-      return;
+    if (!sales) {
+      // Assinatura cancelada, vencida ou sem pagamento: a atendente para (mesma regra dos disparos e lembretes).
+      const { data: subscription } = await supabaseAdmin
+        .from('subscriptions')
+        .select('status')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!isSubscriptionAllowedToDispatch(subscription?.status)) {
+        logger.info('assistant.subscription_inactive', { tenantId, status: subscription?.status ?? null });
+        return;
+      }
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -448,6 +502,13 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     // Cliente costuma mandar várias mensagens seguidas: só a última responde, com todas no contexto.
     await sleep(DEBOUNCE_MS);
     if ((await latestInboundId(tenantId, leadId)) !== trigger.messageId) return;
+
+    // Vendas: só fala com quem a gente abordou (antes de gastar IA, até com áudio).
+    const approach = sales ? await loadApproach(tenantId, leadId) : null;
+    if (approach && !approach.approached) {
+      logger.info('assistant.skipped', { tenantId, leadId, reason: 'NOT_APPROACHED' });
+      return;
+    }
 
     // Áudio do cliente: transcreve antes de ler o histórico (a IA responde ao que foi falado).
     await transcribePendingAudios({
@@ -510,6 +571,9 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       now,
       disabledForContact: Boolean(lead.assistant_disabled),
       resumedAt: lead.assistant_resumed_at ? new Date(lead.assistant_resumed_at) : null,
+      requireApproach: sales,
+      approached: approach?.approached,
+      humanIgnoredUntil: approach?.firstReplyAt ?? null,
     });
     if (!decision.reply) {
       if (decision.reason === 'RATE_LIMIT') {
@@ -536,7 +600,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       return;
     }
 
-    const quota = await loadAssistantQuota(tenantId, now, leadId);
+    const quota = sales ? null : await loadAssistantQuota(tenantId, now, leadId);
     if (quota) {
       const check = checkAssistantQuota({
         limit: quota.limit,
@@ -572,7 +636,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       leadId,
       leadPhone: lead.phone,
       leadName: lead.name || 'Cliente',
-      companyName: tenant.name || (vertical === 'imobiliario' ? 'a imobiliária' : 'a loja'),
+      companyName: sales ? 'Domu' : tenant.name || (vertical === 'imobiliario' ? 'a imobiliária' : 'a loja'),
       lastCustomerMessage: lastMessage.body || '',
       now,
       settings,
@@ -615,9 +679,9 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     const flags = detectFlags({
       reply: replyText,
       knownPrices: setup.knownPrices,
-      ownerText: `${settings.extra_info}\n${settings.about}\n${activePromo(settings, now) || ''}`,
+      ownerText: `${settings.extra_info}\n${settings.about}\n${activePromo(settings, now) || ''}\n${setup.ownerText || ''}`,
       tools: toolLog,
-      checkScheduleTimes: vertical !== 'imobiliario',
+      checkScheduleTimes: vertical === 'automotivo' || vertical === 'saude',
     });
 
     // Chegou mensagem nova enquanto a IA pensava: a execução dela responde, com tudo no contexto.

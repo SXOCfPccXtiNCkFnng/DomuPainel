@@ -277,6 +277,23 @@ export async function activateTenantSubscription(input: {
     }
   }
 
+  // Aviso de venda para a Domu: começou o teste grátis ou pagou (renovação não avisa).
+  const salesEvent =
+    status === 'ACTIVE' && !wasAlreadyActive ? 'PAID' : status === 'TRIAL' && previousSub?.status !== 'TRIAL' ? 'TRIAL' : null;
+  if (salesEvent) {
+    const tenantId = input.tenantId;
+    const extra = { planTier, price: input.monthlyPrice };
+    const notifySale = () =>
+      import('@/lib/salesAgent')
+        .then((m) => m.notifySalesEvent(salesEvent, tenantId, extra))
+        .catch((err) => console.warn('[billing] aviso de venda:', err instanceof Error ? err.message : err));
+    try {
+      after(notifySale);
+    } catch {
+      void notifySale();
+    }
+  }
+
   if (status === 'ACTIVE' && !wasAlreadyActive) {
     await notifyTenantAdmins(input.tenantId, {
       title: 'Assinatura ativada',

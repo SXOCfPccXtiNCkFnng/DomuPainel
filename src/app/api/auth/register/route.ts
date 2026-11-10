@@ -15,6 +15,7 @@ import { LEGAL_DOCS_VERSION } from '@/lib/legal';
 import { appBaseUrl, sendEmail } from '@/lib/email';
 import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { logger } from '@/lib/logger';
+import { scheduleSalesEvent } from '@/lib/salesAgent';
 
 export const dynamic = 'force-dynamic';
 
@@ -154,6 +155,9 @@ export async function POST(req: NextRequest) {
     if (!welcomeResult.ok) {
       logger.error('auth.welcome_email_failed', { userId: newUser.id, error: welcomeResult.error });
     }
+
+    // Aviso de conta nova para a Domu (WhatsApp do comercial), depois da resposta.
+    scheduleSalesEvent('SIGNUP', newTenant.id);
 
     // Sem login automático: limpa cookie antigo e manda o usuário autenticar no /login.
     const res = NextResponse.json({

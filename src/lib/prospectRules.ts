@@ -265,21 +265,21 @@ export function placeToProspect(p: PlacesPlace, kind: ProspectKind, searchCity: 
 
 export const DEFAULT_TEMPLATES: Record<TenantSegment, string> = {
   automotivo:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. A gente criou uma atendente no WhatsApp para lava-rápido e estética automotiva: ela responde os clientes na hora e já agenda os horários sozinha, até de madrugada. Posso te mandar um vídeo rapidinho mostrando?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde seus clientes no WhatsApp na hora, passa os valores e já agenda a lavagem sozinha, até de madrugada e no domingo. Posso te mostrar como ela funcionaria aí com vocês?',
   saude:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. A gente tem uma plataforma que ajuda a lotar a agenda pelo WhatsApp: lembretes, promoções para quem sumiu e atendimento organizado. Posso te mostrar em 2 minutinhos?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde seus clientes no WhatsApp na hora e já marca o horário na agenda, com lembrete automático para ninguém esquecer. Posso te mostrar como ela funcionaria aí com vocês?',
   imobiliario:
-    'Oi, tudo bem? Vi a {nome} aqui no Google. A gente tem uma plataforma de WhatsApp para imobiliárias: envia os imóveis para a base de clientes e organiza os leads que chegam. Posso te mostrar como funciona?',
+    'Oi, tudo bem? Vi a {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde os interessados no WhatsApp na hora, mostra os imóveis com valores e entrega o cliente pronto para o corretor. Nenhum lead fica sem resposta. Posso te mostrar como funciona?',
   alimentacao:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. A gente ajuda restaurantes da região a vender mais pelo WhatsApp, mandando o cardápio e as promoções do dia para os clientes. Posso te mostrar como funciona?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda restaurantes a vender mais pelo WhatsApp oficial, mandando o cardápio e as promoções do dia para toda a lista de clientes de uma vez, sem risco de bloqueio. Posso te mostrar como funciona?',
   juridico:
-    'Olá, tudo bem? Vi o {nome} aqui no Google. Temos uma plataforma que organiza o atendimento do escritório pelo WhatsApp e mantém os clientes informados. Posso apresentar em poucos minutos?',
+    'Olá, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda escritórios a manter os clientes informados pelo WhatsApp oficial, com mensagens organizadas e sem risco de bloqueio do número. Posso te apresentar em poucos minutos?',
   ecommerce:
-    'Oi, tudo bem? Vi a {nome} aqui no Google. A gente ajuda lojas a vender mais pelo WhatsApp, avisando os clientes das novidades e promoções. Posso te mostrar como funciona?',
+    'Oi, tudo bem? Vi a {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda lojas a vender mais pelo WhatsApp oficial, avisando toda a lista de clientes das novidades e promoções de uma vez, sem risco de bloqueio. Posso te mostrar como funciona?',
   marketing_apenas:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. A gente tem uma plataforma para enviar promoções pelo WhatsApp para os seus clientes. Posso te mostrar?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda empresas a mandar promoções para toda a lista de clientes pelo WhatsApp oficial, de uma vez e sem risco de bloqueio. Posso te mostrar como funciona?',
   geral:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. A gente tem uma plataforma que ajuda empresas de {cidade} a vender mais pelo WhatsApp. Posso te mostrar em 2 minutinhos?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda empresas de {cidade} a vender mais pelo WhatsApp oficial, mandando promoções e novidades para toda a lista de clientes de uma vez, sem risco de bloqueio. Posso te mostrar como funciona?',
 };
 
 export function fillTemplate(template: string, vars: { nome: string; cidade?: string | null }): string {
