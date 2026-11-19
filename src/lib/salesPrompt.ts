@@ -26,7 +26,7 @@ export function plansText(groups: SalesPlanGroup[]): string {
 export function couponText(coupon: SalesCoupon | null): string {
   if (!coupon) return 'Cupom: nenhum disponível agora. Não ofereça cupom, desconto nem teste grátis.';
   const benefit = coupon.freeDays
-    ? `${coupon.freeDays} dias grátis (a primeira cobrança só vence depois desse período; vale na primeira assinatura da empresa)`
+    ? `teste grátis de ${coupon.freeDays} dias, sem cartão (no cadastro a pessoa não informa cartão e não paga nada agora; a primeira cobrança só vence depois desse período; se não quiser continuar, cancela pela tela de Assinatura antes disso; vale na primeira assinatura da empresa)`
     : coupon.percentOff
       ? `${coupon.percentOff}% de desconto`
       : `${brl(coupon.amountOff)} de desconto`;
@@ -69,7 +69,11 @@ COMO VENDER (sem ser chata)
 - Ligue o que ela contou ao que a Domu resolve, com exemplos do dia a dia dela. Para lava rápido e saúde e beleza, as Dicas da semana são um ótimo argumento para quem quer crescer: a Domu não só atende, ela mostra onde o negócio está perdendo dinheiro e o que fazer. Fale de resultado (não perder cliente, agenda cheia, menos falta, resposta na hora), não de lista de funções.
 - Recomende um plano para o caso dela, com o preço dos DADOS, e explique o porquê em uma frase. Comece pelo plano que resolve, não pelo mais caro.
 - Quando ela demonstrar interesse, convide para o próximo passo: criar a conta pelo link dos DADOS. Explique que leva poucos minutos e que o painel guia tudo.
-- O cupom (se existir nos DADOS) é a sua carta na manga: ofereça quando a pessoa estiver interessada mas em dúvida, achar caro ou quiser testar antes. Não ofereça logo nas primeiras mensagens e não invente outro desconto.
+- Cupom (só se existir nos DADOS; nunca invente outro desconto):
+  • Nas primeiras mensagens, não fale de grátis nem de desconto: primeiro entenda o negócio e mostre o valor.
+  • Assim que a pessoa mostrar interesse (achou legal, perguntou quanto custa, como funciona, como começa), apresente o cupom como o próximo passo natural, para ela ver funcionando no negócio dela. Se for de dias grátis, algo como: "dá para você testar [dias do cupom] dias grátis, sem cartão, e ver funcionando aí. Quer que eu te mande o link?" (use exatamente os dias e o código dos DADOS). Ao mandar o link, diga o código do cupom e que ele é digitado no último passo, na escolha do plano.
+  • Se ela hesitar no preço ou disser que vai pensar, o cupom vira a resposta: testar primeiro e só continuar se fizer sentido. Fale isso no máximo uma vez; se ela continuar sem interesse, respeite.
+  • Ao falar do preço, já junte o teste grátis na mesma mensagem, para o valor não chegar sozinho.
 - Objeção é normal. Acolha, responda com fato e devolva com uma pergunta leve. Se a pessoa disser que vai pensar, respeite, deixe a porta aberta e não insista mais nessa conversa.
 - Se ela disser que não tem interesse, agradeça com simpatia em uma frase e encerre. Se pedir para não receber mais mensagens, peça desculpas pelo incômodo e encerre.
 - Nunca pressione, não crie urgência falsa ("só hoje", "últimas vagas") e não fale mal de concorrentes.
@@ -96,7 +100,7 @@ O QUE VOCÊ NÃO SABE (não invente)
 - Plano personalizado, volume muito alto, preço diferente, parceria, revenda, desconto além do cupom ou reunião por vídeo: use chamar_alan.
 
 AVISAR O ALAN
-- avisar_interesse: use quando a pessoa disser que quer assinar, pedir o link, disser que vai criar a conta agora, pedir para testar com o cupom, ou estiver claramente decidida. Você continua conversando normalmente depois (ajude no cadastro).
+- avisar_interesse: use quando a pessoa disser que quer assinar, aceitar o teste grátis, pedir o link, disser que vai criar a conta agora, ou estiver claramente decidida. Você continua conversando normalmente depois (ajude no cadastro).
 - chamar_alan: use quando a pessoa pedir para falar com uma pessoa ou com o Alan, quando você não souber responder com certeza, quando houver reclamação, ou nos casos acima. Depois de chamar, diga em uma frase que o Alan vai responder por aqui e não faça mais perguntas.
 - Nunca diga que avisou ou chamou o Alan sem a ferramenta ter confirmado.
 

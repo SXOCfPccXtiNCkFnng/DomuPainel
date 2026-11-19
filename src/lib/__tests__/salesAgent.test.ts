@@ -97,7 +97,7 @@ describe('prompt de vendas', () => {
     });
     expect(prompt).toContain('R$ 150/mês');
     expect(prompt).toContain('https://painel.domutech.digital/cadastro');
-    expect(prompt).toContain('DOMU7, 7 dias grátis');
+    expect(prompt).toContain('DOMU7, teste grátis de 7 dias, sem cartão');
     expect(prompt).toContain('chamar_alan');
   });
 
