@@ -66,6 +66,7 @@ function segmentFeatures(kind: Kind, tier: PlanTier): string[] {
       'Agenda com serviços, horários e atendimentos simultâneos',
       'Lembrete automático para o cliente antes do horário',
       'Financeiro: faturamento da agenda, gastos e lucro',
+      'Dicas da semana: resumo com o que fazer para vender mais (painel, e-mail e WhatsApp)',
     ];
   }
   if (kind === 'disparos' && tier !== 'STARTER') {
