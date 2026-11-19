@@ -32,6 +32,44 @@ export function isSalesTenant(tenantId: string | null | undefined): boolean {
   return Boolean(id && tenantId && id === tenantId);
 }
 
+// ───────── Liga/desliga (Modo teste) ─────────
+
+const SALES_SETTING_KEY = 'sales_agent';
+const SETTING_CACHE_MS = 15_000;
+let enabledCache: { value: boolean; at: number } | null = null;
+
+/**
+ * Vendedora ligada? Desligada pelo Modo teste, a conta de vendas volta a ser
+ * uma conta comum do ramo dela (para testar o imobiliário e os outros).
+ * Sem a linha ou sem a migration, fica ligada.
+ */
+export async function isSalesAgentEnabled(): Promise<boolean> {
+  if (enabledCache && Date.now() - enabledCache.at < SETTING_CACHE_MS) return enabledCache.value;
+  const { data, error } = await supabaseAdmin.from('platform_settings').select('value').eq('key', SALES_SETTING_KEY).maybeSingle();
+  const value = error ? true : (data?.value as { enabled?: boolean } | null)?.enabled !== false;
+  enabledCache = { value, at: Date.now() };
+  return value;
+}
+
+export async function setSalesAgentEnabled(enabled: boolean, by: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabaseAdmin
+    .from('platform_settings')
+    .upsert({ key: SALES_SETTING_KEY, value: { enabled }, updated_by: by, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') {
+      return { ok: false, error: 'Rode a migration 20261120_platform_settings.sql para usar o liga/desliga.' };
+    }
+    throw error;
+  }
+  enabledCache = { value: enabled, at: Date.now() };
+  return { ok: true };
+}
+
+/** Esta conta está atendendo como vendedora agora? */
+export async function isSalesAgentActive(tenantId: string): Promise<boolean> {
+  return isSalesTenant(tenantId) && (await isSalesAgentEnabled());
+}
+
 /** Número que recebe os avisos (55 + DDD + número) ou null se não parecer válido. */
 export function normalizeNotifyPhone(raw: string | null | undefined): string | null {
   const stored = toStoredPhone(String(raw || ''));

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { FlaskConical, Loader2, X } from 'lucide-react';
 import { SEGMENT_LABELS, getSegmentFromStorage } from '@/lib/segmentConfig';
@@ -35,6 +35,24 @@ export default function TestModePanel({ besideSidebar = false }: { besideSidebar
   const [error, setError] = useState<string | null>(null);
   const current = getSegmentFromStorage();
   const onboarded = getAuthItem('domu_is_onboarded') === 'true';
+  const [salesAgent, setSalesAgent] = useState<{ configured: boolean; isThisAccount: boolean; enabled: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/interno/test-mode')
+      .then((r) => r.json())
+      .then((json) => json?.success && setSalesAgent(json.salesAgent))
+      .catch(() => {});
+  }, [open]);
+
+  const toggleSalesAgent = () =>
+    run('sales', async () => {
+      if (!salesAgent) return;
+      const enabled = !salesAgent.enabled;
+      const err = await testAction({ action: 'set_sales_agent', enabled });
+      if (err) return setError(err);
+      setSalesAgent({ ...salesAgent, enabled });
+    });
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -94,6 +112,35 @@ export default function TestModePanel({ besideSidebar = false }: { besideSidebar
 
           <div className="p-4 space-y-4">
             {error && <p className="text-[11px] text-red-700 bg-red-50 rounded-lg px-2.5 py-1.5">{error}</p>}
+
+            {salesAgent && (
+              <section className="space-y-1.5">
+                <h3 className="text-[11px] font-black text-slate-900">Vendedora da Domu</h3>
+                {salesAgent.configured ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={toggleSalesAgent}
+                      disabled={busy !== null}
+                      className={`w-full text-[11px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-60 ${
+                        salesAgent.enabled ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-800 hover:bg-slate-50'
+                      }`}
+                    >
+                      {busy === 'sales' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {salesAgent.enabled ? 'Ligada · clique para desligar' : 'Desligada · clique para ligar'}
+                    </button>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      {salesAgent.enabled
+                        ? 'Responde quem você abordou no número de vendas.'
+                        : 'A conta de vendas atende como uma conta comum do módulo dela. Ligue de novo quando terminar o teste.'}
+                      {salesAgent.isThisAccount ? ' (É esta conta.)' : ''}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[10px] text-slate-500">Não configurada: falta DOMU_SALES_TENANT_ID na Vercel.</p>
+                )}
+              </section>
+            )}
 
             <section className="space-y-1.5">
               <h3 className="text-[11px] font-black text-slate-900">Módulo da conta</h3>

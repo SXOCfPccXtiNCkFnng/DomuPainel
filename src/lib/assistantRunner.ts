@@ -46,7 +46,7 @@ import {
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import type { ServiceItem } from '@/lib/scheduling';
 import { loadAssistantQuota } from '@/lib/assistantQuota';
-import { isExistingCustomerPhone, isSalesTenant, loadSalesCoupon, loadSalesPlans } from '@/lib/salesAgent';
+import { isExistingCustomerPhone, isSalesAgentActive, loadSalesCoupon, loadSalesPlans } from '@/lib/salesAgent';
 import { buildSalesSystemPrompt, couponText, plansText } from '@/lib/salesPrompt';
 import { executeSalesTool, salesToolDeclarations, SALES_HANDOFF_TOOL } from '@/lib/salesTools';
 import { appBaseUrl } from '@/lib/email';
@@ -474,8 +474,9 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       supabaseAdmin.from('tenants').select('name, segment').eq('id', tenantId).maybeSingle(),
       supabaseAdmin.from('assistant_settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
     ]);
-    // Conta de vendas da Domu: liga pela variável de ambiente, sem assinatura nem cota.
-    const sales = isSalesTenant(tenantId);
+    // Conta de vendas da Domu (variável de ambiente + liga/desliga do Modo teste), sem assinatura nem cota.
+    // Desligada, a conta atende como qualquer outra do ramo dela.
+    const sales = await isSalesAgentActive(tenantId);
     const vertical: Vertical | null = tenant ? (sales ? 'vendas' : assistantVertical(tenant.segment)) : null;
     if (!tenant || !vertical || (!sales && !settingsRow?.enabled)) return;
 
