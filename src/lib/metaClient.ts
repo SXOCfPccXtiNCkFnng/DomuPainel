@@ -357,6 +357,8 @@ export function toMetaPositionalBody(bodyText: string): {
     novidade: 'novos horários aos sábados',
     nome_comprador: 'Juliana',
     aviso: 'Barbearia do João assinou o plano Starter',
+    resumo: 'R$ 2.450 em 38 atendimentos, 12% a mais que a semana anterior',
+    dica: 'Movimente a terça. Uma promoção só para o dia mais fraco ajuda a encher a agenda.',
   };
 
   const metaBody = bodyText.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_full, rawName: string) => {

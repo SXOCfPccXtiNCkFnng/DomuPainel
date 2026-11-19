@@ -46,7 +46,7 @@ import {
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import type { ServiceItem } from '@/lib/scheduling';
 import { loadAssistantQuota } from '@/lib/assistantQuota';
-import { isSalesTenant, loadSalesCoupon, loadSalesPlans } from '@/lib/salesAgent';
+import { isExistingCustomerPhone, isSalesTenant, loadSalesCoupon, loadSalesPlans } from '@/lib/salesAgent';
 import { buildSalesSystemPrompt, couponText, plansText } from '@/lib/salesPrompt';
 import { executeSalesTool, salesToolDeclarations, SALES_HANDOFF_TOOL } from '@/lib/salesTools';
 import { appBaseUrl } from '@/lib/email';
@@ -554,6 +554,11 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     ]);
     const lead = leadRes.data;
     if (!lead) return;
+    // Vendas: quem já é cliente da Domu (respondeu um aviso ou o resumo semanal) fala com o Alan, não com a vendedora.
+    if (sales && (await isExistingCustomerPhone(lead.phone))) {
+      logger.info('assistant.skipped', { tenantId, leadId, reason: 'ALREADY_CUSTOMER' });
+      return;
+    }
 
     const history = ((historyRes.data || []) as HistoryMessage[]).reverse();
     const lastMessage = history[history.length - 1];

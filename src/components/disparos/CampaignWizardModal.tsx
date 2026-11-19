@@ -61,6 +61,9 @@ interface CampaignWizardModalProps {
   onStartCampaign: (payload: CampaignStartPayload) => void;
   initialPropertyTitle?: string;
   initialPropertyId?: string;
+  /** Público pronto (ex.: clientes que não voltam, das Dicas da semana): só eles vêm marcados. */
+  initialLeadIds?: string[];
+  initialTitle?: string;
 }
 
 interface LeadContact {
@@ -97,6 +100,8 @@ export default function CampaignWizardModal({
   onStartCampaign,
   initialPropertyTitle,
   initialPropertyId,
+  initialLeadIds,
+  initialTitle,
 }: CampaignWizardModalProps) {
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(1);
@@ -161,9 +166,8 @@ export default function CampaignWizardModal({
     if (!isOpen) return;
     setStep(1);
     setTitle(
-      initialPropertyTitle
-        ? `Campanha · ${initialPropertyTitle}`
-        : 'Nova Campanha de Envios'
+      initialTitle ||
+        (initialPropertyTitle ? `Campanha · ${initialPropertyTitle}` : 'Nova Campanha de Envios')
     );
     setContactSearch('');
     setFilterInterest('');
@@ -178,7 +182,7 @@ export default function CampaignWizardModal({
     fetchTemplates();
     fetchProperties();
     fetchMetaStats();
-  }, [isOpen, initialPropertyId, initialPropertyTitle]);
+  }, [isOpen, initialPropertyId, initialPropertyTitle, initialTitle]);
 
   const fetchMetaStats = async () => {
     try {
@@ -213,7 +217,8 @@ export default function CampaignWizardModal({
       const json = await res.json();
       if (json.success && json.leads) {
         const list: LeadContact[] = json.leads;
-        const eligible = list.filter((contact) => contact.opt_in !== false);
+        const audience = initialLeadIds?.length ? new Set(initialLeadIds) : null;
+        const eligible = list.filter((contact) => contact.opt_in !== false && (!audience || audience.has(contact.id)));
         setContacts(list);
         setSelectedIds(new Set(eligible.map((contact) => contact.id)));
       }

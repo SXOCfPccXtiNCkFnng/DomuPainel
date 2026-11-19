@@ -74,6 +74,7 @@ export type NavItemId =
   | 'atendente'
   | 'servicos'
   | 'financeiro'
+  | 'dicas'
   | 'disparos'
   | 'templates'
   | 'contatos'
@@ -226,6 +227,7 @@ function schedulingNav(segment: TenantSegment): NavSection[] {
     {
       title: 'Resultados',
       items: [
+        { id: 'dicas', name: 'Dicas da semana', href: '/dicas', isComingSoon: false },
         { id: 'financeiro', name: 'Financeiro', href: '/financeiro', isComingSoon: false },
         ...REAL_ESTATE_NAV[2].items,
       ],
@@ -296,6 +298,10 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   '/agenda': {
     title: 'Agenda',
     subtitle: 'Agendamentos do dia',
+  },
+  '/dicas': {
+    title: 'Dicas da semana',
+    subtitle: 'Como foi a semana e o que fazer para vender mais',
   },
   '/financeiro': {
     title: 'Financeiro',

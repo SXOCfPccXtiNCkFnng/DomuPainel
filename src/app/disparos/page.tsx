@@ -26,14 +26,34 @@ export default function DisparosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  /** Público vindo das Dicas da semana (?publico=sumidos): clientes que não voltam há mais de 30 dias. */
+  const [audience, setAudience] = useState<{ leadIds: string[]; title: string } | null>(null);
 
   useEffect(() => {
     fetchCampaigns();
     if (typeof window !== 'undefined') {
-      const id = new URLSearchParams(window.location.search).get('campaign');
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('campaign');
       if (id) setActiveCampaignId(id);
+      if (params.get('publico') === 'sumidos') openLapsedAudience();
     }
   }, []);
+
+  const openLapsedAudience = async () => {
+    try {
+      const res = await fetch('/api/insights');
+      const json = await res.json();
+      const leadIds: string[] = json?.insight?.metrics?.lapsed?.leadIds || [];
+      if (!leadIds.length) {
+        setError('Não encontramos clientes sumidos com contato salvo nas dicas desta semana.');
+        return;
+      }
+      setAudience({ leadIds, title: 'Campanha · Clientes que não voltam' });
+      setIsWizardOpen(true);
+    } catch {
+      setError('Não foi possível carregar os clientes das dicas da semana.');
+    }
+  };
 
   const fetchCampaigns = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) {
@@ -262,8 +282,13 @@ export default function DisparosPage() {
 
       <CampaignWizardModal
         isOpen={isWizardOpen}
-        onClose={() => setIsWizardOpen(false)}
+        onClose={() => {
+          setIsWizardOpen(false);
+          setAudience(null);
+        }}
         onStartCampaign={handleStartCampaign}
+        initialLeadIds={audience?.leadIds}
+        initialTitle={audience?.title}
       />
     </div>
   );

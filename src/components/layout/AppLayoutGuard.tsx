@@ -154,7 +154,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         router.replace('/leads');
         return;
       }
-      if ((pathname === '/agenda' || pathname === '/servicos' || pathname === '/financeiro') && !isSchedulingSegment(segment)) {
+      if ((pathname === '/agenda' || pathname === '/servicos' || pathname === '/financeiro' || pathname === '/dicas') && !isSchedulingSegment(segment)) {
         router.replace('/');
         return;
       }

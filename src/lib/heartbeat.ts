@@ -21,6 +21,12 @@ export const HEARTBEATS: { name: string; label: string; expectedEveryMin: number
     fix: 'No cron-job.org, confira o job de /api/scheduling/reminders/run-due (a cada 5 min, com o cabeçalho do CRON_SECRET).',
   },
   {
+    name: 'cron.insights',
+    label: 'Cron · dicas da semana',
+    expectedEveryMin: 15,
+    fix: 'No cron-job.org, confira o job de /api/insights/weekly/run-due (a cada 15 min, com o cabeçalho do CRON_SECRET). Ele só gera os resumos no domingo à noite.',
+  },
+  {
     name: 'cron.expiry-check',
     label: 'Cron · aviso de vencimento',
     expectedEveryMin: 24 * 60,

@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CarFront,
   HeartPulse,
+  Lightbulb,
   Headset,
   Megaphone,
   Pizza,
@@ -89,9 +90,17 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
     );
   }
 
-  if (id === 'leads' || id === 'visitas' || id === 'servicos' || id === 'financeiro') {
+  if (id === 'leads' || id === 'visitas' || id === 'servicos' || id === 'financeiro' || id === 'dicas') {
     const Icon =
-      id === 'leads' ? UserRoundSearch : id === 'visitas' ? CalendarCheck : id === 'financeiro' ? Wallet : Wrench;
+      id === 'leads'
+        ? UserRoundSearch
+        : id === 'visitas'
+          ? CalendarCheck
+          : id === 'financeiro'
+            ? Wallet
+            : id === 'dicas'
+              ? Lightbulb
+              : Wrench;
     return (
       <span
         className={`inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 ${className || ''}`}

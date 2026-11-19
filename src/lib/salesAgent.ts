@@ -11,9 +11,9 @@ import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { logger } from '@/lib/logger';
 import { notifyTenantAdmins } from '@/lib/notify';
-import { formatMetaError, sendMetaTemplate, sendMetaText } from '@/lib/metaClient';
+import { formatMetaError, sendMetaTemplate, sendMetaText, type MetaCredentials } from '@/lib/metaClient';
 import { requireVerifiedWhatsApp } from '@/lib/whatsappConnection';
-import { ensureUtilityTemplate } from '@/lib/utilityTemplate';
+import { ensureUtilityTemplate, type TemplateState } from '@/lib/utilityTemplate';
 import { phoneLookupVariants, toStoredPhone } from '@/lib/phone';
 import { formatPhoneBR } from '@/lib/validators';
 import { findActiveCoupon, couponFreeDays } from '@/lib/billing';
@@ -104,48 +104,68 @@ export function alertParam(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 900);
 }
 
-async function sendAlertWhatsApp(text: string): Promise<void> {
+/**
+ * Modelo de mensagem no WhatsApp da Domu (número da conta de vendas): avisos
+ * para o Alan e o resumo semanal para os clientes. Criado na primeira vez.
+ */
+export async function ensureDomuTemplate(spec: { prefix: string; body: string; variables: string[]; label: string }): Promise<TemplateState> {
   const tenantId = salesTenantId();
-  const to = salesNotifyPhone();
-  if (!tenantId || !to) {
-    logger.warn('sales.alert_not_configured', { message: 'Defina DOMU_SALES_TENANT_ID e DOMU_SALES_NOTIFY_PHONE.' });
-    return;
-  }
-  const wa = await requireVerifiedWhatsApp(tenantId);
-  if (!wa.ok) {
-    logger.warn('sales.alert_whatsapp_unavailable', { error: wa.error });
-    return;
-  }
-
-  // Aviso pode chegar a qualquer hora: o modelo aprovado não depende da janela de 24h.
-  const template = await ensureUtilityTemplate(tenantId, {
-    prefix: SALES_ALERT_PREFIX,
-    body: SALES_ALERT_BODY,
-    variables: ['aviso'],
-    label: 'de aviso de vendas',
+  if (!tenantId) return { ok: false, reason: 'DOMU_SALES_TENANT_ID não configurado.' };
+  return ensureUtilityTemplate(tenantId, {
+    ...spec,
     loadId: async () => {
       const { data } = await supabaseAdmin
         .from('hsm_templates')
         .select('id')
         .eq('tenant_id', tenantId)
-        .like('name', `${SALES_ALERT_PREFIX}%`)
+        .like('name', `${spec.prefix}%`)
         .order('created_at', { ascending: false })
         .limit(1);
       return data?.[0]?.id ?? null;
     },
     saveId: async () => {},
   }).catch((err) => ({ ok: false as const, reason: err instanceof Error ? err.message : String(err) }));
+}
+
+/** Credenciais do WhatsApp da Domu (conta de vendas), ou null se não estiver pronto. */
+export async function domuWhatsApp(): Promise<MetaCredentials | null> {
+  const tenantId = salesTenantId();
+  if (!tenantId) return null;
+  const wa = await requireVerifiedWhatsApp(tenantId);
+  if (!wa.ok) {
+    logger.warn('sales.whatsapp_unavailable', { error: wa.error });
+    return null;
+  }
+  return wa.credentials;
+}
+
+async function sendAlertWhatsApp(text: string): Promise<void> {
+  const to = salesNotifyPhone();
+  if (!salesTenantId() || !to) {
+    logger.warn('sales.alert_not_configured', { message: 'Defina DOMU_SALES_TENANT_ID e DOMU_SALES_NOTIFY_PHONE.' });
+    return;
+  }
+  const credentials = await domuWhatsApp();
+  if (!credentials) return;
+
+  // Aviso pode chegar a qualquer hora: o modelo aprovado não depende da janela de 24h.
+  const template = await ensureDomuTemplate({
+    prefix: SALES_ALERT_PREFIX,
+    body: SALES_ALERT_BODY,
+    variables: ['aviso'],
+    label: 'de aviso de vendas',
+  });
 
   const sent = template.ok
     ? await sendMetaTemplate({
         to,
         templateName: template.name,
         languageCode: template.language,
-        credentials: wa.credentials,
+        credentials,
         components: [{ type: 'body', parameters: [{ type: 'text', text: alertParam(text) }] }],
       })
     : // Modelo ainda em análise: texto livre chega se o Alan falou com o número nas últimas 24h.
-      await sendMetaText({ to, textBody: `Aviso da Domu: ${text}`, credentials: wa.credentials });
+      await sendMetaText({ to, textBody: `Aviso da Domu: ${text}`, credentials });
   if (!sent.success) {
     logger.warn('sales.alert_send_failed', {
       template: template.ok ? template.name : null,
@@ -153,6 +173,17 @@ async function sendAlertWhatsApp(text: string): Promise<void> {
       error: formatMetaError(sent.error),
     });
   }
+}
+
+/** Telefone de quem já tem conta na Domu (admin de outra empresa): a vendedora não aborda cliente. */
+export async function isExistingCustomerPhone(phone: string): Promise<boolean> {
+  const variants = phoneLookupVariants(phone);
+  const ownTenant = salesTenantId();
+  if (!variants.length) return false;
+  let q = supabaseAdmin.from('users').select('id').in('phone', variants);
+  if (ownTenant) q = q.neq('tenant_id', ownTenant);
+  const { data } = await q.limit(1);
+  return Boolean(data?.length);
 }
 
 /** Avisa o Alan: WhatsApp no número dele + sino/celular do painel da conta de vendas. Nunca lança. */
