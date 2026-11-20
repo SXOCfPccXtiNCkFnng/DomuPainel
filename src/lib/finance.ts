@@ -17,6 +17,8 @@ export const EXPENSE_CATEGORIES = [
   'Marketing',
   'Impostos e taxas',
   'Equipamentos e manutenção',
+  'Entregas e motoboys',
+  'Embalagens',
   'Outros',
 ] as const;
 

@@ -1,12 +1,15 @@
 import { TenantSegment } from '@/types';
 import { getAuthItem } from '@/lib/authStorage';
 import { isSchedulingSegment, schedulingCopyFor } from '@/lib/schedulingVerticals';
+import { isPizzeriaSegment } from '@/lib/pizzeria';
+
+export { isPizzeriaSegment };
 
 export const SEGMENT_LABELS: Record<TenantSegment, string> = {
   imobiliario: 'Imobiliário',
   ecommerce: 'E-commerce',
   saude: 'Saúde e Beleza',
-  alimentacao: 'Alimentação',
+  alimentacao: 'Pizzaria e Delivery',
   automotivo: 'Lava Rápido e Estética Automotiva',
   juridico: 'Jurídico',
   marketing_apenas: 'Somente Disparos',
@@ -17,7 +20,7 @@ export const SEGMENT_WELCOME: Record<TenantSegment, string> = {
   imobiliario: 'Automatize lançamentos, leads e visitas pelo WhatsApp.',
   ecommerce: 'Recupere carrinhos, envie ofertas e notifique seus clientes.',
   saude: 'Confirme consultas, horários e retornos com mensagens automáticas.',
-  alimentacao: 'Receba pedidos, confirme entregas e fidelize clientes no WhatsApp.',
+  alimentacao: 'A atendente anota os pedidos no WhatsApp, você acompanha no quadro e as campanhas trazem o cliente de volta.',
   automotivo: 'Agende lavagens, avise quando o carro estiver pronto e traga o cliente de volta.',
   juridico: 'Gerencie prazos, cobranças e comunicação com clientes.',
   marketing_apenas: 'Foque em campanhas e disparos em massa no WhatsApp.',
@@ -75,6 +78,9 @@ export type NavItemId =
   | 'servicos'
   | 'financeiro'
   | 'dicas'
+  | 'pedidos'
+  | 'cardapio'
+  | 'vendas'
   | 'disparos'
   | 'templates'
   | 'contatos'
@@ -236,9 +242,34 @@ function schedulingNav(segment: TenantSegment): NavSection[] {
   ];
 }
 
+/** Pizzaria e delivery: menu pela noite de trabalho (pedidos primeiro). */
+const PIZZERIA_NAV: NavSection[] = [
+  {
+    title: 'Operação',
+    items: [
+      { id: 'dashboard', name: 'Painel', href: '/', isComingSoon: false },
+      { id: 'pedidos', name: 'Pedidos', href: '/pedidos', isComingSoon: false },
+      { id: 'cardapio', name: 'Cardápio e entrega', href: '/cardapio', isComingSoon: false },
+      { id: 'atendente', name: 'Atendente IA', href: '/atendente', isComingSoon: false },
+    ],
+  },
+  REAL_ESTATE_NAV[1], // Marketing
+  {
+    title: 'Resultados',
+    items: [
+      { id: 'vendas', name: 'Vendas e métricas', href: '/vendas', isComingSoon: false },
+      { id: 'dicas', name: 'Dicas da semana', href: '/dicas', isComingSoon: false },
+      { id: 'financeiro', name: 'Financeiro', href: '/financeiro', isComingSoon: false },
+      { id: 'relatorios', name: 'Relatório de envios', href: '/relatorios', isComingSoon: false },
+    ],
+  },
+  REAL_ESTATE_NAV[3], // Conta
+];
+
 /** Seções do menu lateral para o ramo da conta. */
 export function getNavSectionsForSegment(segment: TenantSegment): NavSection[] {
   if (isRealEstateSegment(segment)) return REAL_ESTATE_NAV;
+  if (isPizzeriaSegment(segment)) return PIZZERIA_NAV;
   if (isSchedulingSegment(segment)) return schedulingNav(segment);
   return [
     { title: 'Plataforma', items: getPlatformNavForSegment(segment) },
@@ -326,6 +357,18 @@ export const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = 
   '/visitas': {
     title: 'Visitas',
     subtitle: 'Pedidos de visita feitos pela atendente para você confirmar',
+  },
+  '/pedidos': {
+    title: 'Pedidos',
+    subtitle: 'Quadro da noite: aceite, prepare e avise o cliente',
+  },
+  '/cardapio': {
+    title: 'Cardápio e entrega',
+    subtitle: 'O que a atendente oferece, taxas de entrega e horário',
+  },
+  '/vendas': {
+    title: 'Vendas e métricas',
+    subtitle: 'Faturamento, sabores, horários, clientes e onde melhorar',
   },
   '/relatorios': {
     title: 'Relatórios de Análise e Performance',
@@ -434,6 +477,19 @@ const REAL_ESTATE_PAGE_TITLES: Record<string, { title: string; subtitle: string 
   },
 };
 
+const PIZZERIA_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  '/': { title: 'Painel', subtitle: 'Pedidos de hoje, vendas e campanhas da sua pizzaria' },
+  '/atendente': { title: 'Atendente IA', subtitle: 'Quem anota os pedidos no WhatsApp a qualquer hora' },
+  '/disparos': { title: 'Campanhas', subtitle: 'Promoção → público → agendar → enviar com status Meta' },
+  '/follow-up': { title: 'Follow-up', subtitle: 'Mensagem automática para quem não respondeu' },
+  '/templates': { title: 'Modelos de mensagem', subtitle: 'Modelos aprovados pela Meta para suas campanhas' },
+  '/contatos': { title: 'Contatos', subtitle: 'Clientes salvos a cada pedido, importação e etiquetas' },
+  '/metricas': { title: 'Resultados de campanha', subtitle: 'Alcance, respostas e entregas das campanhas' },
+  '/dicas': { title: 'Dicas da semana', subtitle: 'Como foi a semana e o que fazer para vender mais' },
+  '/financeiro': { title: 'Financeiro', subtitle: 'Faturamento dos pedidos, gastos e lucro do mês' },
+  '/relatorios': { title: 'Relatório de envios', subtitle: 'Histórico de campanhas e entregas' },
+};
+
 export function getPageTitle(
   pathname: string,
   segment?: TenantSegment | string | null
@@ -449,7 +505,9 @@ export function getPageTitle(
         }
       : isRealEstateSegment(segment || null)
         ? REAL_ESTATE_PAGE_TITLES
-        : null;
+        : isPizzeriaSegment(segment)
+          ? PIZZERIA_PAGE_TITLES
+          : null;
   const titles =
     override && override[pathname] ? { ...PAGE_TITLES, ...override } : PAGE_TITLES;
 

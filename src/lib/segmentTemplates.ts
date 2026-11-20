@@ -11,6 +11,7 @@ import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { createMetaMessageTemplate, resolveMetaCredentials } from '@/lib/metaClient';
 import { isRealEstateSegment } from '@/lib/segmentConfig';
 import { schedulingVerticalOf } from '@/lib/schedulingVerticals';
+import { isPizzeriaSegment } from '@/lib/pizzeria';
 import { ensureReminderTemplate } from '@/lib/appointmentReminders';
 import { ensureVisitReminderTemplate } from '@/lib/visitReminders';
 import { generateSampleImage } from '@/lib/templateImages';
@@ -88,6 +89,37 @@ const HEALTH_BEAUTY: SegmentTemplateDef[] = [
   },
 ];
 
+const PIZZERIA: SegmentTemplateDef[] = [
+  {
+    name: 'promocao_pizza_dia',
+    description: 'Divulgar a promoção do dia ou da semana.',
+    body: `Olá, {{nome}}! Hoje na {{empresa}}: {{promocao}}. 🍕
+
+Quer pedir? É só responder esta mensagem que a gente anota.
+
+${OPT_OUT}`,
+  },
+  {
+    name: 'pizza_destaque_imagem',
+    image: true,
+    description: 'Mostrar uma pizza ou novidade do cardápio com foto.',
+    body: `Olá, {{nome}}! Olha o que saiu do forno aqui na {{empresa}}: {{novidade}}. 😋
+
+Bateu a fome? Responda esta mensagem e faça seu pedido.
+
+${OPT_OUT}`,
+  },
+  {
+    name: 'retorno_cliente_pizza',
+    description: 'Chamar de volta quem não pede há um tempo (com cupom).',
+    body: `Oi, {{nome}}! Faz tempo que você não pede na {{empresa}} e a gente sentiu sua falta.
+
+Para matar a saudade: {{cupom}}. É só responder esta mensagem para pedir.
+
+${OPT_OUT}`,
+  },
+];
+
 const GENERAL: SegmentTemplateDef[] = [
   {
     name: 'novidades_empresa',
@@ -112,6 +144,7 @@ export function segmentTemplateDefs(segment: string | null | undefined): Segment
   const scheduling = schedulingVerticalOf(segment);
   if (scheduling === 'automotivo') return AUTOMOTIVE;
   if (scheduling === 'saude') return HEALTH_BEAUTY;
+  if (isPizzeriaSegment(segment)) return PIZZERIA;
   return GENERAL;
 }
 

@@ -90,6 +90,7 @@ export default function DicasPage() {
   };
 
   const m = insight?.metrics;
+  const orders = m?.kind === 'pedidos';
   const maxDay = m ? Math.max(1, ...m.weekdays.map((d) => d.count)) : 1;
 
   return (
@@ -138,7 +139,7 @@ export default function DicasPage() {
           <Lightbulb className="w-8 h-8 text-domu-blue mx-auto" />
           <h2 className="text-sm font-black text-slate-900">Suas dicas chegam todo domingo à noite</h2>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            A Domu analisa a agenda, o financeiro, as conversas e a atendente, e te mostra onde dá para vender mais e perder menos clientes.
+            A Domu analisa os agendamentos ou pedidos, o financeiro, as conversas e a atendente, e te mostra onde dá para vender mais e perder menos clientes.
             Se quiser ver agora, clique em &quot;Gerar dicas agora&quot;.
           </p>
         </div>
@@ -175,16 +176,16 @@ export default function DicasPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Stat label="Faturamento" value={brl(m.revenue)} {...change(m.revenue, m.prevRevenue)} />
-            <Stat label="Atendimentos" value={String(m.done)} {...change(m.done, m.prevDone)} />
+            <Stat label={orders ? 'Pedidos' : 'Atendimentos'} value={String(m.done)} {...change(m.done, m.prevDone)} />
             <Stat label="Ticket médio" value={brl(m.averageTicket)} />
             <Stat
-              label="Faltas e cancelamentos"
+              label={orders ? 'Cancelados' : 'Faltas e cancelamentos'}
               value={String(m.noShows + m.cancelled)}
               hint={m.lostRevenue ? `${brl(m.lostRevenue)} que não entraram` : undefined}
               tone={m.lostRevenue ? 'bad' : undefined}
             />
-            <Stat label="Já marcado (próximos 7 dias)" value={String(m.upcoming)} hint={m.upcomingRevenue ? brl(m.upcomingRevenue) : undefined} />
-            <Stat label="Agendados pela atendente" value={String(m.bookedByAssistant)} />
+            {!orders && <Stat label="Já marcado (próximos 7 dias)" value={String(m.upcoming)} hint={m.upcomingRevenue ? brl(m.upcomingRevenue) : undefined} />}
+            <Stat label={orders ? 'Pedidos pela atendente' : 'Agendados pela atendente'} value={String(m.bookedByAssistant)} />
             <Stat label="Clientes novos" value={String(m.newCustomers)} hint={`${m.returningCustomers} já eram clientes`} />
             <Stat label="Lucro da semana" value={brl(m.profit)} hint={m.expenses ? `Gastos: ${brl(m.expenses)}` : 'Lance os gastos no Financeiro'} />
           </div>
@@ -199,7 +200,7 @@ export default function DicasPage() {
                     <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-domu-blue rounded-full" style={{ width: `${(d.count / maxDay) * 100}%` }} />
                     </div>
-                    <span className="w-20 text-right text-slate-600">{d.open ? `${d.count} atend.` : 'fechado'}</span>
+                    <span className="w-20 text-right text-slate-600">{d.open ? `${d.count} ${orders ? 'ped.' : 'atend.'}` : 'fechado'}</span>
                   </div>
                 ))}
               </div>
@@ -211,7 +212,7 @@ export default function DicasPage() {
             </section>
 
             <section className="bg-white border border-slate-200/80 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-black text-slate-900">Serviços que mais faturaram na semana</h3>
+              <h3 className="text-xs font-black text-slate-900">{orders ? 'Mais vendidos na semana' : 'Serviços que mais faturaram na semana'}</h3>
               {m.topServices.length ? (
                 <ul className="space-y-1.5">
                   {m.topServices.map((s) => (
@@ -224,7 +225,7 @@ export default function DicasPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-400">Nenhum atendimento feito nesta semana.</p>
+                <p className="text-xs text-slate-400">{orders ? 'Nenhum pedido vendido nesta semana.' : 'Nenhum atendimento feito nesta semana.'}</p>
               )}
               <div className="border-t border-slate-100 pt-3 text-[11px] text-slate-500 space-y-1">
                 <p>
@@ -233,9 +234,9 @@ export default function DicasPage() {
                 </p>
                 {m.lapsed.count > 0 && (
                   <p className="flex flex-wrap items-center gap-x-2">
-                    <span>{m.lapsed.count} clientes não voltam há mais de 30 dias.</span>
+                    <span>{m.lapsed.count} clientes não {orders ? 'pedem' : 'voltam'} há mais de 30 dias.</span>
                     {m.lapsed.leadIds.length > 0 && (
-                      <Link href="/disparos?publico=sumidos" className="font-bold text-domu-blue hover:underline">
+                      <Link href={orders ? '/disparos?publico=sumidos&fonte=pedidos' : '/disparos?publico=sumidos'} className="font-bold text-domu-blue hover:underline">
                         Chamar esses clientes
                       </Link>
                     )}

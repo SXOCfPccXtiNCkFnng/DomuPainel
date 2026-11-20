@@ -321,15 +321,15 @@ export default function OnboardingPage() {
       title: 'Pizzarias, Restaurantes e Delivery',
       badge: 'Pedidos e Cardápio',
       description:
-        'Receba pedidos, envie cardápio, confirme entregas e fidelize clientes com campanhas no WhatsApp.',
+        'A atendente IA mostra o cardápio, anota o pedido com o valor certo e você acompanha tudo num quadro de pedidos.',
       features: [
-        'Cardápio e promoções pelo WhatsApp',
-        'Confirmação de pedidos e delivery',
-        'Campanhas de fidelização e recompra',
+        'Pedidos pelo WhatsApp com a atendente IA',
+        'Quadro de pedidos e aviso de status ao cliente',
+        'Métricas de vendas e campanhas para o cliente voltar',
       ],
       color: 'text-orange-600',
       borderColor: 'border-orange-500',
-      available: false,
+      available: true,
     },
     {
       id: 'geral',
@@ -346,7 +346,7 @@ export default function OnboardingPage() {
       available: false,
     },
   ];
-  const SEGMENT_ORDER: TenantSegment[] = ['imobiliario', 'automotivo', 'saude', 'marketing_apenas'];
+  const SEGMENT_ORDER: TenantSegment[] = ['imobiliario', 'automotivo', 'saude', 'alimentacao', 'marketing_apenas'];
   const segmentRank = (id: TenantSegment) => {
     const i = SEGMENT_ORDER.indexOf(id);
     return i === -1 ? SEGMENT_ORDER.length : i;

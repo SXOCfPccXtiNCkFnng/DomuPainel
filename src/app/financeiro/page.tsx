@@ -53,6 +53,8 @@ export default function FinanceiroPage() {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [entries, setEntries] = useState<FinanceEntry[]>([]);
   const [entriesAvailable, setEntriesAvailable] = useState(true);
+  // Pizzaria: faturamento vem dos pedidos (mesmo resumo, outras palavras).
+  const [fromOrders, setFromOrders] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -71,6 +73,7 @@ export default function FinanceiroPage() {
       }
       setMonth(json.month);
       setSummary(json.summary);
+      setFromOrders(json.source === 'pedidos');
       setEntries(json.entries || []);
       setEntriesAvailable(json.entriesAvailable !== false);
       setError(null);
@@ -259,7 +262,11 @@ export default function FinanceiroPage() {
       ) : summary ? (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Stat label="Faturamento pela agenda" value={brl(summary.revenue)} hint={`${summary.done} atendimentos feitos`} />
+            <Stat
+              label={fromOrders ? 'Faturamento dos pedidos' : 'Faturamento pela agenda'}
+              value={brl(summary.revenue)}
+              hint={`${summary.done} ${fromOrders ? 'pedidos vendidos' : 'atendimentos feitos'}`}
+            />
             <Stat label="Outras entradas" value={brl(summary.otherIncome)} hint="Lançadas à mão" />
             <Stat label="Gastos" value={brl(summary.expenses)} hint="Lançados à mão" />
             <Stat
@@ -271,33 +278,34 @@ export default function FinanceiroPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Stat label="Ticket médio" value={brl(summary.averageTicket)} hint="Por atendimento com preço" />
+            <Stat label="Ticket médio" value={brl(summary.averageTicket)} hint={fromOrders ? 'Por pedido (com taxa de entrega)' : 'Por atendimento com preço'} />
             <Stat
-              label="Previsto no resto do mês"
+              label={fromOrders ? 'Aguardando aceite' : 'Previsto no resto do mês'}
               value={brl(summary.upcomingRevenue)}
-              hint={`${summary.upcoming} agendamentos confirmados`}
+              hint={`${summary.upcoming} ${fromOrders ? 'pedidos novos no quadro' : 'agendamentos confirmados'}`}
             />
             <Stat
-              label="Perdido com faltas e cancelamentos"
+              label={fromOrders ? 'Perdido com cancelamentos' : 'Perdido com faltas e cancelamentos'}
               value={brl(summary.lostRevenue)}
-              hint={`${summary.lost} agendamentos`}
+              hint={`${summary.lost} ${fromOrders ? 'pedidos' : 'agendamentos'}`}
               tone={summary.lost ? 'bad' : undefined}
             />
           </div>
 
           <p className="text-[11px] text-slate-500 flex items-start gap-1.5">
             <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            Conta como feito o agendamento concluído ou confirmado cujo horário já passou. Marque na Agenda quem faltou
-            ou cancelou para o número ficar certo.
+            {fromOrders
+              ? 'Conta como venda o pedido aceito (em preparo, saiu, pronto ou finalizado). Cancele no quadro de Pedidos os que não saíram para o número ficar certo.'
+              : 'Conta como feito o agendamento concluído ou confirmado cujo horário já passou. Marque na Agenda quem faltou ou cancelou para o número ficar certo.'}
             {summary.doneWithoutPrice > 0 &&
               ` ${summary.doneWithoutPrice} atendimento(s) foram de serviços sem preço e não entram no faturamento.`}
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <section className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-2">
-              <h2 className="text-sm font-black text-slate-900">Por serviço</h2>
+              <h2 className="text-sm font-black text-slate-900">{fromOrders ? 'Por canal' : 'Por serviço'}</h2>
               {summary.byService.length === 0 ? (
-                <p className="text-xs text-slate-400">Nenhum atendimento feito neste mês.</p>
+                <p className="text-xs text-slate-400">{fromOrders ? 'Nenhum pedido vendido neste mês.' : 'Nenhum atendimento feito neste mês.'}</p>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {summary.byService.map((s) => (

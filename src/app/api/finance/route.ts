@@ -11,6 +11,8 @@ import {
   type FinanceAppointment,
   type FinanceEntry,
 } from '@/lib/finance';
+import { isPizzeriaSegment, ordersAsFinance } from '@/lib/pizzeria';
+import { loadOrdersSince } from '@/lib/pizzeriaServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,8 +59,15 @@ export async function GET(req: NextRequest) {
     const month = isMonthKey(requested) ? requested : brtDateKey(now).slice(0, 7);
     const range = monthRange(month);
 
+    const { data: tenant } = await supabaseAdmin.from('tenants').select('segment').eq('id', tenantId).maybeSingle();
+    // Pizzaria: o faturamento vem dos pedidos do mês, não da agenda.
+    const pizzeria = isPizzeriaSegment(tenant?.segment);
     const [appointments, entriesRes] = await Promise.all([
-      loadMonthAppointments(tenantId, range.start, range.end),
+      pizzeria
+        ? loadOrdersSince(tenantId, range.start).then((orders) =>
+            ordersAsFinance(orders.filter((o) => new Date(o.created_at) < range.end))
+          )
+        : loadMonthAppointments(tenantId, range.start, range.end),
       supabaseAdmin
         .from('finance_entries')
         .select('id, kind, description, category, amount, occurred_on')
@@ -76,6 +85,7 @@ export async function GET(req: NextRequest) {
       success: true,
       month,
       summary: summarizeFinance(appointments, entries, now),
+      source: pizzeria ? 'pedidos' : 'agenda',
       entries,
       entriesAvailable,
     });

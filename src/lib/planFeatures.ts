@@ -12,12 +12,14 @@ import {
 } from '@/lib/planLimits';
 import { hasFollowUp, isDispatchOnlySegment, isRealEstateSegment } from '@/lib/segmentConfig';
 import { schedulingVerticalOf } from '@/lib/schedulingVerticals';
+import { isPizzeriaSegment } from '@/lib/pizzeria';
 
-type Kind = 'imobiliario' | 'agenda' | 'disparos' | 'geral';
+type Kind = 'imobiliario' | 'agenda' | 'pizzaria' | 'disparos' | 'geral';
 
 function kindOf(segment: string | null | undefined): Kind {
   if (isRealEstateSegment(segment ?? null)) return 'imobiliario';
   if (schedulingVerticalOf(segment)) return 'agenda';
+  if (isPizzeriaSegment(segment)) return 'pizzaria';
   if (isDispatchOnlySegment(segment ?? null)) return 'disparos';
   return 'geral';
 }
@@ -34,6 +36,11 @@ const BLURBS: Record<Kind, Record<PlanTier, string>> = {
     STARTER: 'Agenda e atendente IA para receber horários pelo WhatsApp a qualquer hora.',
     PRO: 'Mais conversas da atendente, mais volume de campanhas e equipe maior.',
     ENTERPRISE: 'Volume alto, equipe grande e acompanhamento próximo da Domu.',
+  },
+  pizzaria: {
+    STARTER: 'Atendente IA que anota pedidos no WhatsApp e quadro de pedidos para a cozinha.',
+    PRO: 'Mais conversas da atendente para as noites cheias, mais campanhas e equipe maior.',
+    ENTERPRISE: 'Volume alto de pedidos, equipe grande e acompanhamento próximo da Domu.',
   },
   disparos: {
     STARTER: 'Campanhas pelo WhatsApp oficial, sem cadastros complexos. Quando crescer, faça upgrade.',
@@ -67,6 +74,15 @@ function segmentFeatures(kind: Kind, tier: PlanTier): string[] {
       'Lembrete automático para o cliente antes do horário',
       'Financeiro: faturamento da agenda, gastos e lucro',
       'Dicas da semana: resumo com o que fazer para vender mais (painel, e-mail e WhatsApp)',
+    ];
+  }
+  if (kind === 'pizzaria') {
+    return [
+      `Atendente IA que mostra o cardápio e anota o pedido com o valor calculado pelo sistema (${conversations} conversas/mês)`,
+      'Quadro de pedidos com aviso de status ao cliente (em preparo, saiu para entrega, pronto)',
+      'Cardápio com tamanhos, meio a meio, taxa por bairro e pedido mínimo',
+      'Vendas e métricas: sabores, horários de pico, ticket médio e clientes que sumiram',
+      'Financeiro e Dicas da semana com o que fazer para vender mais',
     ];
   }
   if (kind === 'disparos' && tier !== 'STARTER') {

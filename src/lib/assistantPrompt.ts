@@ -187,11 +187,16 @@ export function assistantSettingsFromRow(row: Record<string, unknown> | null | u
 export function sampleGreeting(
   settings: AssistantSettings,
   companyName: string,
-  opts?: { realEstate?: boolean; vertical?: SchedulingVertical }
+  opts?: { realEstate?: boolean; pizzeria?: boolean; vertical?: SchedulingVertical }
 ): string {
   if (settings.greeting.trim()) return settings.greeting.trim();
   const who = settings.assistant_name ? `Aqui é ${settings.assistant_name}, da ${companyName}` : `Aqui é da ${companyName}`;
   const emoji = settings.use_emojis;
+  if (opts?.pizzeria) {
+    if (settings.tone === 'PROFISSIONAL') return `Olá, tudo bem? ${who}. Posso anotar seu pedido?${emoji ? ' 🍕' : ''}`;
+    if (settings.tone === 'DESCONTRAIDO') return `E aí, tudo certo? ${who}${emoji ? ' 🍕' : ''} Bateu a fome? Bora pedir!`;
+    return `Oi! ${who}${emoji ? ' 😊' : ''} O que vai ser hoje?`;
+  }
   const realEstate = Boolean(opts?.realEstate);
   const copy = SCHEDULING_COPY[opts?.vertical || 'automotivo'];
   switch (settings.tone) {

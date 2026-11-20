@@ -1,5 +1,5 @@
 /**
- * Assistente de IA no WhatsApp (lava rápido e imobiliário). Roda depois que o
+ * Assistente de IA no WhatsApp (agenda, imobiliário e pizzaria). Roda depois que o
  * webhook já respondeu 200 para a Meta: espera o cliente terminar de digitar,
  * confere se pode responder, conversa com o Gemini (com as ferramentas do
  * ramo: agenda ou catálogo de imóveis) e envia a resposta. Toda execução que passa da espera vira uma
@@ -24,6 +24,10 @@ import { buildRealEstateSystemPrompt } from '@/lib/realEstatePrompt';
 import { executeRealEstateTool, realEstateToolDeclarations, type RealEstateToolContext } from '@/lib/realEstateTools';
 import { OFFERABLE_STATUSES, propertyFromRow, realEstateModeForPlan } from '@/lib/realEstate';
 import { getPlanPropertyLimit } from '@/lib/planLimits';
+import { isPizzeriaSegment } from '@/lib/pizzeria';
+import { buildPizzeriaSystemPrompt } from '@/lib/pizzeriaPrompt';
+import { executePizzeriaTool, pizzeriaToolDeclarations, type PizzeriaToolContext } from '@/lib/pizzeriaTools';
+import { loadCustomerOrders, loadMenu, loadPizzeriaSettings } from '@/lib/pizzeriaServer';
 import {
   ASSISTANT_SENDER_TYPE,
   DEBOUNCE_MS,
@@ -57,6 +61,7 @@ import {
   costUsdFullPrice,
   detectFlags,
   emptyUsage,
+  extractBrlValues,
   type AssistantFlag,
   type AssistantRunStatus,
   type TokenUsage,
@@ -95,7 +100,7 @@ type ToolKit = {
 };
 
 /** Ferramentas que agem de verdade (o cliente precisa saber o resultado). */
-const BOOKING_TOOLS = ['agendar', 'solicitar_visita'];
+const BOOKING_TOOLS = ['agendar', 'solicitar_visita', 'registrar_pedido'];
 const HANDOFF_TOOLS = ['chamar_equipe', 'chamar_corretor', SALES_HANDOFF_TOOL];
 
 async function callGemini(
@@ -203,6 +208,7 @@ async function generateReply(
       toolLog.push({ name, ok });
       if (ok && name === 'agendar' && result.agendamento) effects.booked.push(result.agendamento as Record<string, unknown>);
       if (ok && name === 'solicitar_visita' && result.visita) effects.visits.push(result.visita as Record<string, unknown>);
+      if (ok && name === 'registrar_pedido' && result.pedido) (effects.orders ||= []).push(result.pedido as Record<string, unknown>);
       if (ok && name === 'cancelar_agendamento') effects.cancelled++;
       if (ok && HANDOFF_TOOLS.includes(name)) effects.handoff = true;
       logger.info('assistant.tool_called', { tool: name, tenantId });
@@ -342,13 +348,14 @@ async function loadLeadForAssistant(tenantId: string, leadId: string): Promise<{
 }
 
 /** 'vendas': a atendente que vende a própria Domu (conta DOMU_SALES_TENANT_ID). */
-type Vertical = SchedulingVertical | 'imobiliario' | 'vendas';
+type Vertical = SchedulingVertical | 'imobiliario' | 'pizzaria' | 'vendas';
 
-/** Ramos que têm atendente de IA: os de agenda (lava rápido, saúde e beleza) e o imobiliário. */
+/** Ramos que têm atendente de IA: os de agenda (lava rápido, saúde e beleza), o imobiliário e a pizzaria. */
 export function assistantVertical(segment: string | null | undefined): Vertical | null {
   const scheduling = schedulingVerticalOf(segment);
   if (scheduling) return scheduling;
   if (isRealEstateSegment(segment ?? null)) return 'imobiliario';
+  if (isPizzeriaSegment(segment)) return 'pizzaria';
   return null;
 }
 
@@ -378,6 +385,52 @@ async function prepareVertical(vertical: Vertical, input: VerticalInput): Promis
       toolkit: { declarations: salesToolDeclarations(), execute: (name, args) => executeSalesTool(name, args, base) },
       knownPrices: plans.flatMap((g) => g.plans.flatMap((p) => [p.price, Math.round(p.price * 0.95)])),
       ownerText: `${couponText(coupon)}\n${plansText(plans)}`,
+    };
+  }
+
+  if (vertical === 'pizzaria') {
+    const [menu, pizzeria, recentOrders] = await Promise.all([
+      loadMenu(base.tenantId, { activeOnly: true }),
+      loadPizzeriaSettings(base.tenantId),
+      loadCustomerOrders(base.tenantId, base.leadPhone, 1),
+    ]);
+    const ctx: PizzeriaToolContext = {
+      ...base,
+      menu,
+      pizzeria,
+      showPrices: settings.show_prices,
+      paymentMethods: settings.payment_methods,
+    };
+    // Valores que a IA pode repetir: preços do cardápio, taxas e os totais que calcular_pedido devolveu.
+    const knownPrices: number[] = [
+      ...menu.flatMap((m) => m.prices.map((p) => p.price)),
+      pizzeria.delivery_fee,
+      pizzeria.min_order,
+      ...pizzeria.delivery_areas.map((a) => a.fee),
+      ...recentOrders.map((o) => o.total),
+    ];
+    return {
+      systemPrompt: buildPizzeriaSystemPrompt({
+        settings,
+        companyName: base.companyName,
+        menu,
+        pizzeria,
+        customerName: base.leadName,
+        recentOrders,
+        now: base.now,
+      }),
+      toolkit: {
+        declarations: pizzeriaToolDeclarations(),
+        execute: async (name, args) => {
+          const result = await executePizzeriaTool(name, args, ctx);
+          const text = [result.resumo, result.total, (result.pedido as Record<string, unknown> | undefined)?.total]
+            .filter(Boolean)
+            .join('\n');
+          knownPrices.push(...extractBrlValues(text));
+          return result;
+        },
+      },
+      knownPrices,
     };
   }
 
@@ -464,7 +517,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
   const { tenantId, leadId } = trigger;
   const usage = emptyUsage();
   const toolLog: ToolCall[] = [];
-  const effects: ToolEffects = { booked: [], visits: [], cancelled: 0, handoff: false };
+  const effects: ToolEffects = { booked: [], visits: [], orders: [], cancelled: 0, handoff: false };
   const runStartedAt = Date.now();
   let customerMessage: string | null = null;
   let aiStartedAt: number | null = null;
@@ -642,7 +695,9 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       leadId,
       leadPhone: lead.phone,
       leadName: lead.name || 'Cliente',
-      companyName: sales ? 'Domu' : tenant.name || (vertical === 'imobiliario' ? 'a imobiliária' : 'a loja'),
+      companyName: sales
+        ? 'Domu'
+        : tenant.name || (vertical === 'imobiliario' ? 'a imobiliária' : vertical === 'pizzaria' ? 'a pizzaria' : 'a loja'),
       lastCustomerMessage: lastMessage.body || '',
       now,
       settings,
@@ -664,7 +719,11 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     const aiMs = Date.now() - aiStartedAt;
     let bubbles = reply ? splitReply(reply) : [];
     const hasEffects =
-      effects.booked.length > 0 || effects.visits.length > 0 || effects.cancelled > 0 || effects.handoff;
+      effects.booked.length > 0 ||
+      effects.visits.length > 0 ||
+      (effects.orders?.length ?? 0) > 0 ||
+      effects.cancelled > 0 ||
+      effects.handoff;
     if (!bubbles.length && hasEffects) {
       logger.warn('assistant.fallback_reply', { tenantId, leadId, tools: toolLog.map((t) => t.name) });
       bubbles = [fallbackReplyForEffects(effects)!];

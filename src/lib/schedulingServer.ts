@@ -53,7 +53,12 @@ export async function loadBusyRanges(tenantId: string, from: Date, to: Date): Pr
 }
 
 /** Liga o agendamento ao contato (cria se ainda não existir) — o cliente entra na base de campanhas. */
-async function findOrCreateLeadId(tenantId: string, name: string, phone: string): Promise<string | null> {
+export async function findOrCreateLeadId(
+  tenantId: string,
+  name: string,
+  phone: string,
+  source: string = 'AGENDA'
+): Promise<string | null> {
   const lookup = async () => {
     const { data } = await supabaseAdmin
       .from('leads')
@@ -70,7 +75,7 @@ async function findOrCreateLeadId(tenantId: string, name: string, phone: string)
 
   const { data, error } = await supabaseAdmin
     .from('leads')
-    .insert({ tenant_id: tenantId, name, phone: toStoredPhone(phone), source: 'AGENDA' })
+    .insert({ tenant_id: tenantId, name, phone: toStoredPhone(phone), source })
     .select('id')
     .single();
   if (error) {

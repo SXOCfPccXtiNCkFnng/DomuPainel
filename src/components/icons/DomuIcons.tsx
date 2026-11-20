@@ -5,6 +5,8 @@ import {
   CalendarCheck,
   CalendarDays,
   CarFront,
+  ChartColumnIncreasing,
+  ClipboardList,
   HeartPulse,
   Lightbulb,
   Headset,
@@ -90,9 +92,24 @@ export function NavIcon({ id, active = false, className }: { id: NavItemId; acti
     );
   }
 
-  if (id === 'leads' || id === 'visitas' || id === 'servicos' || id === 'financeiro' || id === 'dicas') {
+  if (
+    id === 'leads' ||
+    id === 'visitas' ||
+    id === 'servicos' ||
+    id === 'financeiro' ||
+    id === 'dicas' ||
+    id === 'pedidos' ||
+    id === 'cardapio' ||
+    id === 'vendas'
+  ) {
     const Icon =
-      id === 'leads'
+      id === 'pedidos'
+        ? ClipboardList
+        : id === 'cardapio'
+          ? Pizza
+          : id === 'vendas'
+            ? ChartColumnIncreasing
+            : id === 'leads'
         ? UserRoundSearch
         : id === 'visitas'
           ? CalendarCheck

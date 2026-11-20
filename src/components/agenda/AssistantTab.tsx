@@ -24,6 +24,7 @@ import {
 } from '@/lib/assistantPrompt';
 import type { ServiceItem } from '@/lib/scheduling';
 import { REAL_ESTATE_EXTRA_INFO_PLACEHOLDER } from '@/lib/realEstatePrompt';
+import { PIZZERIA_EXTRA_INFO_PLACEHOLDER } from '@/lib/pizzeriaPrompt';
 import { SCHEDULING_COPY } from '@/lib/schedulingVerticals';
 import type { RealEstateMode } from '@/lib/realEstate';
 import { agendaInputClass } from './agendaStyles';
@@ -53,7 +54,7 @@ export default function AssistantTab({
   const [aiAvailable, setAiAvailable] = useState(true);
   const [promoAvailable, setPromoAvailable] = useState(true);
   const [quota, setQuota] = useState<{ planName: string; limit: number; used: number } | null>(null);
-  const [vertical, setVertical] = useState<'automotivo' | 'saude' | 'imobiliario' | null>(null);
+  const [vertical, setVertical] = useState<'automotivo' | 'saude' | 'imobiliario' | 'pizzaria' | null>(null);
   const [mode, setMode] = useState<RealEstateMode | null>(null);
   const [readyCount, setReadyCount] = useState(0);
   const [canEdit, setCanEdit] = useState(false);
@@ -143,12 +144,25 @@ export default function AssistantTab({
   const dirty = JSON.stringify(form) !== JSON.stringify(saved) || companyName.trim() !== savedCompanyName;
   const disabled = !canEdit;
   const realEstate = vertical === 'imobiliario';
-  const business = realEstate ? 'imobiliária' : 'loja';
+  const pizzeria = vertical === 'pizzaria';
+  const business = realEstate ? 'imobiliária' : pizzeria ? 'pizzaria' : 'loja';
   // Lava rápido ou saúde e beleza: mesmos campos, vocabulário do ramo.
   const schedulingVertical = vertical === 'saude' ? 'saude' : 'automotivo';
   const copy = SCHEDULING_COPY[schedulingVertical];
-  const activeServices = realEstate ? readyCount : services.filter((s) => s.active).length;
-  const knowledge = realEstate
+  const activeServices = realEstate || pizzeria ? readyCount : services.filter((s) => s.active).length;
+  const knowledge = pizzeria
+    ? [
+        { done: readyCount > 0, label: readyCount ? `${readyCount} itens no cardápio` : 'Cardápio vazio' },
+        { done: true, label: 'Horário, entrega, taxas e meio a meio (Cardápio e entrega)' },
+        { done: Boolean(form.address.trim()), label: form.address.trim() ? 'Endereço para retirada' : 'Endereço não informado' },
+        {
+          done: form.payment_methods.length > 0,
+          label: form.payment_methods.length ? 'Formas de pagamento' : 'Formas de pagamento não informadas',
+        },
+        { done: Boolean(activePromo(form)), label: activePromo(form) ? 'Promoção em andamento' : 'Nenhuma promoção ativa' },
+        { done: true, label: 'O último pedido de cada cliente (para repetir)' },
+      ]
+    : realEstate
     ? [
         { done: readyCount > 0, label: readyCount ? `${readyCount} imóveis disponíveis` : 'Nenhum imóvel disponível' },
         { done: Boolean(form.address.trim()), label: form.address.trim() ? 'Endereço da imobiliária' : 'Endereço não informado' },
@@ -193,7 +207,9 @@ export default function AssistantTab({
       <p className="text-[11px] text-slate-600 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 flex items-start gap-2">
         <Info className="w-4 h-4 shrink-0 text-domu-blue" />
         <span>
-          {realEstate
+          {pizzeria
+            ? 'A atendente responde no WhatsApp como alguém da pizzaria: mostra o cardápio, ajuda a escolher, anota o pedido e manda para o quadro de Pedidos. O valor é sempre calculado pelo sistema a partir do cardápio; ela não dá desconto nem inventa sabor.'
+            : realEstate
             ? 'A atendente responde seus clientes no WhatsApp como alguém da imobiliária: entende o que cada um procura e apresenta os imóveis do seu catálogo. Você ajusta o jeito dela e o que ela sabe; as regras (só falar de imóvel cadastrado, não negociar valor, não prometer financiamento) ficam sempre ligadas.'
             : copy.assistantIntro}
           {!aiAvailable && ' A atendente ainda não foi liberada no servidor (falta a GEMINI_API_KEY).'}
@@ -213,13 +229,22 @@ export default function AssistantTab({
           <p className="text-[11px] text-slate-600 leading-relaxed">
             {!form.enabled
               ? 'Ligue para ela começar a responder as mensagens que chegarem no WhatsApp conectado.'
-              : realEstate
+              : pizzeria
+                ? 'Ela anota pedidos no horário de funcionamento e, fora dele, avisa quando abre. Cada pedido novo aparece em Pedidos com um bipe. Reclamação ou atraso ela passa para você e fica quieta naquela conversa por 12 horas.'
+                : realEstate
                 ? 'Ela responde a qualquer hora. Quando passa o cliente para o corretor, avisa você aqui no painel e por e-mail e fica quieta naquela conversa por 12 horas (o mesmo vale quando alguém da equipe responde pelo celular).'
                 : 'Ela responde a qualquer hora e marca horários sozinha. Quando alguém da equipe responde pelo celular, ela fica quieta naquela conversa por 12 horas. Se o cliente reclamar ou pedir uma pessoa, ela avisa você aqui no painel e por e-mail.'}
           </p>
           {!form.enabled && activeServices === 0 && (
             <p className="text-[11px] text-amber-700">
-              {realEstate ? (
+              {pizzeria ? (
+                <>
+                  Cadastre o cardápio antes de ligar.{' '}
+                  <Link href="/cardapio" className="font-bold underline">
+                    Abrir o cardápio
+                  </Link>
+                </>
+              ) : realEstate ? (
                 <>
                   Cadastre pelo menos um imóvel disponível antes de ligar.{' '}
                   <Link href="/imoveis" className="font-bold underline">
@@ -229,7 +254,7 @@ export default function AssistantTab({
               ) : (
                 'Cadastre pelo menos um serviço antes de ligar. '
               )}
-              {!realEstate && onGoToServices && (
+              {!realEstate && !pizzeria && onGoToServices && (
                 <button type="button" onClick={onGoToServices} className="font-bold underline">
                   Cadastrar serviços
                 </button>
@@ -383,12 +408,14 @@ export default function AssistantTab({
                   onChange={(e) => update({ show_prices: e.target.checked })}
                   className="rounded border-slate-300 text-domu-blue focus:ring-domu-blue"
                 />
-                {realEstate ? 'Informar valores dos imóveis' : 'Informar preços dos serviços'}
+                {realEstate ? 'Informar valores dos imóveis' : pizzeria ? 'Informar preços do cardápio' : 'Informar preços dos serviços'}
               </label>
             </div>
             {!form.show_prices && (
               <p className="text-[10.5px] text-slate-500">
-                {realEstate
+                {pizzeria
+                  ? 'Sem preços avulsos, ela só passa o valor no resumo do pedido, calculado pelo sistema.'
+                  : realEstate
                   ? 'Sem valores, ela diz que o corretor passa os valores e as condições.'
                   : `Sem preços, ela explica que ${copy.priceHidden}.`}
               </p>
@@ -409,7 +436,7 @@ export default function AssistantTab({
                   setCompanyName(e.target.value);
                   setNotice(null);
                 }}
-                placeholder={realEstate ? 'Ex.: Horizonte Imóveis' : copy.companyPlaceholder}
+                placeholder={realEstate ? 'Ex.: Horizonte Imóveis' : pizzeria ? 'Ex.: Pizzaria Forno de Pedra' : copy.companyPlaceholder}
                 className={agendaInputClass}
               />
             </Field>
@@ -423,7 +450,9 @@ export default function AssistantTab({
                 placeholder={
                   realEstate
                     ? 'Ex.: Imobiliária há 15 anos em Ribeirão Preto, especialista em apartamentos na zona sul e lançamentos.'
-                    : copy.aboutPlaceholder
+                    : pizzeria
+                      ? 'Ex.: Pizzaria de forno a lenha há 12 anos, massa de fermentação natural, especialidade em pizzas doces.'
+                      : copy.aboutPlaceholder
                 }
                 className={`${agendaInputClass} resize-y`}
               />
@@ -435,7 +464,11 @@ export default function AssistantTab({
                 disabled={disabled}
                 onChange={(e) => update({ address: e.target.value })}
                 placeholder={
-                  realEstate ? 'Ex.: Rua Garibaldi, 500 — Centro, Ribeirão Preto' : copy.addressPlaceholder
+                  realEstate
+                    ? 'Ex.: Rua Garibaldi, 500 — Centro, Ribeirão Preto'
+                    : pizzeria
+                      ? 'Ex.: Av. Brasil, 900 — Centro (retirada no balcão)'
+                      : copy.addressPlaceholder
                 }
                 className={agendaInputClass}
               />
@@ -472,7 +505,7 @@ export default function AssistantTab({
                 maxLength={EXTRA_INFO_MAX}
                 disabled={disabled}
                 onChange={(e) => update({ extra_info: e.target.value })}
-                placeholder={realEstate ? REAL_ESTATE_EXTRA_INFO_PLACEHOLDER : copy.extraInfoPlaceholder}
+                placeholder={realEstate ? REAL_ESTATE_EXTRA_INFO_PLACEHOLDER : pizzeria ? PIZZERIA_EXTRA_INFO_PLACEHOLDER : copy.extraInfoPlaceholder}
                 className={`${agendaInputClass} resize-y leading-relaxed`}
               />
             </Field>
@@ -501,7 +534,9 @@ export default function AssistantTab({
                 disabled={disabled || !promoAvailable}
                 onChange={(e) => update({ greeting: e.target.value })}
                 placeholder={
-                  realEstate
+                  pizzeria
+                    ? `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua pizzaria'}. Bateu a fome? Me diz o que vai ser hoje que eu anoto!`
+                    : realEstate
                     ? `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua imobiliária'}. Está procurando imóvel para comprar ou alugar?`
                     : copy.greetingPlaceholder(form.assistant_name || 'a Bia', companyName || 'sua loja')
                 }
@@ -519,7 +554,9 @@ export default function AssistantTab({
                 disabled={disabled || !promoAvailable}
                 onChange={(e) => update({ promo_text: e.target.value })}
                 placeholder={
-                  realEstate
+                  pizzeria
+                    ? 'Ex.: Terça em dobro: na compra de uma pizza grande, a segunda sai pela metade do preço. Só para entrega.'
+                    : realEstate
                     ? 'Ex.: Lançamento Residencial Vista Verde: entrada facilitada em 60x até 30/11.'
                     : copy.promoPlaceholder
                 }
@@ -571,8 +608,8 @@ export default function AssistantTab({
             <h2 className="text-sm font-black text-slate-900">Prévia do tom</h2>
             <WhatsAppPreview
               compact
-              bodyText={sampleGreeting(form, companyName || `sua ${business}`, { realEstate, vertical: schedulingVertical })}
-              contactName={companyName || (realEstate ? 'Sua imobiliária' : 'Sua loja')}
+              bodyText={sampleGreeting(form, companyName || `sua ${business}`, { realEstate, pizzeria, vertical: schedulingVertical })}
+              contactName={companyName || (realEstate ? 'Sua imobiliária' : pizzeria ? 'Sua pizzaria' : 'Sua loja')}
               companyLabel={form.assistant_name ? `Atendimento · ${form.assistant_name}` : 'Atendimento'}
             />
             <p className="text-[10.5px] text-slate-400">

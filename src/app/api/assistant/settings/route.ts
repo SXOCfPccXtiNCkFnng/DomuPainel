@@ -12,6 +12,7 @@ import { isSchemaPendingError, SCHEDULING_MIGRATION_PENDING } from '@/lib/schedu
 import { loadAssistantQuota } from '@/lib/assistantQuota';
 import { assistantVertical } from '@/lib/assistantRunner';
 import { OFFERABLE_STATUSES, realEstateModeForPlan } from '@/lib/realEstate';
+import { isPizzeriaSchemaMissing } from '@/lib/pizzeriaServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,9 +33,21 @@ async function loadSettingsRow(tenantId: string) {
   return { ...base, promoAvailable: false };
 }
 
-/** O que a atendente precisa para funcionar: serviços ativos ou imóveis disponíveis. */
+/** O que a atendente precisa para funcionar: serviços ativos, imóveis disponíveis ou itens do cardápio. */
 async function countReadyItems(tenantId: string, vertical: ReturnType<typeof assistantVertical>): Promise<number> {
   if (!vertical) return 0;
+  if (vertical === 'pizzaria') {
+    const { count, error } = await supabaseAdmin
+      .from('menu_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('active', true);
+    if (error) {
+      if (isPizzeriaSchemaMissing(error)) return 0;
+      throw error;
+    }
+    return count ?? 0;
+  }
   const query =
     vertical === 'imobiliario'
       ? supabaseAdmin
@@ -136,7 +149,9 @@ export async function PUT(req: NextRequest) {
             error:
               vertical === 'imobiliario'
                 ? 'Cadastre pelo menos um imóvel disponível antes de ligar a atendente.'
-                : 'Cadastre pelo menos um serviço ativo antes de ligar a atendente.',
+                : vertical === 'pizzaria'
+                  ? 'Cadastre pelo menos um item no cardápio antes de ligar a atendente.'
+                  : 'Cadastre pelo menos um serviço ativo antes de ligar a atendente.',
           },
           { status: 400 }
         );

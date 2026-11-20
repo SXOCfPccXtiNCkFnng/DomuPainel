@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AssistantTab from '@/components/agenda/AssistantTab';
 import type { ServiceItem } from '@/lib/scheduling';
-import { getSegmentFromStorage, isRealEstateSegment } from '@/lib/segmentConfig';
+import { getSegmentFromStorage, isPizzeriaSegment, isRealEstateSegment } from '@/lib/segmentConfig';
 
 /**
  * Atendente IA. Lava rápido: os serviços e horários ficam em /servicos;
@@ -26,7 +26,9 @@ export default function AtendentePage() {
   }, []);
 
   useEffect(() => {
-    const isRealEstate = isRealEstateSegment(getSegmentFromStorage());
+    // Imobiliário e pizzaria não usam serviços de agenda (catálogo em /imoveis, cardápio em /cardapio).
+    const segment = getSegmentFromStorage();
+    const isRealEstate = isRealEstateSegment(segment) || isPizzeriaSegment(segment);
     setRealEstate(isRealEstate);
     if (isRealEstate) return;
     // Links antigos (/atendente?aba=servicos) vão para a página nova.

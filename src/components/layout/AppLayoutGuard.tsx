@@ -7,6 +7,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import {
   isRealEstateSegment,
+  isPizzeriaSegment,
   isDispatchOnlySegment,
   hasFollowUp,
   getSegmentFromStorage,
@@ -154,11 +155,24 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
         router.replace('/leads');
         return;
       }
-      if ((pathname === '/agenda' || pathname === '/servicos' || pathname === '/financeiro' || pathname === '/dicas') && !isSchedulingSegment(segment)) {
+      if ((pathname === '/agenda' || pathname === '/servicos') && !isSchedulingSegment(segment)) {
         router.replace('/');
         return;
       }
-      if (pathname === '/atendente' && !isSchedulingSegment(segment) && !isRealEstateSegment(segment)) {
+      // Financeiro e Dicas: ramos com agenda e pizzaria.
+      if ((pathname === '/financeiro' || pathname === '/dicas') && !isSchedulingSegment(segment) && !isPizzeriaSegment(segment)) {
+        router.replace('/');
+        return;
+      }
+      if ((pathname === '/pedidos' || pathname === '/cardapio' || pathname === '/vendas') && !isPizzeriaSegment(segment)) {
+        router.replace('/');
+        return;
+      }
+      if (pathname === '/atendimento' && isPizzeriaSegment(segment)) {
+        router.replace('/pedidos');
+        return;
+      }
+      if (pathname === '/atendente' && !isSchedulingSegment(segment) && !isRealEstateSegment(segment) && !isPizzeriaSegment(segment)) {
         router.replace('/');
         return;
       }

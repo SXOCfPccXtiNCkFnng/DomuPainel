@@ -65,6 +65,8 @@ export function insightWindow(now: Date): InsightWindow {
 }
 
 export type WeeklyMetrics = {
+  /** 'pedidos' = pizzaria (números saem dos pedidos); ausente = agenda. */
+  kind?: 'agenda' | 'pedidos';
   weekStart: string;
   weekEnd: string;
   revenue: number;
@@ -282,6 +284,9 @@ export const TIP_ACTIONS = {
   SERVICOS: { label: 'Serviços e horários', href: '/servicos' },
   ATENDENTE: { label: 'Atendente IA', href: '/atendente' },
   FINANCEIRO: { label: 'Abrir o Financeiro', href: '/financeiro' },
+  PEDIDOS: { label: 'Abrir os pedidos', href: '/pedidos' },
+  CARDAPIO: { label: 'Abrir o cardápio', href: '/cardapio' },
+  CAMPANHA_SUMIDOS_PEDIDOS: { label: 'Chamar esses clientes', href: '/disparos?publico=sumidos&fonte=pedidos' },
   NENHUMA: null,
 } as const;
 
@@ -315,8 +320,67 @@ export function sanitizeTips(raw: unknown): InsightTip[] {
 export const brl = (n: number) =>
   `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
+/** Dicas fixas da pizzaria (números dos pedidos). */
+function orderFallbackTips(m: WeeklyMetrics): InsightTip[] {
+  const tips: InsightTip[] = [];
+  if (m.lapsed.count >= 3) {
+    tips.push({
+      title: 'Chame quem parou de pedir',
+      text: `${m.lapsed.count} clientes não pedem há semanas. Um cupom de retorno pelo WhatsApp costuma trazer parte deles de volta.`,
+      action: 'CAMPANHA_SUMIDOS_PEDIDOS',
+    });
+  }
+  const best = m.weekdays.find((d) => d.label === m.bestWeekday);
+  const weak = m.weekdays.find((d) => d.label === m.weakestWeekday);
+  if (best && weak && best.count > 0 && weak.count <= best.count / 2) {
+    tips.push({
+      title: `Movimente a ${weak.label.toLowerCase()}`,
+      text: `Nas últimas 4 semanas, ${weak.label.toLowerCase()} teve ${weak.count} pedidos e ${best.label.toLowerCase()} teve ${best.count}. Uma promoção só para o dia fraco enche o forno.`,
+      action: 'CAMPANHA',
+    });
+  }
+  if (m.cancelled >= 3) {
+    tips.push({
+      title: 'Menos pedidos cancelados',
+      text: `${m.cancelled} pedidos foram cancelados nesta semana (${brl(m.lostRevenue)}). Veja os motivos no quadro e ajuste o que se repete.`,
+      action: 'PEDIDOS',
+    });
+  }
+  if (!m.assistant.enabled && m.messages.inbound >= 10) {
+    tips.push({
+      title: 'Ligue a atendente IA',
+      text: `${m.messages.inbound} mensagens chegaram na semana. Com a atendente ligada, cada uma vira pedido anotado na hora, mesmo no pico.`,
+      action: 'ATENDENTE',
+    });
+  }
+  if (m.topServices[0] && m.done >= 5) {
+    const top = m.topServices[0];
+    tips.push({
+      title: `${top.service} puxou a semana`,
+      text: `Foi o mais vendido: ${top.count} unidades e ${brl(top.revenue)}. Vale destacar na próxima campanha, com foto.`,
+      action: 'CAMPANHA',
+    });
+  }
+  if (m.expenses > 0 && m.expenses > m.revenue + m.otherIncome) {
+    tips.push({
+      title: 'Gastos acima do faturamento',
+      text: `Os gastos da semana (${brl(m.expenses)}) passaram o que entrou (${brl(m.revenue + m.otherIncome)}).`,
+      action: 'FINANCEIRO',
+    });
+  }
+  if (!tips.length) {
+    tips.push({
+      title: 'Registre todos os pedidos',
+      text: 'Ainda há poucos pedidos para achar padrões. Lance também os pedidos de telefone e balcão no quadro para as dicas ficarem certeiras.',
+      action: 'PEDIDOS',
+    });
+  }
+  return tips.slice(0, MAX_TIPS);
+}
+
 /** Dicas fixas: usadas quando a IA não responde (ou para completar as dela). */
 export function fallbackTips(m: WeeklyMetrics): InsightTip[] {
+  if (m.kind === 'pedidos') return orderFallbackTips(m);
   const tips: InsightTip[] = [];
   if (m.lapsed.count >= 3) {
     tips.push({
@@ -385,13 +449,31 @@ export function mergeTips(ai: InsightTip[] | null, fallback: InsightTip[]): Insi
 
 /** Frase curta do resumo ("R$ 2.450 em 38 atendimentos, 12% a mais que a semana anterior"). */
 export function summaryHeadline(m: WeeklyMetrics): string {
-  const base = `${brl(m.revenue)} em ${m.done} ${m.done === 1 ? 'atendimento' : 'atendimentos'}`;
+  const unit = m.kind === 'pedidos' ? (m.done === 1 ? 'pedido' : 'pedidos') : m.done === 1 ? 'atendimento' : 'atendimentos';
+  const base = `${brl(m.revenue)} em ${m.done} ${unit}`;
   if (m.revenueChangePct == null || m.revenueChangePct === 0) return base;
   return `${base}, ${Math.abs(m.revenueChangePct)}% a ${m.revenueChangePct > 0 ? 'mais' : 'menos'} que a semana anterior`;
 }
 
 /** Números em texto para a IA (sem dado pessoal além do primeiro nome). */
 export function metricsForAI(m: WeeklyMetrics): string {
+  if (m.kind === 'pedidos') {
+    return [
+      `Semana: ${m.weekStart} a ${m.weekEnd}`,
+      `Faturamento dos pedidos: ${brl(m.revenue)} (semana anterior: ${brl(m.prevRevenue)})`,
+      `Pedidos vendidos: ${m.done} (semana anterior: ${m.prevDone}); ticket médio ${brl(m.averageTicket)}`,
+      `Pedidos cancelados: ${m.cancelled}; valor perdido: ${brl(m.lostRevenue)}`,
+      `Mais vendidos da semana: ${m.topServices.map((s) => `${s.service} (${s.count}, ${brl(s.revenue)})`).join('; ') || 'nenhum'}`,
+      `Pedidos por dia nas últimas 4 semanas: ${m.weekdays.map((d) => `${d.label} ${d.count}${d.open ? '' : ' (fechado)'}`).join(', ')}`,
+      `Horários com mais pedidos (4 semanas): ${m.peakHours.map((h) => `${h.hour}h (${h.count})`).join(', ') || 'sem dados'}`,
+      `Clientes da semana: ${m.newCustomers} novos e ${m.returningCustomers} que já tinham pedido`,
+      `Clientes que pediram antes e não pedem há ${LAPSED_MIN_DAYS} a ${LAPSED_MAX_DAYS} dias: ${m.lapsed.count}`,
+      `Pedidos anotados pela atendente IA: ${m.bookedByAssistant}`,
+      `Atendente IA: ${m.assistant.enabled ? `ligada; ${m.assistant.replied} respostas, ${m.assistant.booked} conversas com pedido, ${m.assistant.handoffs} passadas para a equipe` : 'desligada'}`,
+      `Mensagens recebidas: ${m.messages.inbound} (semana anterior: ${m.messages.prevInbound}); fora do horário de funcionamento: ${m.messages.afterHours}${m.messages.busiestHour != null ? `; horário com mais mensagens: ${m.messages.busiestHour}h` : ''}`,
+      `Financeiro lançado na semana: gastos ${brl(m.expenses)}${m.topExpense ? ` (maior: ${m.topExpense.category} ${brl(m.topExpense.amount)})` : ''}, outras entradas ${brl(m.otherIncome)}, lucro ${brl(m.profit)}`,
+    ].join('\n');
+  }
   const lines = [
     `Semana: ${m.weekStart} a ${m.weekEnd}`,
     `Faturamento: ${brl(m.revenue)} (semana anterior: ${brl(m.prevRevenue)})`,

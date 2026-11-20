@@ -35,15 +35,16 @@ export default function DisparosPage() {
       const params = new URLSearchParams(window.location.search);
       const id = params.get('campaign');
       if (id) setActiveCampaignId(id);
-      if (params.get('publico') === 'sumidos') openLapsedAudience();
+      if (params.get('publico') === 'sumidos') openLapsedAudience(params.get('fonte') === 'pedidos');
     }
   }, []);
 
-  const openLapsedAudience = async () => {
+  const openLapsedAudience = async (fromOrders = false) => {
     try {
-      const res = await fetch('/api/insights');
+      // Pizzaria: clientes que pararam de pedir, direto dos pedidos (não depende das dicas da semana).
+      const res = await fetch(fromOrders ? '/api/pizzeria/metrics?days=90' : '/api/insights');
       const json = await res.json();
-      const leadIds: string[] = json?.insight?.metrics?.lapsed?.leadIds || [];
+      const leadIds: string[] = (fromOrders ? json?.metrics?.lapsed?.leadIds : json?.insight?.metrics?.lapsed?.leadIds) || [];
       if (!leadIds.length) {
         setError('Não encontramos clientes sumidos com contato salvo nas dicas desta semana.');
         return;

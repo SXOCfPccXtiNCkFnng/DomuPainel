@@ -148,6 +148,8 @@ export type ToolEffects = {
   booked: Record<string, unknown>[];
   /** Pedidos de visita (imobiliário): o corretor ainda confirma o horário. */
   visits: Record<string, unknown>[];
+  /** Pedidos da pizzaria: a loja ainda aceita o pedido. */
+  orders?: Record<string, unknown>[];
   cancelled: number;
   handoff: boolean;
 };
@@ -167,6 +169,9 @@ export function fallbackReplyForEffects(effects: ToolEffects): string | null {
     parts.push(
       `Pedido de visita registrado ✅\n${v.imovel}${v.preferencia ? ` — ${v.preferencia}` : ''}.\nO corretor vai confirmar o horário com você por aqui.`
     );
+  }
+  for (const o of effects.orders || []) {
+    parts.push(`Pedido #${o.numero} registrado ✅${o.total ? `\nTotal: ${o.total}.` : ''}\nA pizzaria vai confirmar e te avisar por aqui.`);
   }
   if (effects.cancelled) parts.push('Pronto, seu agendamento foi cancelado.');
   if (effects.handoff) parts.push('Já avisei a equipe. Em breve alguém te responde por aqui.');

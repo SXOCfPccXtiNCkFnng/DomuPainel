@@ -271,7 +271,7 @@ export const DEFAULT_TEMPLATES: Record<TenantSegment, string> = {
   imobiliario:
     'Oi, tudo bem? Vi a {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde os interessados no WhatsApp na hora, mostra os imóveis com valores e entrega o cliente pronto para o corretor. Nenhum lead fica sem resposta. Posso te mostrar como funciona?',
   alimentacao:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda restaurantes a vender mais pelo WhatsApp oficial, mandando o cardápio e as promoções do dia para toda a lista de clientes de uma vez, sem risco de bloqueio. Posso te mostrar como funciona?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde no WhatsApp na hora, mostra o cardápio e já anota o pedido com o valor certo, até no pico de sexta à noite. Ainda manda as promoções para toda a lista de clientes pelo WhatsApp oficial. Posso te mostrar como funcionaria aí?',
   juridico:
     'Olá, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda escritórios a manter os clientes informados pelo WhatsApp oficial, com mensagens organizadas e sem risco de bloqueio do número. Posso te apresentar em poucos minutos?',
   ecommerce:
