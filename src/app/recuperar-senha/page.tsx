@@ -21,7 +21,7 @@ export default function RecuperarSenhaPage() {
     e.preventDefault();
     setErrorMessage('');
     if (captchaConfigured && !captchaToken) {
-      setErrorMessage('Aguarde a verificação anti-robô terminar e tente de novo.');
+      setErrorMessage('Falta a verificação anti-robô: toque na caixa do Cloudflare logo acima do botão (se ela não aparecer, use "Tentar de novo").');
       return;
     }
 
