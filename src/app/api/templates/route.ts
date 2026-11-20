@@ -88,9 +88,6 @@ export async function GET(req: NextRequest) {
     // depois da resposta. Só roda de fato com WhatsApp conectado e assinatura ativa.
     // (select('*'): sem a migration 20261028_segment_templates a coluna não existe e nada é agendado.)
     const { data: tenantRow } = await supabaseAdmin.from('tenants').select('*').eq('id', tenantId).maybeSingle();
-    if (tenantRow && 'templates_provisioned_at' in tenantRow && !tenantRow.templates_provisioned_at) {
-      scheduleSegmentTemplates(tenantId);
-    }
     const segmentNames = new Set(segmentTemplateDefs(tenantRow?.segment).map((d) => d.name));
 
     let customTemplates: any[] = [];
@@ -99,6 +96,17 @@ export async function GET(req: NextRequest) {
       .select('*')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
+
+    if (tenantRow && 'templates_provisioned_at' in tenantRow) {
+      // Também quando o ramo mudou (upgrade do Somente Disparos, troca de ramo): faltam os
+      // modelos do ramo novo. Tenta de novo no máximo a cada hora (a Meta pode recusar).
+      const existingNames = new Set((data || []).map((t: { name: string }) => t.name));
+      const missing = [...segmentNames].some((n) => !existingNames.has(n));
+      const last = tenantRow.templates_provisioned_at ? new Date(tenantRow.templates_provisioned_at).getTime() : 0;
+      if (!tenantRow.templates_provisioned_at || (missing && Date.now() - last > 60 * 60 * 1000)) {
+        scheduleSegmentTemplates(tenantId);
+      }
+    }
 
     const genericNames = new Set(GLOBAL_SYSTEM_TEMPLATES.map((g) => g.name.toLowerCase()));
 

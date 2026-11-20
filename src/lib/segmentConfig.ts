@@ -58,8 +58,14 @@ export function isAutomotiveSegment(segment: TenantSegment | string | null): boo
   return segment === 'automotivo';
 }
 
-/** Ramos onde o Follow-up Automático não faz sentido (ex.: lava rápido). */
-const SEGMENTS_WITHOUT_FOLLOW_UP: TenantSegment[] = ['automotivo'];
+/**
+ * Ramos onde o Follow-up Automático não faz sentido:
+ * - lava rápido: o cliente volta quando o carro suja, não por insistência;
+ * - alimentação: fome é na hora; cobrar quem não pediu no dia seguinte ou
+ *   repetir a promoção para quem ignorou soa como spam (e a Meta cobra). Lá
+ *   quem traz o cliente de volta é a campanha para "quem parou de pedir".
+ */
+const SEGMENTS_WITHOUT_FOLLOW_UP: TenantSegment[] = ['automotivo', 'alimentacao'];
 
 export function hasFollowUp(segment: TenantSegment | string | null): boolean {
   return !SEGMENTS_WITHOUT_FOLLOW_UP.includes(segment as TenantSegment);
@@ -235,7 +241,7 @@ function schedulingNav(segment: TenantSegment): NavSection[] {
       items: [
         { id: 'dicas', name: 'Dicas da semana', href: '/dicas', badge: 'Pro', isComingSoon: false },
         { id: 'financeiro', name: 'Financeiro', href: '/financeiro', isComingSoon: false },
-        ...REAL_ESTATE_NAV[2].items,
+        { id: 'relatorios', name: 'Relatório de campanhas', href: '/relatorios', isComingSoon: false },
       ],
     },
     REAL_ESTATE_NAV[3], // Conta
@@ -253,14 +259,17 @@ const PIZZERIA_NAV: NavSection[] = [
       { id: 'atendente', name: 'Atendente IA', href: '/atendente', isComingSoon: false },
     ],
   },
-  REAL_ESTATE_NAV[1], // Marketing
+  {
+    title: 'Marketing',
+    items: REAL_ESTATE_NAV[1].items.filter((i) => i.id !== 'followup'),
+  },
   {
     title: 'Resultados',
     items: [
       { id: 'vendas', name: 'Vendas e métricas', href: '/vendas', isComingSoon: false },
       { id: 'dicas', name: 'Dicas da semana', href: '/dicas', badge: 'Pro', isComingSoon: false },
       { id: 'financeiro', name: 'Financeiro', href: '/financeiro', isComingSoon: false },
-      { id: 'relatorios', name: 'Relatório de envios', href: '/relatorios', isComingSoon: false },
+      { id: 'relatorios', name: 'Relatório de campanhas', href: '/relatorios', isComingSoon: false },
     ],
   },
   REAL_ESTATE_NAV[3], // Conta

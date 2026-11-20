@@ -9,6 +9,7 @@
  * Agendar/cancelar é best-effort: falha nunca derruba a campanha nem o webhook.
  */
 import { supabaseAdmin } from '@/lib/supabaseServer';
+import { hasFollowUp } from '@/lib/segmentConfig';
 import { logger } from '@/lib/logger';
 import {
   createMetaMessageTemplate,
@@ -338,10 +339,16 @@ type TenantContext = {
 async function loadTenantContext(tenantId: string): Promise<TenantContext> {
   const settings = await loadFollowUpSettings(tenantId);
   const [{ data: tenant }, { data: sub }] = await Promise.all([
-    supabaseAdmin.from('tenants').select('name').eq('id', tenantId).maybeSingle(),
+    supabaseAdmin.from('tenants').select('name, segment').eq('id', tenantId).maybeSingle(),
     supabaseAdmin.from('subscriptions').select('status').eq('tenant_id', tenantId).maybeSingle(),
   ]);
   const ctx: TenantContext = { settings, companyName: tenant?.name || '', blocked: null };
+
+  // Ramo sem follow-up (lava rápido, alimentação): não envia, mesmo que tenha ficado ligado de antes.
+  if (!hasFollowUp(tenant?.segment ?? null)) {
+    ctx.blocked = { reason: 'Follow-up não está disponível no ramo desta conta.', transient: false };
+    return ctx;
+  }
 
   // Follow-up não conta no limite de disparos do plano, mas exige assinatura ativa.
   if (!isSubscriptionAllowedToDispatch(sub?.status)) {

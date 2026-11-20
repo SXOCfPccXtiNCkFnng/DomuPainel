@@ -190,6 +190,8 @@ describe('atendente e módulo', () => {
     expect(assistantVertical('alimentacao')).toBe('pizzaria');
     const hrefs = getNavSectionsForSegment('alimentacao').flatMap((s) => s.items.map((i) => i.href));
     expect(hrefs).toEqual(expect.arrayContaining(['/pedidos', '/cardapio', '/vendas', '/atendente', '/disparos', '/dicas', '/financeiro']));
+    expect(hrefs).not.toContain('/follow-up');
+    expect(getNavSectionsForSegment('saude').flatMap((s) => s.items.map((i) => i.href))).not.toContain('/metricas');
   });
   it('prompt traz cardápio, situação e regra de não somar', () => {
     const prompt = buildPizzeriaSystemPrompt({

@@ -316,6 +316,8 @@ export default function TemplatesPage() {
                   >
                     <span>Ativar na Meta</span>
                   </button>
+                ) : tpl.status === 'REJECTED' ? (
+                  <span className="text-red-600 font-extrabold text-[11px]">Reprovado pela Meta</span>
                 ) : (
                   <span className="text-amber-700 font-extrabold text-[11px]">
                     Aguardando Meta
