@@ -318,10 +318,10 @@ export default function OnboardingPage() {
     },
     {
       id: 'alimentacao',
-      title: 'Pizzarias, Restaurantes e Delivery',
+      title: 'Alimentação e Delivery',
       badge: 'Pedidos e Cardápio',
       description:
-        'A atendente IA mostra o cardápio, anota o pedido com o valor certo e você acompanha tudo num quadro de pedidos.',
+        'Pizzaria, hamburgueria, dogão, açaí, marmita, restaurante: a atendente IA mostra o cardápio, anota o pedido com o valor certo e você acompanha tudo num quadro de pedidos.',
       features: [
         'Pedidos pelo WhatsApp com a atendente IA',
         'Quadro de pedidos e aviso de status ao cliente',

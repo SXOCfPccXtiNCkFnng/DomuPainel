@@ -4,6 +4,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { formatBRL, type ImprovementTip, type OrderMetrics } from '@/lib/pizzeria';
+import type { SalesIntelligence } from '@/lib/salesIntelligence';
+import SalesIntelligencePanel, { ProLockedCard } from '@/components/shared/SalesIntelligencePanel';
+import AskAiBox from '@/components/shared/AskAiBox';
 
 type Usage = {
   planName: string;
@@ -16,6 +19,8 @@ type Data = {
   days: number;
   metrics: OrderMetrics;
   tips: ImprovementTip[];
+  intelligenceAllowed: boolean;
+  intelligence: SalesIntelligence | null;
   assistant: { enabled: boolean; conversations: number; orders: number; conversionRate: number | null };
   usage: Usage;
 };
@@ -154,6 +159,14 @@ export default function VendasPage() {
 
       {m && data && (
         <>
+          {!data.intelligenceAllowed && (
+            <ProLockedCard
+              title="Inteligência de vendas é do plano Pro"
+              text="No Pro a Domu mostra o que mais vende em cada dia da semana, o que sai junto (para montar combos), o que subiu ou caiu, onde melhorar e manda dicas da semana escritas pela IA para você vender mais."
+            />
+          )}
+
+          {data.intelligenceAllowed && (
           <section className="space-y-2">
             <h2 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-domu-blue" /> Onde dá para melhorar
@@ -178,6 +191,11 @@ export default function VendasPage() {
               </Link>
             </p>
           </section>
+          )}
+
+          {data.intelligenceAllowed && <AskAiBox />}
+
+          {data.intelligence && <SalesIntelligencePanel data={data.intelligence} period={`últimos ${data.days} dias`} />}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Stat label="Faturamento" value={formatBRL(m.revenue)} {...change(m.revenue, m.prevRevenue)} />

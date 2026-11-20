@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { requireAuth } from '@/lib/requireAuth';
 import { internalErrorResponse } from '@/lib/errors';
-import { computeOrderMetrics, improvementTips, LAPSED_MAX_DAYS } from '@/lib/pizzeria';
+import { computeOrderMetrics, improvementTips, LAPSED_MAX_DAYS, ordersAsSales } from '@/lib/pizzeria';
+import { computeSalesIntelligence } from '@/lib/salesIntelligence';
 import { loadMenu, loadOrdersSince } from '@/lib/pizzeriaServer';
 import { countAssistantConversations, loadAssistantQuota } from '@/lib/assistantQuota';
 import { countDispatchesSince, startOfUtcMonthIso } from '@/lib/dispatchUsage';
-import { getPlanDisplayName, getPlanMonthlyLimit, getPlanUserLimit, normalizePlanTier } from '@/lib/planLimits';
+import { getPlanDisplayName, getPlanMonthlyLimit, getPlanUserLimit, normalizePlanTier, planHasSalesIntelligence } from '@/lib/planLimits';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,12 +44,32 @@ export async function GET(req: NextRequest) {
     const activeMenu = menu.filter((m) => m.active).length;
     const tier = normalizePlanTier(subRes.data?.plan_tier);
     const periodConversations = conversations.get(tenantId) ?? 0;
+    const intelligenceAllowed = planHasSalesIntelligence(tier);
+    const startMs = now.getTime() - days * DAY_MS;
+    const inPeriod = (o: { created_at: string }, from: number, to: number) => {
+      const t = new Date(o.created_at).getTime();
+      return t >= from && t < to;
+    };
+    const intelligence = intelligenceAllowed
+      ? computeSalesIntelligence({
+          sales: ordersAsSales(orders.filter((o) => inPeriod(o, startMs, now.getTime() + 1))),
+          previous: ordersAsSales(orders.filter((o) => inPeriod(o, startMs - days * DAY_MS, startMs))),
+          pairScope: 'pedido',
+          unit: 'pedidos',
+          campaignHref: '/disparos',
+          catalogHref: '/cardapio',
+          catalogLabel: 'cardápio',
+        })
+      : null;
 
     return NextResponse.json({
       success: true,
       days,
       metrics,
-      tips: improvementTips(metrics, { assistantEnabled, menuItems: activeMenu }),
+      // Inteligência de vendas (dicas, dia da semana, combos): Pro e Enterprise.
+      intelligenceAllowed,
+      tips: intelligenceAllowed ? improvementTips(metrics, { assistantEnabled, menuItems: activeMenu }) : [],
+      intelligence,
       assistant: {
         enabled: assistantEnabled,
         conversations: periodConversations,

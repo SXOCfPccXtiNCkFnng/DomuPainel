@@ -334,13 +334,16 @@ export async function loadAssistantMetrics(opts: { days: number; tenantId?: stri
 
   const quotaIds = [...byTenant.keys()];
   const plans = new Map<string, string | null>();
+  const segments = new Map<string, string | null>();
   let monthCounts = new Map<string, number>();
   if (quotaIds.length) {
-    const [subsRes, counts] = await Promise.all([
+    const [subsRes, segRes, counts] = await Promise.all([
       supabaseAdmin.from('subscriptions').select('tenant_id, plan_tier').in('tenant_id', quotaIds),
+      supabaseAdmin.from('tenants').select('id, segment').in('id', quotaIds),
       countAssistantConversations(quotaIds, brtMonthStartIso()),
     ]);
     for (const s of subsRes.data || []) plans.set(s.tenant_id, s.plan_tier);
+    for (const t of segRes.data || []) segments.set(t.id, t.segment);
     monthCounts = counts;
   }
 
@@ -348,7 +351,7 @@ export async function loadAssistantMetrics(opts: { days: number; tenantId?: stri
     .map(({ _customers, ...t }) => ({
       ...t,
       planName: getPlanDisplayName(normalizePlanTier(plans.get(t.tenantId))),
-      quotaLimit: getPlanAssistantConversationLimit(plans.get(t.tenantId)),
+      quotaLimit: getPlanAssistantConversationLimit(plans.get(t.tenantId), segments.get(t.tenantId)),
       quotaUsed: monthCounts.get(t.tenantId) ?? 0,
       customers: _customers.size,
       projectedMonthUsdFull: (t.costUsdFull / opts.days) * 30,

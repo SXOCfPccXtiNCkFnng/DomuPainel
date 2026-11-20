@@ -1,5 +1,5 @@
 /**
- * Ferramentas da atendente de IA da pizzaria. Tudo validado aqui no
+ * Ferramentas da atendente de IA do delivery de comida. Tudo validado aqui no
  * servidor: o valor do pedido sai do cardápio (priceOrder), nunca da IA, e o
  * pedido só é gravado para o contato desta conversa.
  */
@@ -39,7 +39,7 @@ const ITEMS_SCHEMA = {
   items: {
     type: 'OBJECT',
     properties: {
-      item: { type: STRING, description: 'Nome do item no cardápio (pizza de um sabor, bebida, esfiha...).' },
+      item: { type: STRING, description: 'Nome do item no cardápio (lanche, pizza de um sabor, açaí, bebida, adicional...).' },
       sabores: {
         type: 'ARRAY',
         items: { type: STRING },
@@ -159,7 +159,7 @@ function calcularPedido(args: Record<string, unknown>, ctx: PizzeriaToolContext)
 
 async function registrarPedido(args: Record<string, unknown>, ctx: PizzeriaToolContext): Promise<ToolResult> {
   if (!isOpenAt(ctx.now, ctx.pizzeria.weekly_hours)) {
-    return { ok: false, erro: 'A pizzaria está fechada agora. Não registre: diga o horário de funcionamento.' };
+    return { ok: false, erro: 'A loja está fechada agora. Não registre: diga o horário de funcionamento.' };
   }
   const r = priceFromArgs(args, ctx);
   if (!r.ok) return { ok: false, erro: r.error };
@@ -197,7 +197,7 @@ async function registrarPedido(args: Record<string, unknown>, ctx: PizzeriaToolC
   return {
     ok: true,
     pedido: { numero: order.order_number, total: formatBRL(order.total), tipo: r.fulfillment === 'ENTREGA' ? 'entrega' : 'retirada' },
-    observacao: `Pedido #${order.order_number} registrado. Diga o número e que a pizzaria vai confirmar e avisar por aqui. Não diga que já está confirmado.`,
+    observacao: `Pedido #${order.order_number} registrado. Diga o número e que a loja vai confirmar e avisar por aqui. Não diga que já está confirmado.`,
   };
 }
 
@@ -235,7 +235,7 @@ export async function executePizzeriaTool(name: string, args: Record<string, unk
       const result = await handOffToTeam(ctx, cleanText(args.motivo, 250) || 'Cliente precisa de atendimento', '/pedidos');
       return {
         ...result,
-        observacao: 'Equipe avisada. Diga ao cliente que alguém da pizzaria responde por aqui em instantes e encerre sem novas perguntas.',
+        observacao: 'Equipe avisada. Diga ao cliente que alguém da loja responde por aqui em instantes e encerre sem novas perguntas.',
       };
     }
     default:

@@ -213,7 +213,7 @@ describe('atendente e módulo', () => {
   });
   it('plano, modelos e dicas falam de pedidos', () => {
     expect(planFeatures('alimentacao', 'STARTER').join(' ')).toContain('pedido');
-    expect(segmentTemplateDefs('alimentacao').map((d) => d.name)).toContain('retorno_cliente_pizza');
+    expect(segmentTemplateDefs('alimentacao').map((d) => d.name)).toContain('retorno_cliente_delivery');
     const m = { kind: 'pedidos', revenue: 100, done: 2, revenueChangePct: null, lapsed: { count: 0, sample: [], leadIds: [] }, weekdays: [], topServices: [], cancelled: 0, assistant: { enabled: true }, messages: { inbound: 0 }, expenses: 0, otherIncome: 0 } as unknown as WeeklyMetrics;
     expect(summaryHeadline(m)).toContain('2 pedidos');
     expect(fallbackTips(m)[0].action).toBe('PEDIDOS');

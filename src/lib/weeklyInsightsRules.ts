@@ -4,6 +4,7 @@
  * partir deles. Sem a IA, as dicas fixas daqui garantem o resumo.
  */
 import { bucketOf } from '@/lib/finance';
+import type { SalesIntelligence } from '@/lib/salesIntelligence';
 import {
   addDaysToKey,
   brtDateKey,
@@ -67,6 +68,8 @@ export function insightWindow(now: Date): InsightWindow {
 export type WeeklyMetrics = {
   /** 'pedidos' = pizzaria (números saem dos pedidos); ausente = agenda. */
   kind?: 'agenda' | 'pedidos';
+  /** Inteligência de vendas das últimas 4 semanas (o que vende em cada dia, o que sai junto). */
+  intelligence?: SalesIntelligence;
   weekStart: string;
   weekEnd: string;
   revenue: number;

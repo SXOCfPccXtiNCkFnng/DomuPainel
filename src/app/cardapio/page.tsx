@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, Pencil, Plus, Star, Trash2, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileUp, Loader2, Pencil, Plus, Star, Trash2, X } from 'lucide-react';
+import MenuImportModal from '@/components/pizzaria/MenuImportModal';
 import { useConfirm } from '@/components/shared/ConfirmDialog';
 import { useModalA11y } from '@/hooks/useModalA11y';
 import { agendaInputClass } from '@/components/agenda/agendaStyles';
@@ -35,7 +36,7 @@ const emptyDraft = (category = 'Pizzas'): Draft => ({
   category,
   name: '',
   description: '',
-  prices: category.startsWith('Pizza') ? SIZE_SUGGESTIONS.slice(0, 3).map((size) => ({ size, price: '' })) : [{ size: '', price: '' }],
+  prices: category.startsWith('Pizza') || category.startsWith('Açaí') ? SIZE_SUGGESTIONS.slice(0, 3).map((size) => ({ size, price: '' })) : [{ size: '', price: '' }],
   allows_half: category.startsWith('Pizza'),
   featured: false,
   active: true,
@@ -115,7 +116,7 @@ function ItemModal({ draft, onClose, onSaved }: { draft: Draft | null; onClose: 
             placeholder="Ex.: Molho, mussarela, calabresa fatiada, cebola e orégano"
             className={`${agendaInputClass} resize-y`}
           />
-          <span className="block text-[10.5px] text-slate-400">A atendente usa isso para responder &quot;o que vem na pizza?&quot;. Ela não inventa ingrediente.</span>
+          <span className="block text-[10.5px] text-slate-400">A atendente usa isso para responder &quot;o que vem nesse lanche?&quot;. Ela não inventa ingrediente.</span>
         </label>
         <div className="space-y-1.5">
           <span className="block text-[11px] font-bold text-slate-600">Preços</span>
@@ -182,6 +183,8 @@ function MenuTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
 
   const load = useCallback(async () => {
@@ -251,18 +254,41 @@ function MenuTab() {
           {items.filter((i) => i.active).length} itens disponíveis. Desmarque &quot;disponível&quot; quando acabar um sabor: a atendente para de oferecer na hora.
         </p>
         {canEdit && (
-          <button type="button" onClick={() => setDraft(emptyDraft())} className="btn-domu-primary text-xs py-2 px-4 flex items-center gap-1.5">
-            <Plus className="w-4 h-4" /> Novo item
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:border-domu-blue hover:text-domu-blue flex items-center gap-1.5"
+            >
+              <FileUp className="w-4 h-4" /> Importar cardápio
+            </button>
+            <button type="button" onClick={() => setDraft(emptyDraft())} className="btn-domu-primary text-xs py-2 px-4 flex items-center gap-1.5">
+              <Plus className="w-4 h-4" /> Novo item
+            </button>
+          </div>
         )}
       </div>
+      {notice && (
+        <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> {notice}
+        </p>
+      )}
 
       {items.length === 0 && !error && (
         <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center space-y-2 max-w-xl mx-auto">
           <h2 className="text-sm font-black text-slate-900">Cadastre seu cardápio</h2>
           <p className="text-xs text-slate-500">
-            Comece pelas pizzas mais vendidas, com os preços de cada tamanho, e as bebidas. É daqui que a atendente tira os sabores e calcula o valor dos pedidos.
+            Comece pelos itens mais vendidos (pizzas, lanches, açaí...), com os preços de cada tamanho, e as bebidas. É daqui que a atendente tira os sabores e calcula o valor dos pedidos.
           </p>
+          {canEdit && (
+            <p className="text-xs text-slate-600">
+              Já tem o cardápio pronto?{' '}
+              <button type="button" onClick={() => setImportOpen(true)} className="font-bold text-domu-blue underline">
+                Importe por foto, PDF ou planilha
+              </button>{' '}
+              e só revise os preços.
+            </p>
+          )}
         </div>
       )}
 
@@ -318,6 +344,15 @@ function MenuTab() {
       ))}
 
       <ItemModal draft={draft} onClose={() => setDraft(null)} onSaved={load} />
+      <MenuImportModal
+        isOpen={importOpen}
+        existing={items}
+        onClose={() => setImportOpen(false)}
+        onSaved={(count) => {
+          setNotice(`${count} itens importados para o cardápio.`);
+          load();
+        }}
+      />
       {confirmDialog}
     </div>
   );
@@ -509,7 +544,7 @@ function DeliveryTab() {
         <section className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3">
           <h2 className="text-sm font-black text-slate-900">Meio a meio</h2>
           <label className="block space-y-1">
-            <span className="block text-[11px] font-bold text-slate-600">Sabores por pizza</span>
+            <span className="block text-[11px] font-bold text-slate-600">Sabores por pizza (só para pizzaria)</span>
             <select value={form.max_flavors} disabled={disabled} onChange={(e) => set({ max_flavors: Number(e.target.value) })} className={agendaInputClass}>
               <option value={1}>1 (não faz meio a meio)</option>
               <option value={2}>Até 2 sabores</option>

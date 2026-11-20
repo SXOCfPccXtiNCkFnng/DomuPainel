@@ -6,6 +6,25 @@ export const PLAN_PRICES_BRL: Record<PlanTier, number> = {
   ENTERPRISE: 597,
 };
 
+/**
+ * Preço padrão de cada módulo (quando o /interno não tem um preço próprio
+ * salvo para o ramo — o do banco sempre vence). Conta usada para chegar
+ * nesses valores (custo da IA no preço cheio de 2027, por conversa:
+ * agenda ~R$ 0,35, imobiliário ~R$ 0,45, alimentação ~R$ 0,40, + ~R$ 15 de
+ * infraestrutura e taxa de cobrança por conta): margem de ~40% mesmo com a
+ * cota de conversas 100% usada; no uso normal (metade da cota) fica perto de 70%.
+ * Vale para cadastro novo e troca de plano; assinante atual só muda pelo
+ * /interno (que avisa com 30 dias de antecedência).
+ */
+export const SEGMENT_PLAN_PRICES_BRL: Record<string, Partial<Record<PlanTier, number>>> = {
+  // Porta de entrada: sem IA, custo quase zero (a Meta cobra direto do cliente).
+  marketing_apenas: { STARTER: 97 },
+  automotivo: { STARTER: 147, PRO: 327, ENTERPRISE: 697 },
+  saude: { STARTER: 147, PRO: 327, ENTERPRISE: 697 },
+  imobiliario: { STARTER: 197, PRO: 447, ENTERPRISE: 997 },
+  alimentacao: { STARTER: 197, PRO: 447, ENTERPRISE: 1097 },
+};
+
 /** Soft limits enforced by DOMU (independent from Meta Cloud API tiers). */
 export const PLAN_DISPATCH_LIMITS: Record<
   PlanTier,
@@ -119,8 +138,39 @@ export const PLAN_ASSISTANT_CONVERSATION_LIMITS: Record<PlanTier, number> = {
   ENTERPRISE: 1200,
 };
 
-export function getPlanAssistantConversationLimit(planTier: string | null | undefined): number {
-  return PLAN_ASSISTANT_CONVERSATION_LIMITS[normalizePlanTier(planTier)];
+/**
+ * Ramos com muito mais conversas por mês (delivery: cada pedido é uma
+ * conversa, dezenas por noite) têm cota própria.
+ */
+export const SEGMENT_CONVERSATION_LIMITS: Record<string, Record<PlanTier, number>> = {
+  alimentacao: { STARTER: 250, PRO: 700, ENTERPRISE: 1800 },
+};
+
+export function getPlanAssistantConversationLimit(
+  planTier: string | null | undefined,
+  segment?: string | null
+): number {
+  const tier = normalizePlanTier(planTier);
+  return (segment && SEGMENT_CONVERSATION_LIMITS[segment]?.[tier]) || PLAN_ASSISTANT_CONVERSATION_LIMITS[tier];
+}
+
+/**
+ * Inteligência de vendas (o que vende mais em cada dia da semana, o que sai
+ * junto, dicas da semana com IA): só do Pro para cima.
+ */
+export function planHasSalesIntelligence(planTier: string | null | undefined): boolean {
+  return normalizePlanTier(planTier) !== 'STARTER';
+}
+
+/** Perguntas por mês no "Pergunte para a IA" (custa ~R$ 0,05 cada no preço cheio). */
+export const PLAN_AI_QUESTION_LIMITS: Record<PlanTier, number> = {
+  STARTER: 0,
+  PRO: 60,
+  ENTERPRISE: 200,
+};
+
+export function getPlanAiQuestionLimit(planTier: string | null | undefined): number {
+  return PLAN_AI_QUESTION_LIMITS[normalizePlanTier(planTier)];
 }
 
 /**

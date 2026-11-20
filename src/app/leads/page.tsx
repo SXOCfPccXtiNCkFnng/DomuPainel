@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Bot, BotOff, Building2, CalendarPlus, Loader2, MessageCircle, Search, UserRound } from 'lucide-react';
 import VisitScheduleModal, { type VisitScheduleValues } from '@/components/imoveis/VisitScheduleModal';
+import DemandIntelligence from '@/components/imoveis/DemandIntelligence';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { agendaInputClass } from '@/components/agenda/agendaStyles';
 import { formatPhoneBR } from '@/lib/validators';
@@ -190,6 +191,7 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-4 w-full font-sans">
+      <DemandIntelligence />
       <p className="text-[11px] text-slate-500 bg-white border border-slate-200/80 rounded-xl px-3 py-2 leading-relaxed">
         Quando a atendente passa o cliente para o corretor, ou quando alguém da equipe responde, ela fica 12 horas sem
         responder aquele cliente. Em cada lead dá para devolver o cliente para ela antes disso ou desligá-la só para ele.

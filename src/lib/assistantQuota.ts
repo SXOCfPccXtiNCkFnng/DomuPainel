@@ -80,8 +80,9 @@ export async function loadAssistantQuota(
   leadId?: string
 ): Promise<AssistantQuota | null> {
   const monthStart = brtMonthStartIso(now);
-  const [subRes, blockedRes, todayRes] = await Promise.all([
+  const [subRes, tenantRes, blockedRes, todayRes] = await Promise.all([
     supabaseAdmin.from('subscriptions').select('plan_tier').eq('tenant_id', tenantId).maybeSingle(),
+    supabaseAdmin.from('tenants').select('segment').eq('id', tenantId).maybeSingle(),
     supabaseAdmin
       .from('assistant_runs')
       .select('id', { count: 'exact', head: true })
@@ -106,7 +107,7 @@ export async function loadAssistantQuota(
   return {
     planTier,
     planName: getPlanDisplayName(planTier),
-    limit: getPlanAssistantConversationLimit(planTier),
+    limit: getPlanAssistantConversationLimit(planTier, tenantRes.data?.segment),
     used: counts.get(tenantId) ?? 0,
     continuingToday: (todayRes.count ?? 0) > 0,
     alreadyBlockedThisMonth: (blockedRes.count ?? 0) > 0,

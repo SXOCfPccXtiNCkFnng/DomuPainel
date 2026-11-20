@@ -65,15 +65,24 @@ export function formatBRL(value: number | null | undefined): string {
 /* Cardápio                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Serve para qualquer delivery de comida: pizzaria, hamburgueria, dogão, açaí, marmita... */
 export const MENU_CATEGORIES = [
   'Pizzas',
   'Pizzas doces',
-  'Esfihas',
+  'Hambúrgueres',
   'Lanches',
+  'Cachorro-quente',
+  'Pastéis',
+  'Esfihas',
+  'Pratos e marmitas',
+  'Japonesa',
   'Porções',
+  'Açaí e sorvetes',
+  'Saladas',
+  'Adicionais',
+  'Combos',
   'Bebidas',
   'Sobremesas',
-  'Combos',
   'Outros',
 ] as const;
 
@@ -232,7 +241,7 @@ export type PizzeriaSettings = {
 
 export const DELIVERY_AREAS_MAX = 80;
 
-/** Terça a domingo, das 18h às 23h30 (segunda fechado) — o padrão das pizzarias. */
+/** Terça a domingo, das 18h às 23h30 (segunda fechado) — padrão comum no delivery noturno; o dono ajusta. */
 export const DEFAULT_PIZZERIA_HOURS: DayHours[] = [0, 1, 2, 3, 4, 5, 6].map((d) => ({
   enabled: d !== 1,
   open: '18:00',
@@ -618,8 +627,8 @@ export function statusMessage(params: {
   switch (params.status) {
     case 'EM_PREPARO':
       return params.fulfillment === 'ENTREGA'
-        ? `${hi}seu pedido ${n} foi confirmado e já está sendo preparado! 🍕 Previsão de entrega: cerca de ${params.etaMinutes} minutos.`
-        : `${hi}seu pedido ${n} foi confirmado e já está sendo preparado! 🍕 Fica pronto para retirar em cerca de ${params.etaMinutes} minutos.`;
+        ? `${hi}seu pedido ${n} foi confirmado e já está sendo preparado! 😋 Previsão de entrega: cerca de ${params.etaMinutes} minutos.`
+        : `${hi}seu pedido ${n} foi confirmado e já está sendo preparado! 😋 Fica pronto para retirar em cerca de ${params.etaMinutes} minutos.`;
     case 'SAIU_ENTREGA':
       return `${hi}seu pedido ${n} saiu para entrega! 🛵 Já já chega aí.`;
     case 'PRONTO_RETIRADA':
@@ -923,6 +932,20 @@ export function ordersAsFinance(orders: Order[]): { service_name: string; price:
   }));
 }
 
+/** Pedidos vendidos no formato da inteligência de vendas (meio a meio divide entre os sabores). */
+export function ordersAsSales(orders: Order[]): { at: string; customerKey: string; items: { name: string; quantity: number; revenue: number }[] }[] {
+  return orders
+    .filter((o) => SOLD_STATUSES.includes(o.status))
+    .map((o) => ({
+      at: o.created_at,
+      customerKey: phoneKey(o.customer_phone),
+      items: (o.items || []).flatMap((l) => {
+        const flavors = l.flavors?.length ? l.flavors : [l.description];
+        return flavors.map((f) => ({ name: f, quantity: l.quantity / flavors.length, revenue: Number(l.total || 0) / flavors.length }));
+      }),
+    }));
+}
+
 export type ImprovementTip = { title: string; text: string; href: string | null; action: string | null };
 
 /**
@@ -934,7 +957,7 @@ export function improvementTips(m: OrderMetrics, ctx: { assistantEnabled: boolea
   if (ctx.menuItems === 0) {
     tips.push({
       title: 'Cadastre o cardápio',
-      text: 'Sem cardápio a atendente não consegue anotar pedidos. Comece pelas pizzas mais vendidas e as bebidas.',
+      text: 'Sem cardápio a atendente não consegue anotar pedidos. Comece pelos itens mais vendidos e as bebidas.',
       href: '/cardapio',
       action: 'Abrir o cardápio',
     });
@@ -960,7 +983,7 @@ export function improvementTips(m: OrderMetrics, ctx: { assistantEnabled: boolea
   if (best && weak && weak.orders <= best.orders / 2) {
     tips.push({
       title: `Movimente a ${weak.label.toLowerCase()}`,
-      text: `${weak.label} teve ${weak.orders} pedidos e ${best.label.toLowerCase()} teve ${best.orders}. Uma promoção só para o dia fraco (ex.: "${weak.label.toLowerCase()} da pizza em dobro") enche o forno.`,
+      text: `${weak.label} teve ${weak.orders} pedidos e ${best.label.toLowerCase()} teve ${best.orders}. Uma promoção só para o dia fraco (ex.: "${weak.label.toLowerCase()} em dobro") movimenta a cozinha.`,
       href: '/disparos',
       action: 'Criar campanha',
     });
@@ -995,7 +1018,7 @@ export function improvementTips(m: OrderMetrics, ctx: { assistantEnabled: boolea
     if (share < 0.4) {
       tips.push({
         title: 'Venda mais bebidas',
-        text: `Só ${Math.round(share * 100)} bebidas a cada 100 pedidos. Um combo pizza + refri aumenta o ticket médio (hoje ${formatBRL(m.averageTicket)}).`,
+        text: `Só ${Math.round(share * 100)} bebidas a cada 100 pedidos. Um combo com bebida aumenta o ticket médio (hoje ${formatBRL(m.averageTicket)}).`,
         href: '/cardapio',
         action: 'Criar combo',
       });

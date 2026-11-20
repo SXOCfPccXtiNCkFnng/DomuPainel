@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, Lightbulb, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { TIP_ACTIONS, summaryHeadline, type InsightTip, type WeeklyMetrics } from '@/lib/weeklyInsightsRules';
+import SalesIntelligencePanel, { ProLockedCard } from '@/components/shared/SalesIntelligencePanel';
+import AskAiBox from '@/components/shared/AskAiBox';
 
 type Insight = {
   id: string;
@@ -45,6 +47,7 @@ export default function DicasPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
 
   const load = useCallback(async (id?: string) => {
     setIsLoading(true);
@@ -55,6 +58,7 @@ export default function DicasPage() {
         setError(res.status === 403 ? 'Só administradores veem as dicas da semana.' : json.error || 'Não foi possível carregar.');
         return;
       }
+      setLocked(Boolean(json.locked));
       setInsight(json.insight);
       setWeeks(json.weeks || []);
       setError(json.available === false ? json.error : null);
@@ -93,6 +97,17 @@ export default function DicasPage() {
   const orders = m?.kind === 'pedidos';
   const maxDay = m ? Math.max(1, ...m.weekdays.map((d) => d.count)) : 1;
 
+  if (locked) {
+    return (
+      <div className="space-y-4 w-full font-sans">
+        <ProLockedCard
+          title="Dicas da semana e inteligência de vendas são do plano Pro"
+          text="Todo domingo a Domu analisa a semana e mostra o que mais vendeu em cada dia, o que sai junto, quem parou de comprar e 3 dicas escritas pela IA com o que fazer para vender mais. Chega no painel, no e-mail e no WhatsApp."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 w-full font-sans">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -129,6 +144,8 @@ export default function DicasPage() {
         </p>
       )}
       {notice && <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">{notice}</p>}
+
+      <AskAiBox />
 
       {isLoading && !insight ? (
         <div className="flex items-center gap-2 text-xs text-slate-500 p-5">
@@ -173,6 +190,8 @@ export default function DicasPage() {
               })}
             </div>
           </section>
+
+          {m.intelligence && <SalesIntelligencePanel data={m.intelligence} period="últimas 4 semanas" />}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Stat label="Faturamento" value={brl(m.revenue)} {...change(m.revenue, m.prevRevenue)} />

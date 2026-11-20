@@ -9,7 +9,7 @@ export const SEGMENT_LABELS: Record<TenantSegment, string> = {
   imobiliario: 'Imobiliário',
   ecommerce: 'E-commerce',
   saude: 'Saúde e Beleza',
-  alimentacao: 'Pizzaria e Delivery',
+  alimentacao: 'Alimentação e Delivery',
   automotivo: 'Lava Rápido e Estética Automotiva',
   juridico: 'Jurídico',
   marketing_apenas: 'Somente Disparos',
@@ -35,7 +35,7 @@ export const SEGMENT_WELCOME: Record<TenantSegment, string> = {
 export const BUSINESS_SEGMENT_OPTIONS: { id: TenantSegment; label: string }[] = [
   { id: 'imobiliario', label: 'Imobiliário (imobiliárias e corretores)' },
   { id: 'saude', label: 'Saúde e Beleza (barbearia, salão, estética, clínicas, dentistas)' },
-  { id: 'alimentacao', label: 'Alimentação (pizzaria, restaurante, delivery)' },
+  { id: 'alimentacao', label: 'Alimentação (pizzaria, hamburgueria, lanches, dogão, açaí, marmita, restaurante)' },
   { id: 'automotivo', label: 'Automotivo (lava rápido, estética automotiva)' },
   { id: 'ecommerce', label: 'E-commerce e Varejo' },
   { id: 'geral', label: 'Serviços, Jurídico e Outros' },
@@ -233,7 +233,7 @@ function schedulingNav(segment: TenantSegment): NavSection[] {
     {
       title: 'Resultados',
       items: [
-        { id: 'dicas', name: 'Dicas da semana', href: '/dicas', isComingSoon: false },
+        { id: 'dicas', name: 'Dicas da semana', href: '/dicas', badge: 'Pro', isComingSoon: false },
         { id: 'financeiro', name: 'Financeiro', href: '/financeiro', isComingSoon: false },
         ...REAL_ESTATE_NAV[2].items,
       ],
@@ -242,7 +242,7 @@ function schedulingNav(segment: TenantSegment): NavSection[] {
   ];
 }
 
-/** Pizzaria e delivery: menu pela noite de trabalho (pedidos primeiro). */
+/** Alimentação (pizzaria, hamburgueria, dogão, açaí...): menu pela noite de trabalho (pedidos primeiro). */
 const PIZZERIA_NAV: NavSection[] = [
   {
     title: 'Operação',
@@ -258,7 +258,7 @@ const PIZZERIA_NAV: NavSection[] = [
     title: 'Resultados',
     items: [
       { id: 'vendas', name: 'Vendas e métricas', href: '/vendas', isComingSoon: false },
-      { id: 'dicas', name: 'Dicas da semana', href: '/dicas', isComingSoon: false },
+      { id: 'dicas', name: 'Dicas da semana', href: '/dicas', badge: 'Pro', isComingSoon: false },
       { id: 'financeiro', name: 'Financeiro', href: '/financeiro', isComingSoon: false },
       { id: 'relatorios', name: 'Relatório de envios', href: '/relatorios', isComingSoon: false },
     ],
@@ -478,7 +478,7 @@ const REAL_ESTATE_PAGE_TITLES: Record<string, { title: string; subtitle: string 
 };
 
 const PIZZERIA_PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
-  '/': { title: 'Painel', subtitle: 'Pedidos de hoje, vendas e campanhas da sua pizzaria' },
+  '/': { title: 'Painel', subtitle: 'Pedidos de hoje, vendas e campanhas do seu delivery' },
   '/atendente': { title: 'Atendente IA', subtitle: 'Quem anota os pedidos no WhatsApp a qualquer hora' },
   '/disparos': { title: 'Campanhas', subtitle: 'Promoção → público → agendar → enviar com status Meta' },
   '/follow-up': { title: 'Follow-up', subtitle: 'Mensagem automática para quem não respondeu' },

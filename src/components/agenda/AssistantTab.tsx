@@ -145,7 +145,7 @@ export default function AssistantTab({
   const disabled = !canEdit;
   const realEstate = vertical === 'imobiliario';
   const pizzeria = vertical === 'pizzaria';
-  const business = realEstate ? 'imobiliária' : pizzeria ? 'pizzaria' : 'loja';
+  const business = realEstate ? 'imobiliária' : 'loja';
   // Lava rápido ou saúde e beleza: mesmos campos, vocabulário do ramo.
   const schedulingVertical = vertical === 'saude' ? 'saude' : 'automotivo';
   const copy = SCHEDULING_COPY[schedulingVertical];
@@ -208,7 +208,7 @@ export default function AssistantTab({
         <Info className="w-4 h-4 shrink-0 text-domu-blue" />
         <span>
           {pizzeria
-            ? 'A atendente responde no WhatsApp como alguém da pizzaria: mostra o cardápio, ajuda a escolher, anota o pedido e manda para o quadro de Pedidos. O valor é sempre calculado pelo sistema a partir do cardápio; ela não dá desconto nem inventa sabor.'
+            ? 'A atendente responde no WhatsApp como alguém da loja: mostra o cardápio, ajuda a escolher, anota o pedido e manda para o quadro de Pedidos. O valor é sempre calculado pelo sistema a partir do cardápio; ela não dá desconto nem inventa sabor.'
             : realEstate
             ? 'A atendente responde seus clientes no WhatsApp como alguém da imobiliária: entende o que cada um procura e apresenta os imóveis do seu catálogo. Você ajusta o jeito dela e o que ela sabe; as regras (só falar de imóvel cadastrado, não negociar valor, não prometer financiamento) ficam sempre ligadas.'
             : copy.assistantIntro}
@@ -436,7 +436,7 @@ export default function AssistantTab({
                   setCompanyName(e.target.value);
                   setNotice(null);
                 }}
-                placeholder={realEstate ? 'Ex.: Horizonte Imóveis' : pizzeria ? 'Ex.: Pizzaria Forno de Pedra' : copy.companyPlaceholder}
+                placeholder={realEstate ? 'Ex.: Horizonte Imóveis' : pizzeria ? 'Ex.: Burger do Zé' : copy.companyPlaceholder}
                 className={agendaInputClass}
               />
             </Field>
@@ -451,7 +451,7 @@ export default function AssistantTab({
                   realEstate
                     ? 'Ex.: Imobiliária há 15 anos em Ribeirão Preto, especialista em apartamentos na zona sul e lançamentos.'
                     : pizzeria
-                      ? 'Ex.: Pizzaria de forno a lenha há 12 anos, massa de fermentação natural, especialidade em pizzas doces.'
+                      ? 'Ex.: Hamburgueria artesanal há 5 anos, pão brioche e blend da casa. (Ou: pizzaria de forno a lenha, dogão prensado, açaí no copo, marmitaria...)'
                       : copy.aboutPlaceholder
                 }
                 className={`${agendaInputClass} resize-y`}
@@ -535,7 +535,7 @@ export default function AssistantTab({
                 onChange={(e) => update({ greeting: e.target.value })}
                 placeholder={
                   pizzeria
-                    ? `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua pizzaria'}. Bateu a fome? Me diz o que vai ser hoje que eu anoto!`
+                    ? `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua loja'}. Bateu a fome? Me diz o que vai ser hoje que eu anoto!`
                     : realEstate
                     ? `Ex.: Oi! Aqui é ${form.assistant_name || 'a Bia'}, da ${companyName || 'sua imobiliária'}. Está procurando imóvel para comprar ou alugar?`
                     : copy.greetingPlaceholder(form.assistant_name || 'a Bia', companyName || 'sua loja')
@@ -555,7 +555,7 @@ export default function AssistantTab({
                 onChange={(e) => update({ promo_text: e.target.value })}
                 placeholder={
                   pizzeria
-                    ? 'Ex.: Terça em dobro: na compra de uma pizza grande, a segunda sai pela metade do preço. Só para entrega.'
+                    ? 'Ex.: Terça em dobro: na compra de um lanche, o segundo sai pela metade do preço. Só para entrega.'
                     : realEstate
                     ? 'Ex.: Lançamento Residencial Vista Verde: entrada facilitada em 60x até 30/11.'
                     : copy.promoPlaceholder
@@ -609,7 +609,7 @@ export default function AssistantTab({
             <WhatsAppPreview
               compact
               bodyText={sampleGreeting(form, companyName || `sua ${business}`, { realEstate, pizzeria, vertical: schedulingVertical })}
-              contactName={companyName || (realEstate ? 'Sua imobiliária' : pizzeria ? 'Sua pizzaria' : 'Sua loja')}
+              contactName={companyName || (realEstate ? 'Sua imobiliária' : 'Sua loja')}
               companyLabel={form.assistant_name ? `Atendimento · ${form.assistant_name}` : 'Atendimento'}
             />
             <p className="text-[10.5px] text-slate-400">

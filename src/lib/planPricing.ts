@@ -1,5 +1,11 @@
 import { supabaseAdmin } from '@/lib/supabaseServer';
-import { PLAN_PRICES_BRL, normalizePlanTier, PlanTier, segmentAfterPlanActivation } from '@/lib/planLimits';
+import {
+  PLAN_PRICES_BRL,
+  SEGMENT_PLAN_PRICES_BRL,
+  normalizePlanTier,
+  PlanTier,
+  segmentAfterPlanActivation,
+} from '@/lib/planLimits';
 
 export const PLAN_TIERS: PlanTier[] = ['STARTER', 'PRO', 'ENTERPRISE'];
 
@@ -21,9 +27,14 @@ export async function getDefaultPlanPrices(): Promise<Record<PlanTier, number>> 
   return prices;
 }
 
-/** Preços próprios de cada ramo: { imobiliario: { PRO: 397 }, ... }. */
+/**
+ * Preços próprios de cada ramo: { imobiliario: { PRO: 397 }, ... }. Parte dos
+ * padrões do código (SEGMENT_PLAN_PRICES_BRL); o que estiver salvo no banco
+ * pelo /interno vence.
+ */
 export async function getSegmentPriceOverrides(): Promise<Record<string, Partial<Record<PlanTier, number>>>> {
   const overrides: Record<string, Partial<Record<PlanTier, number>>> = {};
+  for (const [segment, prices] of Object.entries(SEGMENT_PLAN_PRICES_BRL)) overrides[segment] = { ...prices };
   const { data, error } = await supabaseAdmin.from('segment_plan_prices').select('segment, plan_tier, price_brl');
   if (error || !data) return overrides; // migration pendente: só o preço padrão
   for (const row of data) {

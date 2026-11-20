@@ -89,28 +89,29 @@ const HEALTH_BEAUTY: SegmentTemplateDef[] = [
   },
 ];
 
-const PIZZERIA: SegmentTemplateDef[] = [
+/** Alimentação: qualquer delivery de comida (pizzaria, hamburgueria, dogão, açaí...). */
+const FOOD: SegmentTemplateDef[] = [
   {
-    name: 'promocao_pizza_dia',
+    name: 'promocao_cardapio_dia',
     description: 'Divulgar a promoção do dia ou da semana.',
-    body: `Olá, {{nome}}! Hoje na {{empresa}}: {{promocao}}. 🍕
+    body: `Olá, {{nome}}! Hoje na {{empresa}}: {{promocao}}. 😋
 
 Quer pedir? É só responder esta mensagem que a gente anota.
 
 ${OPT_OUT}`,
   },
   {
-    name: 'pizza_destaque_imagem',
+    name: 'destaque_cardapio_imagem',
     image: true,
-    description: 'Mostrar uma pizza ou novidade do cardápio com foto.',
-    body: `Olá, {{nome}}! Olha o que saiu do forno aqui na {{empresa}}: {{novidade}}. 😋
+    description: 'Mostrar um prato, lanche ou novidade do cardápio com foto.',
+    body: `Olá, {{nome}}! Olha o que acabou de sair aqui na {{empresa}}: {{novidade}}. 😋
 
 Bateu a fome? Responda esta mensagem e faça seu pedido.
 
 ${OPT_OUT}`,
   },
   {
-    name: 'retorno_cliente_pizza',
+    name: 'retorno_cliente_delivery',
     description: 'Chamar de volta quem não pede há um tempo (com cupom).',
     body: `Oi, {{nome}}! Faz tempo que você não pede na {{empresa}} e a gente sentiu sua falta.
 
@@ -144,7 +145,7 @@ export function segmentTemplateDefs(segment: string | null | undefined): Segment
   const scheduling = schedulingVerticalOf(segment);
   if (scheduling === 'automotivo') return AUTOMOTIVE;
   if (scheduling === 'saude') return HEALTH_BEAUTY;
-  if (isPizzeriaSegment(segment)) return PIZZERIA;
+  if (isPizzeriaSegment(segment)) return FOOD;
   return GENERAL;
 }
 

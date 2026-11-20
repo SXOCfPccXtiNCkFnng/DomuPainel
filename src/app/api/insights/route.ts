@@ -4,6 +4,14 @@ import { requireAdmin } from '@/lib/requireAuth';
 import { internalErrorResponse } from '@/lib/errors';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { generateWeeklyInsight, INSIGHTS_MIGRATION_PENDING, isMissingTable } from '@/lib/weeklyInsights';
+import { getPlanDisplayName, planHasSalesIntelligence } from '@/lib/planLimits';
+
+/** Dicas da semana e inteligência de vendas: Pro e Enterprise. */
+async function planLocked(tenantId: string): Promise<NextResponse | null> {
+  const { data } = await supabaseAdmin.from('subscriptions').select('plan_tier').eq('tenant_id', tenantId).maybeSingle();
+  if (planHasSalesIntelligence(data?.plan_tier)) return null;
+  return NextResponse.json({ success: true, locked: true, planName: getPlanDisplayName(data?.plan_tier), insight: null, weeks: [] });
+}
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -20,6 +28,8 @@ export async function GET(req: NextRequest) {
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
     const id = new URL(req.url).searchParams.get('id');
+    const locked = await planLocked(tenantId);
+    if (locked) return locked;
 
     const [listRes, oneRes] = await Promise.all([
       supabaseAdmin
@@ -55,6 +65,9 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdmin(req);
     if ('error' in auth) return auth.error;
     const tenantId = auth.session.tenantId;
+
+    const locked = await planLocked(tenantId);
+    if (locked) return NextResponse.json({ success: false, locked: true, error: 'As dicas da semana são do plano Pro para cima.' }, { status: 403 });
 
     const limit = checkRateLimit(`insights:${tenantId}`, 3, 60 * 60 * 1000);
     if (!limit.ok) {

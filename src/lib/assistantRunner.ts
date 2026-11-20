@@ -350,7 +350,7 @@ async function loadLeadForAssistant(tenantId: string, leadId: string): Promise<{
 /** 'vendas': a atendente que vende a própria Domu (conta DOMU_SALES_TENANT_ID). */
 type Vertical = SchedulingVertical | 'imobiliario' | 'pizzaria' | 'vendas';
 
-/** Ramos que têm atendente de IA: os de agenda (lava rápido, saúde e beleza), o imobiliário e a pizzaria. */
+/** Ramos que têm atendente de IA: os de agenda (lava rápido, saúde e beleza), o imobiliário e o delivery de comida. */
 export function assistantVertical(segment: string | null | undefined): Vertical | null {
   const scheduling = schedulingVerticalOf(segment);
   if (scheduling) return scheduling;
@@ -697,7 +697,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       leadName: lead.name || 'Cliente',
       companyName: sales
         ? 'Domu'
-        : tenant.name || (vertical === 'imobiliario' ? 'a imobiliária' : vertical === 'pizzaria' ? 'a pizzaria' : 'a loja'),
+        : tenant.name || (vertical === 'imobiliario' ? 'a imobiliária' : 'a loja'),
       lastCustomerMessage: lastMessage.body || '',
       now,
       settings,

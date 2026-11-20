@@ -10,8 +10,11 @@ import { appBaseUrl, sendEmail } from '@/lib/email';
 import { brandedEmailHtml, escapeHtml } from '@/lib/emailTemplates';
 import { isSubscriptionAllowedToDispatch } from '@/lib/billing';
 import { schedulingVerticalOf } from '@/lib/schedulingVerticals';
-import { computeOrderMetrics, isOpenAt, isPizzeriaSegment, SOLD_STATUSES } from '@/lib/pizzeria';
+import { computeOrderMetrics, isOpenAt, isPizzeriaSegment, ordersAsSales, SOLD_STATUSES } from '@/lib/pizzeria';
 import { loadMenu, loadOrdersSince, loadPizzeriaSettings } from '@/lib/pizzeriaServer';
+import { computeSalesIntelligence, intelligenceForAI, type Sale } from '@/lib/salesIntelligence';
+import { planHasSalesIntelligence } from '@/lib/planLimits';
+import { bucketOf } from '@/lib/finance';
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import { describeBody } from '@/lib/followUpContext';
 import { sendMetaTemplate, formatMetaError } from '@/lib/metaClient';
@@ -75,12 +78,12 @@ async function paged<T>(build: (from: number, to: number) => PromiseLike<{ data:
 
 // ───────── IA ─────────
 
-function tipsPrompt(params: { company: string; vertical: string; metrics: string; services: string[]; messages: string[]; pizzeria?: boolean }): string {
+function tipsPrompt(params: { company: string; vertical: string; metrics: string; intelligence?: string; services: string[]; messages: string[]; pizzeria?: boolean }): string {
   const actions = params.pizzeria
     ? 'CAMPANHA_SUMIDOS_PEDIDOS (mensagem para clientes que pararam de pedir), CAMPANHA (promoção ou divulgação), PEDIDOS (quadro de pedidos: aceite, tempo, cancelamentos), CARDAPIO (cardápio, combos, preços, entrega e horário), ATENDENTE (atendente IA), FINANCEIRO, ou NENHUMA'
     : 'CAMPANHA_SUMIDOS (mensagem para clientes que pararam de vir), CAMPANHA (promoção ou divulgação), AGENDA, SERVICOS (cadastro de serviços, horários e lembretes), ATENDENTE (atendente IA), FINANCEIRO, ou NENHUMA';
   const pizzeriaHints = params.pizzeria
-    ? '\n- Para pizzaria, pense em: combos e bebidas para subir o ticket, promoção no dia fraco, reforço de entregador no horário de pico, sabores que os clientes pedem e não têm no cardápio, tempo de entrega.'
+    ? '\n- Para delivery de comida, pense em: combos e bebidas para subir o ticket, promoção no dia fraco, reforço de entregador no horário de pico, sabores que os clientes pedem e não têm no cardápio, tempo de entrega.'
     : '';
   return `Você é uma consultora de negócios da Domu e escreve as dicas da semana para o dono de ${params.vertical}: ${params.company}.
 
@@ -88,6 +91,7 @@ Escreva exatamente ${MAX_TIPS} dicas práticas para ele vender mais, lucrar mais
 
 REGRAS
 - Use só os números dos DADOS. Cada dica cita o número que a justifica. Nunca invente número, porcentagem, preço ou fato.
+- Use também a INTELIGÊNCIA DE VENDAS (o que vende mais em cada dia da semana, o que sai junto, o que subiu ou caiu): pelo menos uma dica deve vir dela, dizendo o item, o dia e o que fazer (ex.: "a calabresa vende o dobro na sexta: mande a campanha dela na sexta às 17h").
 - Cada dica diz o que fazer, de forma concreta (ex.: "mande uma promoção para a terça à tarde", "reforce a equipe no sábado de manhã", "cadastre o serviço X que os clientes pedem").
 - Leia as mensagens dos clientes: se pedem algo que não está nos serviços, se reclamam de preço, se procuram um horário que não existe, isso vale uma dica. Não cite nome nem telefone de cliente.
 - Linguagem simples, direta e positiva, como alguém que entende do negócio. Português do Brasil. Sem markdown, sem travessão.
@@ -100,6 +104,9 @@ Responda só com JSON: {"dicas":[{"titulo":"...","texto":"...","acao":"..."}]}
 
 DADOS
 ${params.metrics}
+
+INTELIGÊNCIA DE VENDAS (últimas 4 semanas)
+${params.intelligence || 'sem dados'}
 
 ${params.pizzeria ? 'Cardápio' : 'Serviços cadastrados'}: ${params.services.join(', ') || 'nenhum'}
 
@@ -156,7 +163,11 @@ export async function generateWeeklyInsight(tenantId: string, now: Date = new Da
   const { data: tenant } = await supabaseAdmin.from('tenants').select('name, segment').eq('id', tenantId).maybeSingle();
   const vertical = schedulingVerticalOf(tenant?.segment);
   const pizzeria = isPizzeriaSegment(tenant?.segment);
-  if (!tenant || (!vertical && !pizzeria)) return { ok: false, error: 'As dicas da semana são para contas com agenda ou pizzaria.' };
+  if (!tenant || (!vertical && !pizzeria)) return { ok: false, error: 'As dicas da semana são para contas com agenda ou delivery.' };
+  const { data: sub } = await supabaseAdmin.from('subscriptions').select('plan_tier').eq('tenant_id', tenantId).maybeSingle();
+  if (!planHasSalesIntelligence(sub?.plan_tier)) {
+    return { ok: false, error: 'As dicas da semana com inteligência de vendas são do plano Pro para cima.' };
+  }
 
   const w = insightWindow(now);
   // Pizzaria: os pedidos entram no lugar dos agendamentos (mesmo cálculo), e o horário é o de funcionamento.
@@ -257,6 +268,33 @@ export async function generateWeeklyInsight(tenantId: string, now: Date = new Da
     weeklyHours: pizzeriaData ? pizzeriaData[1].weekly_hours : scheduling!.weekly_hours,
     assistantEnabled: Boolean(assistantRow.data?.enabled),
   });
+  // Inteligência de vendas: últimas 4 semanas contra as 4 anteriores.
+  const DAY = 86_400_000;
+  const intelStart = now.getTime() - 28 * DAY;
+  const between = (iso: string, from: number, to: number) => {
+    const t = new Date(iso).getTime();
+    return t >= from && t < to;
+  };
+  const toSales = (from: number, to: number): Sale[] =>
+    pizzeriaData
+      ? ordersAsSales(pizzeriaData[0].filter((o) => between(o.created_at, from, to)))
+      : appointments
+          .filter((a) => between(a.starts_at, from, to) && bucketOf(a, now) === 'DONE')
+          .map((a) => ({
+            at: a.starts_at,
+            customerKey: String(a.customer_phone || '').replace(/\D/g, '').slice(-8),
+            items: [{ name: a.service_name, quantity: 1, revenue: a.price == null ? 0 : Number(a.price) }],
+          }));
+  metrics.intelligence = computeSalesIntelligence({
+    sales: toSales(intelStart, now.getTime() + 1),
+    previous: toSales(intelStart - 28 * DAY, intelStart),
+    pairScope: pizzeriaData ? 'pedido' : 'cliente',
+    unit: pizzeriaData ? 'pedidos' : 'atendimentos',
+    campaignHref: '/disparos',
+    catalogHref: pizzeriaData ? '/cardapio' : '/servicos',
+    catalogLabel: pizzeriaData ? 'cardápio' : 'serviços',
+  });
+
   if (pizzeriaData) {
     const [orders, pizzeriaSettings] = pizzeriaData;
     metrics.kind = 'pedidos';
@@ -277,11 +315,12 @@ export async function generateWeeklyInsight(tenantId: string, now: Date = new Da
     tipsPrompt({
       company: tenant.name || 'a empresa',
       vertical: pizzeria
-        ? 'uma pizzaria com delivery'
+        ? 'um delivery de comida (pizzaria, hamburgueria, lanchonete, açaí, marmitaria...)'
         : vertical === 'automotivo'
           ? 'um lava rápido ou estética automotiva'
           : 'um negócio de saúde e beleza',
       metrics: metricsForAI(metrics),
+      intelligence: intelligenceForAI(metrics.intelligence),
       services: pizzeriaData
         ? pizzeriaData[2].map((m) => m.name).slice(0, 100)
         : ((servicesRes.data || []) as { name: string }[]).map((s) => s.name),
@@ -422,12 +461,14 @@ export async function processWeeklyInsights(opts: { deadlineMs: number; now?: Da
 
   const { data: tenants } = await supabaseAdmin
     .from('tenants')
-    .select('id, subscriptions(status)')
+    .select('id, subscriptions(status, plan_tier)')
     .in('segment', ['automotivo', 'saude', 'alimentacao'])
     .limit(5_000);
   const eligible = (tenants || []).filter((t) => {
     const sub = Array.isArray(t.subscriptions) ? t.subscriptions[0] : t.subscriptions;
-    return isSubscriptionAllowedToDispatch((sub as { status?: string } | null)?.status);
+    const s = sub as { status?: string; plan_tier?: string } | null;
+    // Dicas com inteligência de vendas: só Pro e Enterprise.
+    return isSubscriptionAllowedToDispatch(s?.status) && planHasSalesIntelligence(s?.plan_tier);
   });
   if (!eligible.length) return result;
 
