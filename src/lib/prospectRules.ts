@@ -268,13 +268,13 @@ export function placeToProspect(p: PlacesPlace, kind: ProspectKind, searchCity: 
 
 export const DEFAULT_TEMPLATES: Record<TenantSegment, string> = {
   automotivo:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde seus clientes no WhatsApp na hora, passa os valores e já agenda a lavagem sozinha, até de madrugada e no domingo. Posso te mostrar como ela funcionaria aí com vocês?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente virtual treinada para lava rápido, que conversa como alguém da sua equipe: responde seus clientes no WhatsApp na hora, passa os valores e já agenda a lavagem sozinha, até de madrugada e no domingo. Posso te mostrar como ela funcionaria aí com vocês?',
   saude:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde seus clientes no WhatsApp na hora e já marca o horário na agenda, com lembrete automático para ninguém esquecer. Posso te mostrar como ela funcionaria aí com vocês?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente virtual treinada para o seu tipo de negócio, que conversa como alguém da sua equipe: responde seus clientes no WhatsApp na hora e já marca o horário na agenda, com lembrete automático para ninguém esquecer. Posso te mostrar como ela funcionaria aí com vocês?',
   imobiliario:
-    'Oi, tudo bem? Vi a {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde os interessados no WhatsApp na hora, mostra os imóveis com valores e entrega o cliente pronto para o corretor. Nenhum lead fica sem resposta. Posso te mostrar como funciona?',
+    'Oi, tudo bem? Vi a {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente virtual treinada para imobiliárias, que conversa como alguém da sua equipe: responde os interessados no WhatsApp na hora, mostra os imóveis com valores e entrega o cliente pronto para o corretor. Nenhum lead fica sem resposta. Posso te mostrar como funciona?',
   alimentacao:
-    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente com inteligência artificial que responde no WhatsApp na hora, mostra o cardápio e já anota o pedido com o valor certo, até no pico de sexta à noite. Ainda manda as promoções para toda a lista de clientes pelo WhatsApp oficial. Posso te mostrar como funcionaria aí?',
+    'Oi, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente tem uma atendente virtual treinada para delivery, que conversa como alguém da sua equipe: responde no WhatsApp na hora, mostra o cardápio e já anota o pedido com o valor certo, até no pico de sexta à noite. Ainda manda as promoções para toda a lista de clientes pelo WhatsApp oficial. Posso te mostrar como funcionaria aí?',
   juridico:
     'Olá, tudo bem? Vi o {nome} aqui no Google. Sou o Alan, da Domu. A gente ajuda escritórios a manter os clientes informados pelo WhatsApp oficial, com mensagens organizadas e sem risco de bloqueio do número. Posso te apresentar em poucos minutos?',
   ecommerce:
