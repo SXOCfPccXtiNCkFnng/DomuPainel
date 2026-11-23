@@ -161,3 +161,17 @@ describe('abordagem vale por conversa', () => {
     expect(r.approached).toBe(false);
   });
 });
+
+describe('vendedora não cita nomes nem monitoramento', () => {
+  it('o prompt não traz o nome do fundador', () => {
+    const prompt = buildSalesSystemPrompt({
+      customerName: 'Ana',
+      now: new Date('2026-11-23T12:00:00Z'),
+      signupUrl: 'x',
+      plans: [],
+      coupon: null,
+    });
+    expect(prompt).not.toMatch(/Alan/);
+    expect(prompt).toContain('Nunca diga que alguém acompanha, monitora ou lê as conversas');
+  });
+});

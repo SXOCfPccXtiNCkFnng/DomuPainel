@@ -86,7 +86,7 @@ async function notifyWithin(work: Promise<unknown>, ctx: HandoffContext, label: 
 async function avisarInteresse(args: Record<string, unknown>, ctx: HandoffContext): Promise<ToolResult> {
   const summary = clause(text(args.resumo, 400));
   if (summary.length < 3) return { ok: false, erro: 'Escreva um resumo curto do que a pessoa quer.' };
-  if (await interestAlreadySent(ctx)) return { ok: true, observacao: 'O Alan já foi avisado. Siga ajudando no cadastro.' };
+  if (await interestAlreadySent(ctx)) return { ok: true, observacao: 'O time já foi avisado. Siga ajudando no cadastro.' };
 
   const phone = formatPhoneBR(ctx.leadPhone) || ctx.leadPhone;
   await notifyWithin(
@@ -99,7 +99,7 @@ async function avisarInteresse(args: Record<string, unknown>, ctx: HandoffContex
   );
   await syncProspectStatus(ctx.leadPhone, 'INTERESTED');
   logger.info('sales.interest_alert', { tenantId: ctx.tenantId, leadId: ctx.leadId });
-  return { ok: true, observacao: 'Alan avisado. Continue ajudando a pessoa a criar a conta.' };
+  return { ok: true, observacao: 'Time avisado. Continue ajudando a pessoa a criar a conta.' };
 }
 
 async function chamarAlan(args: Record<string, unknown>, ctx: HandoffContext): Promise<ToolResult> {
@@ -123,7 +123,7 @@ async function chamarAlan(args: Record<string, unknown>, ctx: HandoffContext): P
     ctx,
     'chamar_alan'
   );
-  return { ok: true, observacao: 'Alan avisado. Diga em uma frase que ele vai responder por aqui e não faça mais perguntas.' };
+  return { ok: true, observacao: 'Time avisado. Diga em uma frase que alguém do time vai responder por aqui (sem citar nomes) e não faça mais perguntas.' };
 }
 
 export async function executeSalesTool(name: string, args: Record<string, unknown>, ctx: HandoffContext): Promise<ToolResult> {
