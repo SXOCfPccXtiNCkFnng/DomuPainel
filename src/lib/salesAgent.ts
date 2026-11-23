@@ -243,15 +243,26 @@ async function sendAlertWhatsApp(text: string): Promise<void> {
   }
 }
 
-/** Telefone de quem já tem conta na Domu (admin de outra empresa): a vendedora não aborda cliente. */
+/**
+ * Telefone de um cliente de verdade da Domu (admin de outra empresa com
+ * assinatura paga ou em teste grátis): a vendedora não tenta vender para ele.
+ * Contas de teste (liberadas de graça pelo Modo teste ou de e-mail do
+ * /interno) não contam, para o Alan conseguir testar com o próprio número.
+ */
 export async function isExistingCustomerPhone(phone: string): Promise<boolean> {
   const variants = phoneLookupVariants(phone);
-  const ownTenant = salesTenantId();
   if (!variants.length) return false;
-  let q = supabaseAdmin.from('users').select('id').in('phone', variants);
+  const ownTenant = salesTenantId();
+  let q = supabaseAdmin.from('users').select('tenant_id, email').in('phone', variants);
   if (ownTenant) q = q.neq('tenant_id', ownTenant);
-  const { data } = await q.limit(1);
-  return Boolean(data?.length);
+  const { data: users } = await q.limit(20);
+  const tenantIds = [...new Set((users || []).filter((u) => !isPlatformAdminEmail(u.email)).map((u) => u.tenant_id))];
+  if (!tenantIds.length) return false;
+  const { data: subs } = await supabaseAdmin
+    .from('subscriptions')
+    .select('status, monthly_price_brl')
+    .in('tenant_id', tenantIds);
+  return (subs || []).some((s) => s.status === 'TRIAL' || (s.status === 'ACTIVE' && Number(s.monthly_price_brl || 0) > 0));
 }
 
 /** Avisa o Alan: WhatsApp no número dele + sino/celular do painel da conta de vendas. Nunca lança. */

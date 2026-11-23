@@ -177,3 +177,31 @@ export function fallbackReplyForEffects(effects: ToolEffects): string | null {
   if (effects.handoff) parts.push('Já avisei a equipe. Em breve alguém te responde por aqui.');
   return parts.length ? parts.join('\n\n') : null;
 }
+
+/** Sem conversa por esse tempo, a próxima mensagem começa uma conversa nova (vale a abordagem de novo). */
+export const APPROACH_SESSION_GAP_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Vendedora: a conversa ATUAL começou com mensagem nossa? Conversa atual =
+ * desde a última pausa de 7 dias. Assim um contato que já falou com o número
+ * antes (outro assunto, outro teste) pode ser abordado de novo.
+ * Devolve também quando ele respondeu pela primeira vez nessa conversa:
+ * mensagens da equipe antes disso são a abordagem e não pausam a IA.
+ */
+export function approachFromHistory(
+  messages: { direction: string; created_at: string }[],
+  gapMs: number = APPROACH_SESSION_GAP_MS
+): { approached: boolean; firstReplyAt: Date | null } {
+  const sorted = [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  if (!sorted.length) return { approached: false, firstReplyAt: null };
+  let start = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    if (new Date(sorted[i].created_at).getTime() - new Date(sorted[i - 1].created_at).getTime() >= gapMs) start = i;
+  }
+  const session = sorted.slice(start);
+  const reply = session.find((m) => m.direction === 'INBOUND');
+  return {
+    approached: session[0].direction === 'OUTBOUND',
+    firstReplyAt: reply ? new Date(reply.created_at) : null,
+  };
+}

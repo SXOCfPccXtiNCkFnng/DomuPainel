@@ -4,7 +4,7 @@ vi.mock('@/lib/supabaseServer', () => ({ supabaseAdmin: {} }));
 
 import { alertParam, isSalesTenant, normalizeNotifyPhone, salesEventText } from '../salesAgent';
 import { buildSalesSystemPrompt, couponText } from '../salesPrompt';
-import { shouldAssistantReply } from '../assistantRules';
+import { approachFromHistory, shouldAssistantReply } from '../assistantRules';
 
 const now = new Date('2026-11-10T15:00:00Z');
 const base = {
@@ -127,5 +127,37 @@ describe('prompt de vendas', () => {
   it('sem prospecção, ela descobre o ramo na conversa', () => {
     const prompt = buildSalesSystemPrompt({ customerName: 'Ana', now, signupUrl: 'x', plans, coupon: null });
     expect(prompt).toContain('descubra o ramo na conversa');
+  });
+});
+
+describe('abordagem vale por conversa', () => {
+  const msg = (direction: string, iso: string) => ({ direction, created_at: iso });
+
+  it('contato que já tinha falado com o número antes (outro assunto) pode ser abordado de novo', () => {
+    // Caso do teste: conversa de RH em 25/10 e abordagem da Domu em 23/11.
+    const history = [
+      msg('INBOUND', '2026-10-25T13:00:00Z'),
+      msg('OUTBOUND', '2026-10-25T13:30:00Z'),
+      msg('INBOUND', '2026-10-25T23:13:00Z'),
+      msg('OUTBOUND', '2026-11-23T12:42:00Z'), // abordagem
+      msg('INBOUND', '2026-11-23T12:43:00Z'), // resposta: "Caramba que legal"
+    ];
+    const r = approachFromHistory(history);
+    expect(r.approached).toBe(true);
+    expect(r.firstReplyAt?.toISOString()).toBe('2026-11-23T12:43:00.000Z');
+  });
+
+  it('quem escreveu primeiro na conversa atual não é abordado', () => {
+    const r = approachFromHistory([msg('INBOUND', '2026-11-23T12:00:00Z'), msg('OUTBOUND', '2026-11-23T12:05:00Z')]);
+    expect(r.approached).toBe(false);
+  });
+
+  it('conversa seguida (menos de 7 dias entre mensagens) continua a mesma', () => {
+    const r = approachFromHistory([
+      msg('INBOUND', '2026-11-18T12:00:00Z'),
+      msg('OUTBOUND', '2026-11-21T12:00:00Z'),
+      msg('INBOUND', '2026-11-23T12:00:00Z'),
+    ]);
+    expect(r.approached).toBe(false);
   });
 });

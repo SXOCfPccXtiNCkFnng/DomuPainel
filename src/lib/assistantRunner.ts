@@ -34,6 +34,7 @@ import {
   HISTORY_LIMIT,
   HUMAN_PAUSE_MS,
   HUMAN_SENDER_TYPES,
+  approachFromHistory,
   shouldAssistantReply,
   fallbackReplyForEffects,
   splitReply,
@@ -310,27 +311,17 @@ async function recordRun(trigger: AssistantTrigger, run: RunRecord): Promise<voi
   }
 }
 
-/**
- * A conversa começou com mensagem nossa (abordagem pelo celular, painel ou
- * campanha)? E quando o contato respondeu pela primeira vez: mensagens da
- * equipe antes disso são a abordagem e não pausam a atendente.
- */
+/** Vendedora: a conversa atual (últimos 60 dias, separada por pausas de 7 dias) começou com a abordagem? */
 async function loadApproach(tenantId: string, leadId: string): Promise<{ approached: boolean; firstReplyAt: Date | null }> {
-  const first = (inboundOnly: boolean) => {
-    let q = supabaseAdmin
-      .from('chat_messages')
-      .select('direction, created_at')
-      .eq('tenant_id', tenantId)
-      .eq('lead_id', leadId);
-    if (inboundOnly) q = q.eq('direction', 'INBOUND');
-    return q.order('created_at', { ascending: true }).limit(1);
-  };
-  const [firstRes, replyRes] = await Promise.all([first(false), first(true)]);
-  const reply = replyRes.data?.[0]?.created_at;
-  return {
-    approached: firstRes.data?.[0]?.direction === 'OUTBOUND',
-    firstReplyAt: reply ? new Date(reply) : null,
-  };
+  const { data } = await supabaseAdmin
+    .from('chat_messages')
+    .select('direction, created_at')
+    .eq('tenant_id', tenantId)
+    .eq('lead_id', leadId)
+    .gte('created_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(300);
+  return approachFromHistory((data || []) as { direction: string; created_at: string }[]);
 }
 
 type LeadForAssistant = {
@@ -571,7 +562,9 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     // Vendas: só fala com quem a gente abordou (antes de gastar IA, até com áudio).
     const approach = sales ? await loadApproach(tenantId, leadId) : null;
     if (approach && !approach.approached) {
+      // Fica no monitor do /interno: dá para ver por que a vendedora não respondeu.
       logger.info('assistant.skipped', { tenantId, leadId, reason: 'NOT_APPROACHED' });
+      await recordRun(trigger, { status: 'SKIPPED', reason: 'NAO_ABORDADO', usage, tools: toolLog });
       return;
     }
 
@@ -622,6 +615,7 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     // Vendas: quem já é cliente da Domu (respondeu um aviso ou o resumo semanal) fala com o Alan, não com a vendedora.
     if (sales && (await isExistingCustomerPhone(lead.phone))) {
       logger.info('assistant.skipped', { tenantId, leadId, reason: 'ALREADY_CUSTOMER' });
+      await recordRun(trigger, { status: 'SKIPPED', reason: 'JA_E_CLIENTE', usage, tools: toolLog });
       return;
     }
 
