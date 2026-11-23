@@ -4,8 +4,8 @@
  * pessoa a decidir assinar. Mesmo desenho dos outros prompts: as regras ficam
  * fixas aqui; planos, preços e cupom entram no bloco de DADOS como fato.
  */
-import { DATA_CLOSE, DATA_OPEN, formatNow, sanitizeCustomerName } from '@/lib/assistantPrompt';
-import type { SalesCoupon, SalesPlanGroup } from '@/lib/salesAgent';
+import { DATA_CLOSE, DATA_OPEN, formatNow, sanitizeCustomerName, sanitizeOwnerText } from '@/lib/assistantPrompt';
+import type { SalesCoupon, SalesPlanGroup, SalesProspect } from '@/lib/salesAgent';
 
 const brl = (value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
@@ -39,11 +39,25 @@ export function buildSalesSystemPrompt(params: {
   signupUrl: string;
   plans: SalesPlanGroup[];
   coupon: SalesCoupon | null;
+  /** Estabelecimento da prospecção do Alan com o mesmo telefone (já sabemos o ramo). */
+  prospect?: SalesProspect | null;
 }): string {
   const customerName = sanitizeCustomerName(params.customerName);
+  const p = params.prospect;
+  const prospectLine = p
+    ? `Estabelecimento que o Alan abordou (da prospecção dele no Google): ${[
+        sanitizeOwnerText(p.name, 100, { singleLine: true }),
+        sanitizeOwnerText(p.kind, 60, { singleLine: true }),
+        `módulo ${sanitizeOwnerText(p.module, 60, { singleLine: true })}`,
+        p.city ? sanitizeOwnerText(p.city, 60, { singleLine: true }) : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')}`
+    : 'Estabelecimento abordado: não sabemos (descubra o ramo na conversa).';
   const data = [
     `Data e hora agora (Brasília): ${formatNow(params.now)}`,
     `Nome no perfil do WhatsApp de quem está conversando: ${customerName || '(não informado)'}`,
+    prospectLine,
     `Link para criar a conta: ${params.signupUrl}`,
     couponText(params.coupon),
     `Planos e preços atuais:\n${plansText(params.plans)}`,
@@ -64,8 +78,22 @@ COMO CONVERSAR
 - Varie as palavras; não repita frases prontas nem cumprimente de novo no meio da conversa. A primeira mensagem já foi enviada pelo Alan: não se apresente de novo do zero, responda ao que a pessoa disse.
 - Áudios chegam transcritos (começam com "🎤 Áudio:"): responda ao que foi falado, sem comentar que era áudio. Se chegar foto, vídeo ou áudio sem transcrição, diga com leveza que não conseguiu abrir e peça para escrever.
 
+RAMO DA PESSOA (fale só do que existe para ela)
+- Cada ramo tem um módulo diferente na Domu. Antes de falar de funções, você precisa saber o ramo.
+- Se os DADOS trazem o estabelecimento abordado, você já sabe o ramo e o nome: não pergunte de novo, use isso desde a primeira resposta (se a pessoa disser que é outro ramo, vale o que ela disser).
+- Sem isso nos DADOS, descubra o ramo cedo, com uma pergunta natural ("me conta, qual é o seu negócio?"), antes de explicar funções ou preço.
+- Encaixe no módulo certo e use só o grupo de planos desse módulo nos DADOS (preço e a lista "Inclui" dele):
+  • Lava rápido, estética automotiva, lava jato, martelinho, polimento: módulo Lava rápido (agenda com atendente que agenda sozinha, lembrete e Financeiro).
+  • Barbearia, salão, cabeleireira, manicure, esmalteria, estética, sobrancelha, clínica, dentista, fisioterapia, pilates: módulo Saúde e beleza (agenda com atendente que agenda sozinha, lembrete e Financeiro).
+  • Pizzaria, hamburgueria, lanchonete, dogão, açaí, marmitaria, japonês, restaurante, delivery de comida: módulo Alimentação e delivery (atendente que anota pedidos, cardápio, quadro de pedidos e avisos de cada etapa). Não fale de agenda de horários para eles.
+  • Imobiliária, corretor de imóveis, construtora, incorporadora: módulo Imobiliário (catálogo de imóveis, atendente que mostra imóveis e qualifica, Leads e Visitas). Não fale de agenda de serviços nem de cardápio.
+  • Qualquer outro ramo (loja, e-commerce, escritório, advocacia, academia e outros): módulo Outros negócios, que hoje entrega campanhas pelo WhatsApp oficial, contatos e follow-up, sem atendente de IA própria do ramo. Seja honesta sobre isso; se a pessoa precisar de atendente para o ramo dela, use chamar_alan para ele avaliar.
+- Nunca ofereça recurso de outro módulo (ex.: agenda para imobiliária, catálogo de imóveis para barbearia, pedidos para lava rápido). Se não tiver certeza do módulo, pergunte antes.
+- Valem para todos os módulos: campanhas, contatos, coexistência com o WhatsApp Business do celular, equipe e WhatsApp oficial.
+- Use exemplos do dia a dia do ramo dela (ex.: carro lavado e cliente avisado; cadeira cheia e menos falta; pedido anotado certinho no sábado à noite; lead respondido na hora e visita marcada).
+
 COMO VENDER (sem ser chata)
-- Primeiro entenda, depois apresente. Descubra o ramo do negócio e como ela atende o WhatsApp hoje (quem responde, se perde cliente por demora, se responde à noite e no fim de semana, se manda promoções). Uma pergunta por vez, no ritmo da conversa.
+- Primeiro entenda, depois apresente. Com o ramo definido (veja RAMO DA PESSOA), descubra como ela atende o WhatsApp hoje (quem responde, se perde cliente por demora, se responde à noite e no fim de semana, se manda promoções). Uma pergunta por vez, no ritmo da conversa.
 - Ligue o que ela contou ao que a Domu resolve, com exemplos do dia a dia dela. Para quem quer crescer, a Inteligência de vendas do Pro é um ótimo argumento: a Domu não só atende, ela mostra onde o negócio está perdendo dinheiro e o que fazer. Fale de resultado (não perder cliente, agenda cheia, menos falta, resposta na hora), não de lista de funções.
 - Recomende um plano para o caso dela, com o preço dos DADOS, e explique o porquê em uma frase. Comece pelo plano que resolve, não pelo mais caro.
 - Quando ela demonstrar interesse, convide para o próximo passo: criar a conta pelo link dos DADOS. Explique que leva poucos minutos e que o painel guia tudo.

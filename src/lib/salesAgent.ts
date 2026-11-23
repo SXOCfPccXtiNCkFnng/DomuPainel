@@ -21,6 +21,9 @@ import { getDefaultPlanPrices, getSegmentPriceOverrides, resolvePlanPrices, PLAN
 import { planBlurb, planFeatures } from '@/lib/planFeatures';
 import { getPlanDisplayName } from '@/lib/planLimits';
 import { isPlatformAdminEmail } from '@/lib/platformAdmin';
+import { phoneKey, PROSPECT_KINDS } from '@/lib/prospectRules';
+import { SEGMENT_LABELS } from '@/lib/segmentConfig';
+import type { TenantSegment } from '@/types';
 
 export function salesTenantId(): string | null {
   const id = String(process.env.DOMU_SALES_TENANT_ID || '').trim();
@@ -112,8 +115,35 @@ export const SALES_SEGMENTS: { segment: string; label: string }[] = [
   { segment: 'imobiliario', label: 'Imobiliárias, corretores e construtoras' },
   { segment: 'automotivo', label: 'Lava rápido e estética automotiva' },
   { segment: 'saude', label: 'Saúde e beleza (barbearia, salão, manicure, estética, clínicas, dentistas)' },
-  { segment: 'geral', label: 'Outros negócios (restaurante, loja, escritório e outros): campanhas pelo WhatsApp oficial' },
+  { segment: 'alimentacao', label: 'Alimentação e delivery (pizzaria, hamburgueria, lanchonete, açaí, marmitaria, japonês, restaurante)' },
+  { segment: 'geral', label: 'Outros negócios (loja, escritório, advocacia, e-commerce e outros): campanhas pelo WhatsApp oficial' },
 ];
+
+export type SalesProspect = { name: string; kind: string; module: string; city: string | null };
+
+/**
+ * Estabelecimento que o Alan abordou pela prospecção do /interno (mesmo
+ * telefone): a vendedora já sabe o ramo e o nome, sem perguntar de novo.
+ */
+export async function findProspectForPhone(phone: string): Promise<SalesProspect | null> {
+  const key = phoneKey(phone);
+  if (!key) return null;
+  const last4 = key.slice(-4);
+  const { data, error } = await supabaseAdmin
+    .from('prospects')
+    .select('name, kind, module, city, phone, phone_intl')
+    .or(`phone.ilike.%${last4}%,phone_intl.ilike.%${last4}%`)
+    .limit(50);
+  if (error) return null;
+  const row = (data || []).find((p) => phoneKey(p.phone_intl) === key || phoneKey(p.phone) === key);
+  if (!row) return null;
+  return {
+    name: String(row.name || ''),
+    kind: PROSPECT_KINDS.find((k) => k.id === row.kind)?.label || String(row.kind || ''),
+    module: SEGMENT_LABELS[row.module as TenantSegment] || String(row.module || ''),
+    city: row.city ?? null,
+  };
+}
 
 /** Planos com o preço vigente (editável no /interno) e a mesma lista da tela de Assinatura. */
 export async function loadSalesPlans(): Promise<SalesPlanGroup[]> {

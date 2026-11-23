@@ -50,7 +50,13 @@ import {
 import { loadSchedulingSettings } from '@/lib/schedulingServer';
 import type { ServiceItem } from '@/lib/scheduling';
 import { loadAssistantQuota } from '@/lib/assistantQuota';
-import { isExistingCustomerPhone, isSalesAgentActive, loadSalesCoupon, loadSalesPlans } from '@/lib/salesAgent';
+import {
+  findProspectForPhone,
+  isExistingCustomerPhone,
+  isSalesAgentActive,
+  loadSalesCoupon,
+  loadSalesPlans,
+} from '@/lib/salesAgent';
 import { buildSalesSystemPrompt, couponText, plansText } from '@/lib/salesPrompt';
 import { executeSalesTool, salesToolDeclarations, SALES_HANDOFF_TOOL } from '@/lib/salesTools';
 import { appBaseUrl } from '@/lib/email';
@@ -373,7 +379,11 @@ async function prepareVertical(vertical: Vertical, input: VerticalInput): Promis
   const { settings, planTier, ...base } = input;
 
   if (vertical === 'vendas') {
-    const [plans, coupon] = await Promise.all([loadSalesPlans(), loadSalesCoupon()]);
+    const [plans, coupon, prospect] = await Promise.all([
+      loadSalesPlans(),
+      loadSalesCoupon(),
+      findProspectForPhone(base.leadPhone).catch(() => null),
+    ]);
     return {
       systemPrompt: buildSalesSystemPrompt({
         customerName: base.leadName,
@@ -381,6 +391,7 @@ async function prepareVertical(vertical: Vertical, input: VerticalInput): Promis
         signupUrl: `${appBaseUrl()}/cadastro`,
         plans,
         coupon,
+        prospect,
       }),
       toolkit: { declarations: salesToolDeclarations(), execute: (name, args) => executeSalesTool(name, args, base) },
       knownPrices: plans.flatMap((g) => g.plans.flatMap((p) => [p.price, Math.round(p.price * 0.95)])),
