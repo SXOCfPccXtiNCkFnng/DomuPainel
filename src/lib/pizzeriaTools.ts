@@ -20,7 +20,9 @@ import {
   type Fulfillment,
   type MenuItem,
   type OrderItemInput,
+  type OrderLine,
   type PizzeriaSettings,
+  type PricedOrder,
 } from '@/lib/pizzeria';
 
 export type PizzeriaToolContext = HandoffContext & {
@@ -157,6 +159,30 @@ function calcularPedido(args: Record<string, unknown>, ctx: PizzeriaToolContext)
   };
 }
 
+/** Mesmos itens (quantidade, descrição e observação), em qualquer ordem. */
+export function orderSignature(lines: Pick<OrderLine, 'quantity' | 'description' | 'notes'>[]): string {
+  return lines
+    .map((l) => `${l.quantity}x ${l.description}|${l.notes || ''}`)
+    .sort()
+    .join(';');
+}
+
+const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
+
+async function findRecentSameOrder(ctx: PizzeriaToolContext, priced: PricedOrder) {
+  const recent = await loadCustomerOrders(ctx.tenantId, ctx.leadPhone, 3);
+  const signature = orderSignature(priced.lines);
+  return (
+    recent.find(
+      (o) =>
+        o.status === 'NOVO' &&
+        ctx.now.getTime() - new Date(o.created_at).getTime() < DUPLICATE_WINDOW_MS &&
+        o.total === priced.total &&
+        orderSignature(o.items) === signature
+    ) ?? null
+  );
+}
+
 async function registrarPedido(args: Record<string, unknown>, ctx: PizzeriaToolContext): Promise<ToolResult> {
   if (!isOpenAt(ctx.now, ctx.pizzeria.weekly_hours)) {
     return { ok: false, erro: 'A loja está fechada agora. Não registre: diga o horário de funcionamento.' };
@@ -170,8 +196,30 @@ async function registrarPedido(args: Record<string, unknown>, ctx: PizzeriaToolC
   const payment = cleanText(args.pagamento, 40);
   if (!payment) return { ok: false, erro: 'Pergunte a forma de pagamento.' };
   const change = parseMoney(args.troco_para);
-  const changeFor = change !== 'invalid' && change != null && change > r.priced.total ? change : null;
+  if (change === 'invalid') return { ok: false, erro: 'Não entendi o valor do troco. Pergunte de novo para quanto é o troco.' };
+  // Troco menor que o total não serve para a entrega: confirma em vez de sumir com a informação.
+  if (change != null && change > 0 && change <= r.priced.total) {
+    return {
+      ok: false,
+      erro: `O troco precisa ser para um valor maior que o total (${formatBRL(r.priced.total)}). Confirme com o cliente para quanto é o troco, ou se ele não precisa de troco.`,
+    };
+  }
+  const changeFor = change != null && change > r.priced.total ? change : null;
   const name = cleanText(args.nome_cliente, 120) || ctx.leadName;
+
+  // A IA chamou registrar duas vezes (mesma conversa, mesmos itens, poucos minutos): não manda duas pizzas para a cozinha.
+  const duplicate = await findRecentSameOrder(ctx, r.priced);
+  if (duplicate) {
+    return {
+      ok: true,
+      pedido: {
+        numero: duplicate.order_number,
+        total: formatBRL(duplicate.total),
+        tipo: duplicate.fulfillment === 'ENTREGA' ? 'entrega' : 'retirada',
+      },
+      observacao: `Este pedido já estava registrado como #${duplicate.order_number}. Não registre de novo: só diga o número ao cliente.`,
+    };
+  }
 
   const order = await createOrder({
     tenantId: ctx.tenantId,

@@ -194,28 +194,68 @@ export function sortMenu(items: MenuItem[]): MenuItem[] {
 }
 
 /** Acha o item pelo nome que o cliente (ou a IA) escreveu. */
-export function findMenuItem(menu: MenuItem[], name: unknown): MenuItem | null {
-  const wanted = normalizeName(name).replace(/^(pizza|esfiha|esfirra) (de )?/, '');
-  if (!wanted) return null;
+/** Palavras que não ajudam a diferenciar itens ("frango com catupiry" = "frango catupiry"). */
+const NAME_STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'c', 'e', 'a', 'o', 'sem']);
+const NUMBER_WORDS: Record<string, string> = { um: '1', uma: '1', dois: '2', duas: '2', tres: '3', quatro: '4', cinco: '5', seis: '6' };
+const stripKind = (s: string) => s.replace(/^(pizza|esfiha|esfirra) (de )?/, '');
+
+/** Palavras que identificam o item (sem "pizza de", sem "com", números por extenso viram dígito). */
+export function nameTokens(value: unknown): string[] {
+  return stripKind(normalizeName(value))
+    .split(' ')
+    .map((t) => NUMBER_WORDS[t] ?? t)
+    .filter((t) => t && !NAME_STOPWORDS.has(t));
+}
+
+const sameTokens = (a: string[], b: string[]) => a.length === b.length && a.every((t) => b.includes(t));
+const containsAll = (big: string[], small: string[]) => small.length > 0 && small.every((t) => big.includes(t));
+
+export type MenuMatch = { item: MenuItem; options: MenuItem[] } | { item: null; options: MenuItem[] };
+
+/**
+ * Item do cardápio pelo nome que o cliente (ou a IA) escreveu. Só escolhe
+ * sozinho quando não há dúvida: nome igual, mesmas palavras, ou as palavras
+ * do cliente batem com um único item. Senão devolve as opções parecidas para
+ * a atendente confirmar com o cliente (pizza errada é prejuízo na hora).
+ */
+export function matchMenuItem(menu: MenuItem[], name: unknown): MenuMatch {
   const active = menu.filter((m) => m.active);
-  const norm = (m: MenuItem) => normalizeName(m.name).replace(/^(pizza|esfiha|esfirra) (de )?/, '');
-  return (
-    active.find((m) => norm(m) === wanted) ||
-    active.find((m) => norm(m).startsWith(wanted) || wanted.startsWith(norm(m))) ||
-    (wanted.length >= 4 ? active.find((m) => norm(m).includes(wanted)) : undefined) ||
-    null
-  );
+  const wanted = stripKind(normalizeName(name));
+  if (!wanted) return { item: null, options: [] };
+  const exact = active.find((m) => stripKind(normalizeName(m.name)) === wanted);
+  if (exact) return { item: exact, options: [exact] };
+
+  const words = nameTokens(name);
+  if (!words.length) return { item: null, options: [] };
+  const same = active.filter((m) => sameTokens(nameTokens(m.name), words));
+  if (same.length === 1) return { item: same[0], options: same };
+
+  // Cliente falou menos palavras que o nome do item ("coca lata", "frango catupiry").
+  const wider = active.filter((m) => containsAll(nameTokens(m.name), words));
+  if (wider.length === 1) return { item: wider[0], options: wider };
+  if (wider.length > 1) return { item: null, options: wider.slice(0, 6) };
+
+  // Nada certo: sugere o que tem palavras em comum (ex.: "calabresa acebolada" → Calabresa).
+  const related = active.filter((m) => nameTokens(m.name).some((t) => t.length >= 3 && words.includes(t)));
+  return { item: null, options: related.slice(0, 6) };
+}
+
+export function findMenuItem(menu: MenuItem[], name: unknown): MenuItem | null {
+  return matchMenuItem(menu, name).item;
 }
 
 function findPrice(item: MenuItem, size: unknown): MenuPrice | null {
   if (item.prices.length === 1 && !item.prices[0].size) return item.prices[0];
   const wanted = normalizeName(size);
   if (!wanted) return null;
-  return (
-    item.prices.find((p) => normalizeName(p.size) === wanted) ||
-    item.prices.find((p) => normalizeName(p.size).startsWith(wanted) || wanted.startsWith(normalizeName(p.size))) ||
-    null
-  );
+  const exact = item.prices.find((p) => normalizeName(p.size) === wanted);
+  if (exact) return exact;
+  // "G" → Grande, "media" → Média; se servir para mais de um tamanho, pergunta.
+  const partial = item.prices.filter((p) => {
+    const size = normalizeName(p.size);
+    return size && (size.startsWith(wanted) || wanted.startsWith(size));
+  });
+  return partial.length === 1 ? partial[0] : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -378,17 +418,42 @@ export function formatPizzeriaHours(hours: DayHours[]): string {
 }
 
 /** Taxa para o bairro: lista vazia = taxa única; bairro fora da lista = null (não entrega). */
+/** Abreviações comuns de bairro ("jd bandeirantes" = Jardim Bandeirantes). */
+const AREA_ABBREVIATIONS: Record<string, string> = {
+  jd: 'jardim',
+  jdm: 'jardim',
+  vl: 'vila',
+  pq: 'parque',
+  pqe: 'parque',
+  res: 'residencial',
+  cj: 'conjunto',
+  conj: 'conjunto',
+  sta: 'santa',
+  sto: 'santo',
+};
+const areaTokens = (value: unknown) =>
+  normalizeName(value)
+    .split(' ')
+    .map((t) => AREA_ABBREVIATIONS[t] ?? t)
+    .filter((t) => t && !NAME_STOPWORDS.has(t));
+
+/**
+ * Taxa para o bairro: lista vazia = taxa única; bairro fora da lista = null
+ * (não entrega). Nome pela metade que serve para mais de um bairro também
+ * devolve null: a atendente pergunta qual é, em vez de cobrar a taxa errada.
+ */
 export function deliveryFeeFor(settings: PizzeriaSettings, area: unknown): { fee: number; area: string | null } | null {
   if (!settings.delivery_areas.length) return { fee: settings.delivery_fee, area: cleanText(area, 100) || null };
   const wanted = normalizeName(area);
   if (!wanted) return null;
-  const match =
-    settings.delivery_areas.find((a) => normalizeName(a.area) === wanted) ||
-    settings.delivery_areas.find((a) => {
-      const n = normalizeName(a.area);
-      return n.length >= 4 && (wanted.includes(n) || n.includes(wanted));
-    });
-  return match ? { fee: match.fee, area: match.area } : null;
+  const exact = settings.delivery_areas.find((a) => normalizeName(a.area) === wanted);
+  if (exact) return { fee: exact.fee, area: exact.area };
+  const words = areaTokens(area);
+  if (!words.length) return null;
+  const same = settings.delivery_areas.filter((a) => sameTokens(areaTokens(a.area), words));
+  if (same.length === 1) return { fee: same[0].fee, area: same[0].area };
+  const partial = settings.delivery_areas.filter((a) => containsAll(areaTokens(a.area), words));
+  return partial.length === 1 ? { fee: partial[0].fee, area: partial[0].area } : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -459,9 +524,17 @@ export function priceOrder(params: {
 
     const found: MenuItem[] = [];
     for (const n of names) {
-      const item = findMenuItem(menu, n);
-      if (!item) return { ok: false, error: `"${n}" não está no cardápio. Use ver_cardapio e o nome exato.` };
-      found.push(item);
+      const match = matchMenuItem(menu, n);
+      if (!match.item) {
+        const options = match.options.map((o) => o.name);
+        return {
+          ok: false,
+          error: options.length
+            ? `Não achei "${n}" exatamente no cardápio. Parecidos: ${options.join(', ')}. Confirme com o cliente qual ele quer antes de calcular.`
+            : `"${n}" não está no cardápio. Use ver_cardapio e o nome exato.`,
+        };
+      }
+      found.push(match.item);
     }
     const sizeRaw = cleanText(input.tamanho, SIZE_MAX);
     const prices: { item: MenuItem; price: MenuPrice }[] = [];
