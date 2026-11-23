@@ -177,11 +177,39 @@ async function agendar(args: Record<string, unknown>, ctx: AssistantToolContext)
   const minutes = parseTime(args.horario);
   if (!isValidDateKey(dateKey) || minutes == null) return { ok: false, erro: 'Data ou horário inválido.' };
 
+  // O cliente confirmou de novo e a IA tentou marcar outra vez: o horário já é dele.
+  // Sem isso a agenda recusa (vaga ocupada por ele mesmo) e a IA diz que o horário "foi preenchido".
+  const startsAt = brtToUtc(dateKey, minutes).toISOString();
+  const { data: already } = await supabaseAdmin
+    .from('appointments')
+    .select('id, service_name, starts_at, ends_at, vehicle')
+    .eq('tenant_id', ctx.tenantId)
+    .or(ownAppointmentsFilter(ctx))
+    .eq('status', 'CONFIRMED')
+    .eq('starts_at', startsAt)
+    .limit(1);
+  if (already?.length) {
+    const a = already[0];
+    return {
+      ok: true,
+      agendamento: {
+        id: a.id,
+        servico: a.service_name,
+        data: dateKey,
+        dia_da_semana: weekdayOf(dateKey),
+        horario: timeOf(a.starts_at),
+        previsao_de_termino: timeOf(a.ends_at),
+        veiculo: a.vehicle,
+      },
+      observacao: 'Esse horário já estava marcado para este cliente. Não marque de novo: só confirme que está tudo certo.',
+    };
+  }
+
   const result = await createAppointment(
     ctx.tenantId,
     {
       serviceId: match.service.id,
-      startsAt: brtToUtc(dateKey, minutes).toISOString(),
+      startsAt,
       customerName: args.nome_cliente || ctx.leadName,
       customerPhone: ctx.leadPhone,
       vehicle: args.veiculo,

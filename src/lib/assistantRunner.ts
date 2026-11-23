@@ -177,6 +177,8 @@ async function generateReply(
   effects: ToolEffects
 ): Promise<string | null> {
   const contents = [...history];
+  // O modelo às vezes devolve vazio (sem texto e sem ferramenta): tenta de novo uma vez, se der tempo.
+  let retriedEmpty = false;
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     if (deadline - Date.now() < MIN_CALL_MS) return null;
     const content = await callGemini(apiKey, systemPrompt, contents, usage, deadline, toolkit.declarations).catch((err) => {
@@ -184,17 +186,22 @@ async function generateReply(
       logger.warn('assistant.ai_call_failed', { message: err instanceof Error ? err.message : String(err) });
       return null;
     });
-    if (!content?.parts) return null;
-
-    const calls = content.parts.filter((p) => p.functionCall);
-    if (!calls.length) {
-      const text = content.parts
-        .filter((p) => !p.thought)
-        .map((p) => p.text || '')
-        .join('')
-        .trim();
-      return text || null;
+    const calls = content?.parts?.filter((p) => p.functionCall) ?? [];
+    const text = calls.length
+      ? ''
+      : (content?.parts || [])
+          .filter((p) => !p.thought)
+          .map((p) => p.text || '')
+          .join('')
+          .trim();
+    if (!calls.length && !text) {
+      if (retriedEmpty || deadline - Date.now() < MIN_CALL_MS * 2) return null;
+      retriedEmpty = true;
+      logger.info('assistant.ai_empty_retry', { tenantId });
+      continue;
     }
+    if (!calls.length) return text;
+    if (!content?.parts) return null;
 
     // Devolve a resposta do modelo como veio (inclui as assinaturas de raciocínio).
     contents.push({ role: 'model', parts: content.parts as Record<string, unknown>[] });
