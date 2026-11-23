@@ -63,31 +63,64 @@ async function interestAlreadySent(ctx: HandoffContext): Promise<boolean> {
   return Boolean(data?.length);
 }
 
+/** Sem ponto final (o texto do aviso já coloca a pontuação). */
+const clause = (value: string) => value.replace(/[.!?;,s]+$/, '');
+
+/** Avisos podem demorar (Meta, e-mail): a resposta para o cliente não espera mais que isso. */
+const ALERT_WAIT_MS = 6_000;
+
+async function notifyWithin(work: Promise<unknown>, ctx: HandoffContext, label: string): Promise<void> {
+  const done = work.then(
+    () => true,
+    (err) => {
+      logger.warn('sales.alert_failed', { tenantId: ctx.tenantId, leadId: ctx.leadId, label, message: err instanceof Error ? err.message : String(err) });
+      return true;
+    }
+  );
+  const finished = await Promise.race([done, new Promise<boolean>((r) => setTimeout(() => r(false), ALERT_WAIT_MS))]);
+  if (!finished) logger.warn('sales.alert_slow', { tenantId: ctx.tenantId, leadId: ctx.leadId, label });
+}
+
 async function avisarInteresse(args: Record<string, unknown>, ctx: HandoffContext): Promise<ToolResult> {
-  const summary = text(args.resumo, 400);
+  const summary = clause(text(args.resumo, 400));
   if (summary.length < 3) return { ok: false, erro: 'Escreva um resumo curto do que a pessoa quer.' };
   if (await interestAlreadySent(ctx)) return { ok: true, observacao: 'O Alan já foi avisado. Siga ajudando no cadastro.' };
 
   const phone = formatPhoneBR(ctx.leadPhone) || ctx.leadPhone;
-  await notifySalesOwner({
-    title: 'Cliente quente na conversa de vendas',
-    text: `${ctx.leadName} (${phone}) está decidido: ${summary}. Última mensagem: "${text(ctx.lastCustomerMessage, 200)}"`,
-  });
+  await notifyWithin(
+    notifySalesOwner({
+      title: 'Cliente quente na conversa de vendas',
+      text: `${ctx.leadName} (${phone}) está decidido. ${summary}. Última mensagem: "${clause(text(ctx.lastCustomerMessage, 200))}"`,
+    }),
+    ctx,
+    'interesse'
+  );
   logger.info('sales.interest_alert', { tenantId: ctx.tenantId, leadId: ctx.leadId });
   return { ok: true, observacao: 'Alan avisado. Continue ajudando a pessoa a criar a conta.' };
 }
 
 async function chamarAlan(args: Record<string, unknown>, ctx: HandoffContext): Promise<ToolResult> {
-  const reason = text(args.motivo, 300) || 'Pediu para falar com uma pessoa';
-  const summary = text(args.resumo, 300);
+  const reason = clause(text(args.motivo, 300)) || 'Pediu para falar com uma pessoa';
+  const summary = clause(text(args.resumo, 300));
   const phone = formatPhoneBR(ctx.leadPhone) || ctx.leadPhone;
-  // Pausa a IA nesta conversa por 12h e avisa no painel e por e-mail.
-  const result = await handOffToTeam(ctx, reason, '/atendimento');
-  await notifySalesOwner({
-    title: `${ctx.leadName} precisa de você`,
-    text: `${ctx.leadName} (${phone}) precisa de você: ${reason}.${summary ? ` Sobre o negócio: ${summary}.` : ''} A atendente parou de responder essa conversa por 12 horas.`,
-  });
-  return { ...result, observacao: 'Alan avisado. Diga em uma frase que ele vai responder por aqui e não faça mais perguntas.' };
+  // Pausa primeiro (rápido); os avisos (painel, e-mail e WhatsApp) não podem segurar a resposta ao cliente.
+  await supabaseAdmin
+    .from('leads')
+    .update({ assistant_paused_until: new Date(ctx.now.getTime() + HUMAN_PAUSE_MS).toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', ctx.leadId)
+    .eq('tenant_id', ctx.tenantId);
+  await notifyWithin(
+    Promise.all([
+      handOffToTeam(ctx, reason, '/atendimento'),
+      notifySalesOwner({
+        title: `${ctx.leadName} precisa de você`,
+        text: `${ctx.leadName} (${phone}) precisa de você. ${reason}.${summary ? ` Sobre o negócio: ${summary}.` : ''} A atendente parou de responder essa conversa por 12 horas.`,
+      }),
+    ]),
+    ctx,
+    'chamar_alan'
+  );
+  return { ok: true, observacao: 'Alan avisado. Diga em uma frase que ele vai responder por aqui e não faça mais perguntas.' };
 }
 
 export async function executeSalesTool(name: string, args: Record<string, unknown>, ctx: HandoffContext): Promise<ToolResult> {
