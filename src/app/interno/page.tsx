@@ -12,6 +12,7 @@ import {
   ChevronRight,
   CircleAlert,
   Filter,
+  Handshake,
   LayoutDashboard,
   MapPin,
   RefreshCw,
@@ -32,6 +33,7 @@ import InsightsMonitor from '@/components/interno/InsightsMonitor';
 import InternoMfaGate from '@/components/interno/InternoMfaGate';
 import SupportMfaReset from '@/components/interno/SupportMfaReset';
 import ProspectingMonitor from '@/components/interno/ProspectingMonitor';
+import SalesMonitor from '@/components/interno/SalesMonitor';
 import ProfitCard from '@/components/interno/ProfitCard';
 
 type CouponRow = {
@@ -46,7 +48,7 @@ type CouponRow = {
 };
 
 type HealthData = { checkedAt: string; summary: Record<HealthStatus, number>; checks: HealthCheck[] };
-type Tab = 'overview' | 'users' | 'insights' | 'prospects' | 'health' | 'errors' | 'tenants' | 'assistant' | 'commercial';
+type Tab = 'overview' | 'users' | 'insights' | 'prospects' | 'sales' | 'health' | 'errors' | 'tenants' | 'assistant' | 'commercial';
 
 function statusLabel(status: SubscriptionStatus) {
   switch (status) {
@@ -405,6 +407,7 @@ export default function InternoPage() {
     { id: 'users', label: 'Cadastros', icon: <Users className="w-4 h-4" /> },
     { id: 'insights', label: 'Funil e risco', icon: <Filter className="w-4 h-4" /> },
     { id: 'prospects', label: 'Prospecção', icon: <MapPin className="w-4 h-4" /> },
+    { id: 'sales', label: 'Vendedora', icon: <Handshake className="w-4 h-4" /> },
     { id: 'health', label: 'Saúde do sistema', icon: <Stethoscope className="w-4 h-4" />, badge: healthFails || healthWarns, badgeTone: healthFails ? 'bg-red-600' : 'bg-amber-500' },
     { id: 'errors', label: 'Erros', icon: <AlertTriangle className="w-4 h-4" />, badge: openErrors, badgeTone: 'bg-red-600' },
     { id: 'tenants', label: 'Empresas', icon: <Building2 className="w-4 h-4" /> },
@@ -1007,6 +1010,7 @@ export default function InternoPage() {
 
       {/* ───────── Comercial ───────── */}
       {tab === 'assistant' ? <AssistantMonitor /> : null}
+      {tab === 'sales' ? <SalesMonitor /> : null}
 
       {tab === 'commercial' ? (
         <div className="space-y-4">

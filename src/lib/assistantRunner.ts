@@ -61,6 +61,7 @@ import {
 import { buildSalesSystemPrompt, couponText, plansText } from '@/lib/salesPrompt';
 import { executeSalesTool, salesToolDeclarations, SALES_HANDOFF_TOOL } from '@/lib/salesTools';
 import { appBaseUrl } from '@/lib/email';
+import { syncProspectStatus } from '@/lib/salesMonitor';
 import {
   addUsage,
   checkAssistantQuota,
@@ -618,6 +619,8 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       await recordRun(trigger, { status: 'SKIPPED', reason: 'JA_E_CLIENTE', usage, tools: toolLog });
       return;
     }
+    // Prospecção do /interno: quem foi abordado e respondeu passa para "Respondeu".
+    if (sales) await syncProspectStatus(lead.phone, 'REPLIED');
 
     const history = ((historyRes.data || []) as HistoryMessage[]).reverse();
     const lastMessage = history[history.length - 1];

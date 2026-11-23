@@ -8,12 +8,14 @@ import { formatPhoneBR } from '@/lib/validators';
 import { HUMAN_PAUSE_MS } from '@/lib/assistantRules';
 import { handOffToTeam, type HandoffContext } from '@/lib/assistantTools';
 import { notifySalesOwner } from '@/lib/salesAgent';
+import { syncProspectStatus } from '@/lib/salesMonitor';
 
 type ToolResult = Record<string, unknown>;
 const STRING = 'STRING';
 
-export const SALES_INTEREST_TOOL = 'avisar_interesse';
-export const SALES_HANDOFF_TOOL = 'chamar_alan';
+import { SALES_HANDOFF_TOOL, SALES_INTEREST_TOOL } from '@/lib/salesMonitorRules';
+
+export { SALES_HANDOFF_TOOL, SALES_INTEREST_TOOL };
 
 export function salesToolDeclarations(): unknown[] {
   return [
@@ -95,6 +97,7 @@ async function avisarInteresse(args: Record<string, unknown>, ctx: HandoffContex
     ctx,
     'interesse'
   );
+  await syncProspectStatus(ctx.leadPhone, 'INTERESTED');
   logger.info('sales.interest_alert', { tenantId: ctx.tenantId, leadId: ctx.leadId });
   return { ok: true, observacao: 'Alan avisado. Continue ajudando a pessoa a criar a conta.' };
 }

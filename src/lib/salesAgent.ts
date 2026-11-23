@@ -336,6 +336,9 @@ export async function notifySalesEvent(
   if (!tenant || isPlatformAdminEmail(admin?.email)) return;
 
   const lead = await salesLeadFor(admin?.phone);
+  // Prospecção do /interno: criou conta = interessado; teste grátis ou pagou = virou cliente.
+  const { syncProspectStatus } = await import('@/lib/salesMonitor');
+  await syncProspectStatus(admin?.phone, kind === 'SIGNUP' ? 'INTERESTED' : 'CLIENT');
   const { title, text } = salesEventText(kind, {
     company: tenant.name || 'Uma empresa',
     person: admin?.name || null,

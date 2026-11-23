@@ -4,11 +4,13 @@
  */
 import { describeBody } from '@/lib/followUpContext';
 import type { ServiceItem } from '@/lib/scheduling';
+import { APPROACH_SESSION_GAP_MS, ASSISTANT_SENDER_TYPE, HUMAN_PAUSE_MS } from '@/lib/assistantTiming';
+
+// Constantes compartilhadas com telas do painel (sem dependência de servidor).
+export { APPROACH_SESSION_GAP_MS, ASSISTANT_SENDER_TYPE, HUMAN_PAUSE_MS };
 
 /** Espera depois da última mensagem: quem manda "oi" / "quero lavar" / "amanhã" recebe uma resposta só. */
 export const DEBOUNCE_MS = 6_000;
-/** Alguém da equipe respondeu (celular ou painel) ou a IA chamou a equipe: ela fica quieta por esse tempo. */
-export const HUMAN_PAUSE_MS = 12 * 60 * 60 * 1000;
 export const HISTORY_LIMIT = 20;
 export const MAX_REPLY_PARTS = 3;
 /**
@@ -19,7 +21,6 @@ export const MAX_REPLIES_PER_HOUR = 20 * MAX_REPLY_PARTS;
 
 /** Quem conta como "alguém da equipe respondeu". */
 export const HUMAN_SENDER_TYPES = ['AGENT', 'AGENT_PHONE'];
-export const ASSISTANT_SENDER_TYPE = 'BOT_AI';
 
 export type SkipReason =
   | 'DISABLED'
@@ -178,8 +179,6 @@ export function fallbackReplyForEffects(effects: ToolEffects): string | null {
   return parts.length ? parts.join('\n\n') : null;
 }
 
-/** Sem conversa por esse tempo, a próxima mensagem começa uma conversa nova (vale a abordagem de novo). */
-export const APPROACH_SESSION_GAP_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Vendedora: a conversa ATUAL começou com mensagem nossa? Conversa atual =
