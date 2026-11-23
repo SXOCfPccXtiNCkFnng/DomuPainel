@@ -109,7 +109,9 @@ export function buildPizzeriaSystemPrompt(params: {
   const lastOrder = last
     ? `Último pedido deste cliente: #${last.order_number} (${ORDER_STATUS_LABELS[last.status]}), ${last.items
         .map((l) => `${l.quantity}x ${sanitizeOwnerText(l.description, 80, { singleLine: true })}`)
-        .join(', ')}${last.address ? `; endereço: ${sanitizeOwnerText(last.address, 200, { singleLine: true })}` : ''}${
+        .join(', ')}; ${last.fulfillment === 'ENTREGA' ? 'entrega' : 'retirada'}${
+        last.address ? `; endereço: ${sanitizeOwnerText(last.address, 200, { singleLine: true })}` : ''
+      }${last.area ? `; bairro: ${sanitizeOwnerText(last.area, 100, { singleLine: true })}` : ''}${
         last.payment_method ? `; pagou com ${last.payment_method}` : ''
       }.`
     : null;
@@ -164,10 +166,10 @@ ${
     ? '- A loja está ABERTA: pode anotar pedidos.'
     : '- A loja está FECHADA agora: não registre pedido. Diga quando abre (pelo horário nos DADOS) e se ofereça para tirar dúvidas do cardápio. Se o cliente insistir, use chamar_equipe.'
 }
-- Ajude o cliente a escolher: sugira as mais pedidas quando ele estiver em dúvida. Ofereça uma bebida ou sobremesa uma única vez, de forma leve, antes de fechar.
+- Ajude o cliente a escolher: sugira as mais pedidas quando ele estiver em dúvida. Ofereça uma bebida ou sobremesa uma única vez, de forma leve, antes de fechar, numa mensagem só para isso (não junte com a pergunta do pagamento ou do endereço). Se o cliente não aceitar, ou responder algo como "pode mandar", "só isso", "não precisa", "tá bom assim" ou "fecha", entenda como não e siga direto: mostre o resumo de calcular_pedido e peça a confirmação. Não ofereça de novo.
 - Para cada item com mais de um tamanho, pergunte o tamanho. Adicionais (bacon extra, borda, cobertura) só se estiverem no cardápio, como item próprio.${hasHalf ? ' Meio a meio: só pizzas com sabores que podem ir em meio a meio, no mesmo tamanho.' : ''}
 - Pergunte se é entrega ou retirada (se as duas existirem). Para entrega, peça o endereço completo com número e o bairro; para retirada, não peça endereço.
-- Pergunte a forma de pagamento. Se for dinheiro, pergunte se precisa de troco e para quanto.
+- Pergunte a forma de pagamento. O pedido tem uma forma de pagamento só: não ofereça dividir entre duas formas (ex.: parte no dinheiro e parte no PIX). Se for dinheiro, pergunte se precisa de troco e para quanto; o troco tem que ser para um valor maior que o total.
 - Antes de registrar, use calcular_pedido e mostre ao cliente o resumo exatamente como veio (itens, taxa e total). Nunca some valores por conta própria. Se calcular_pedido devolver erro, explique ao cliente e ajuste.
 - Só use registrar_pedido depois que o cliente confirmar o resumo ("pode mandar", "isso", "confirmo"). Envie os mesmos itens que foram calculados.
 - Depois de registrar, diga o número do pedido e que a loja vai confirmar e avisar por aqui. Não prometa horário exato além do tempo médio nos DADOS.
