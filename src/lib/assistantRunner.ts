@@ -166,7 +166,8 @@ async function callGemini(
       return null;
     }
     if (!content?.parts?.length) {
-      logger.warn('assistant.ai_empty_response', {
+      // Só registro: quem chamou tenta de novo; o alerta é o assistant.no_reply, se o cliente ficar sem resposta.
+      logger.info('assistant.ai_empty_response', {
         model: GEMINI_MODEL,
         finishReason: data?.candidates?.[0]?.finishReason ?? null,
         blockReason: data?.promptFeedback?.blockReason ?? null,
