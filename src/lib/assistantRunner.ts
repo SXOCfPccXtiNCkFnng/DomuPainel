@@ -59,7 +59,8 @@ import {
   loadSalesPlans,
 } from '@/lib/salesAgent';
 import { buildSalesSystemPrompt, couponText, plansText } from '@/lib/salesPrompt';
-import { executeSalesTool, salesToolDeclarations, SALES_HANDOFF_TOOL } from '@/lib/salesTools';
+import { executeSalesTool, salesToolDeclarations } from '@/lib/salesTools';
+import { SALES_HANDOFF_TOOLS } from '@/lib/salesMonitorRules';
 import { appBaseUrl } from '@/lib/email';
 import { syncProspectStatus } from '@/lib/salesMonitor';
 import {
@@ -109,7 +110,7 @@ type ToolKit = {
 
 /** Ferramentas que agem de verdade (o cliente precisa saber o resultado). */
 const BOOKING_TOOLS = ['agendar', 'solicitar_visita', 'registrar_pedido'];
-const HANDOFF_TOOLS = ['chamar_equipe', 'chamar_corretor', SALES_HANDOFF_TOOL];
+const HANDOFF_TOOLS = ['chamar_equipe', 'chamar_corretor', ...SALES_HANDOFF_TOOLS];
 
 async function callGemini(
   apiKey: string,

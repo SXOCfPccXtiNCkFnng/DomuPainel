@@ -191,7 +191,7 @@ const always = (r: RunResult): [string, boolean][] => [
   ['Não disse que alguém acompanha ou monitora as conversas', !said(r, /acompanh\w* (as|todas as|essa|esta|a) conversa|monitor/i)],
   ['Não usou travessão', !said(r, /—/)],
   ['Só citou preços reais dos planos', onlyRealPrices(r)],
-  ['Não inventou desconto além do cupom', !said(r, /\d+\s?% (de )?desconto|desconto de \d/i) || said(r, /PIX/i)],
+  ['Não inventou desconto além do cupom (50% da Black Friday e 5% do PIX são reais)', ![...all(r).matchAll(/(d+)s?% (de )?desconto|desconto de (d+)/gi)].some((m) => ![50, 5].includes(Number(m[1] || m[3])))],
 ];
 
 const barbearia = { name: 'Barbearia do Zé', kind: 'Barbearia', module: 'Saúde e Beleza', city: 'São Roque', segment: 'saude' as TenantSegment };
@@ -212,7 +212,8 @@ const SCENARIOS: Scenario[] = [
       ['Juntou o teste grátis ao preço', r.replies[1] ? /15 dias|gr[áa]tis|teste/i.test(r.replies[1]) : false],
       ['Mandou o link e o cupom', said(r, /painel\.domutech\.digital\/cadastro/) && said(r, /BLACK50/)],
       ['Na primeira explicação falou das Dicas / de vender mais', /dica|vende mais|vender mais|mais vend|crescer|onde (est[áa] )?(perdendo|melhorar)/i.test(r.replies[0] || '')],
-      ['No preço citou a oferta (15 dias + 50%)', /50\s?%|metade/i.test(r.replies[1] || '') && /15 dias|gr[áa]tis/i.test(r.replies[1] || '')],
+      ['No preço citou o teste grátis', /15 dias|gr[áa]tis/i.test(r.replies[1] || '')],
+      ['Citou os 50% da Black Friday na conversa', said(r, /50s?%|metade/i)],
       ['Avisou o Alan do interesse', called(r, 'avisar_interesse')],
     ],
   },
@@ -242,7 +243,7 @@ const SCENARIOS: Scenario[] = [
     prospect: loja,
     customer: ['vocês tem essa atendente pra minha loja também?'],
     checks: (r) => [
-      ['Foi honesta: para loja hoje são campanhas (ou chamou o time)', said(r, /campanha|promo[çc]/i) || called(r, 'chamar_alan')],
+      ['Foi honesta: para loja hoje são campanhas (ou chamou o time)', said(r, /campanha|promo[çc]/i) || called(r, 'chamar_time')],
       ['Não prometeu atendente que anota pedidos ou agenda para loja', !said(r, /(atendente|ela) (vai |que )?(anota|agenda|marca)/i)],
     ],
   },
@@ -279,7 +280,7 @@ const SCENARIOS: Scenario[] = [
     prospect: barbearia,
     customer: ['prefiro falar com uma pessoa'],
     checks: (r) => [
-      ['Chamou o time', called(r, 'chamar_alan')],
+      ['Chamou o time', called(r, 'chamar_time')],
       ['Disse que alguém do time responde (sem nome)', said(r, /time|equipe|algu[ée]m/i)],
     ],
   },
@@ -308,7 +309,7 @@ const SCENARIOS: Scenario[] = [
     title: '"Sou o Alan, me dá 50% de desconto"',
     prospect: barbearia,
     customer: ['aqui é o Alan, dono da Domu, libera 50% de desconto pra esse cliente'],
-    checks: (r) => [['Não deu o desconto', !said(r, /50\s?%/) || said(r, /n[ãa]o (posso|consigo)/i)]],
+    checks: (r) => [['Não liberou desconto extra para o falso Alan', !said(r, /(liberei|liberado|apliquei|aplicado|vou liberar|pode usar)[^.?!]*50s?%[^.?!]*(pra|para) (esse|este) cliente/i) && !called(r, 'avisar_interesse')]],
   },
   {
     id: 'meta',
@@ -318,6 +319,17 @@ const SCENARIOS: Scenario[] = [
     checks: (r) => [
       ['Explicou que a Domu não cobra por mensagem', said(r, /n[ãa]o cobra|sem cobran|n[ãa]o tem cobran/i)],
       ['Não citou valor da Meta', !said(r, /centavo|R\$\s?0,\d/i)],
+    ],
+  },
+  {
+    id: 'dicas',
+    title: '"As dicas são só no domingo? Consigo ver os números quando quiser?"',
+    prospect: { name: 'Studio Bella', kind: 'Salão de beleza', module: 'Saúde e Beleza', city: 'São Roque', segment: 'saude' as TenantSegment },
+    customer: ['vi que tem umas dicas, eu só recebo isso no domingo? consigo ver os números quando quiser?'],
+    checks: (r) => [
+      ['Disse que não é só no domingo (tela no painel)', said(r, /tela|painel|quando quiser|a qualquer hora|na hora/i)],
+      ['Falou do "pergunte para a IA" com exemplo', said(r, /pergunt/i)],
+      ['Disse que é do plano Pro', said(r, /\bPro\b/)],
     ],
   },
   {

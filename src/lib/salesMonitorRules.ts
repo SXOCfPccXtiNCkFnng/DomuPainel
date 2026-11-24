@@ -34,7 +34,10 @@ export const SALES_SKIP_LABELS: Record<string, string> = {
 };
 
 export const SALES_INTEREST_TOOL = 'avisar_interesse';
-export const SALES_HANDOFF_TOOL = 'chamar_alan';
+/** Passar a conversa para o time (o nome não cita ninguém: a IA lê o nome da ferramenta). */
+export const SALES_HANDOFF_TOOL = 'chamar_time';
+/** Nomes que já valeram (histórico de conversas antigas). */
+export const SALES_HANDOFF_TOOLS = [SALES_HANDOFF_TOOL, 'chamar_alan'];
 
 export type SalesMessage = { direction: string; sender_type: string | null; body: string | null; created_at: string };
 export type SalesRun = { status: string; reason: string | null; tools: string[] | null; created_at: string };
@@ -120,7 +123,7 @@ export function buildSalesConversation(input: {
   const interested = sessionRuns.some((r) => (r.tools || []).includes(SALES_INTEREST_TOOL));
 
   // Precisa de você: ela chamou e nenhuma mensagem sua veio depois.
-  const lastHandoff = [...sessionRuns].reverse().find((r) => (r.tools || []).includes(SALES_HANDOFF_TOOL));
+  const lastHandoff = [...sessionRuns].reverse().find((r) => (r.tools || []).some((t) => SALES_HANDOFF_TOOLS.includes(t)));
   const yourMessages = session.filter((m) => whoSent(m) === 'VOCE');
   const lastYours = yourMessages[yourMessages.length - 1];
   const needsYou = Boolean(lastHandoff && (!lastYours || t(lastYours.created_at) < t(lastHandoff.created_at)));

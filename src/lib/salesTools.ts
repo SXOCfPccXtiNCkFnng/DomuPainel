@@ -121,7 +121,7 @@ async function chamarAlan(args: Record<string, unknown>, ctx: HandoffContext): P
       }),
     ]),
     ctx,
-    'chamar_alan'
+    'chamar_time'
   );
   return { ok: true, observacao: 'Time avisado. Diga em uma frase que alguém do time vai responder por aqui (sem citar nomes) e não faça mais perguntas.' };
 }

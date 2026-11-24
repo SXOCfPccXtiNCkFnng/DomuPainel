@@ -98,7 +98,8 @@ describe('prompt de vendas', () => {
     expect(prompt).toContain('R$ 150/mês');
     expect(prompt).toContain('https://painel.domutech.digital/cadastro');
     expect(prompt).toContain('DOMU7, teste grátis de 7 dias, sem cartão');
-    expect(prompt).toContain('chamar_alan');
+    expect(prompt).toContain('chamar_time');
+    expect(prompt).not.toContain('chamar_alan');
   });
 
   it('sem cupom ativo, a IA não oferece desconto', () => {
