@@ -202,3 +202,26 @@ describe('encaixe logo depois de um atendimento', () => {
     expect(slots).not.toContain('08:40');
   });
 });
+
+describe('encaixe com mais de um box (lava rápido)', () => {
+  const settings = { ...DEFAULT_SCHEDULING_SETTINGS, capacity: 2 };
+  const now = new Date('2026-11-25T13:00:00Z');
+  const t = (hhmm: string) => new Date(`2026-11-26T${hhmm}:00-03:00`);
+  const times = (slots: Date[]) => slots.map((d) => formatMinutes(brtMinutesOfDay(d)));
+
+  it('um carro às 15h: ainda cabe outro às 15h', () => {
+    const busy = [{ start: t('15:00'), end: t('16:00') }];
+    expect(times(availableSlots({ dateKey: '2026-11-26', durationMinutes: 60, settings, busy, now }))).toContain('15:00');
+  });
+
+  it('dois carros às 15h: 15h lotado; encaixe às 15h40 só quando um box libera', () => {
+    const busy = [
+      { start: t('15:00'), end: t('16:00') },
+      { start: t('15:00'), end: t('15:40') },
+    ];
+    const slots = times(availableSlots({ dateKey: '2026-11-26', durationMinutes: 60, settings, busy, now }));
+    expect(slots).not.toContain('15:00');
+    expect(slots).not.toContain('15:30');
+    expect(slots).toContain('15:40');
+  });
+});

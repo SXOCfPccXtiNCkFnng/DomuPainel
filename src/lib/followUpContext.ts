@@ -185,7 +185,8 @@ export async function checkContextWithAI(
           contents: [{ role: 'user', parts: [{ text: buildPrompt(messages, followUpText, companyName) }] }],
           generationConfig: {
             temperature: 0,
-            maxOutputTokens: 300,
+            // Folga para o raciocínio do modelo não cortar o JSON no meio.
+            maxOutputTokens: 800,
             responseMimeType: 'application/json',
             thinkingConfig: { thinkingBudget: 0 },
           },

@@ -133,7 +133,9 @@ async function callGemini(
           tools: [{ functionDeclarations: declarations }],
           generationConfig: {
             temperature: 0.4,
-            maxOutputTokens: 800,
+            // Com ferramentas o modelo às vezes "pensa" mesmo com budget 0, e o raciocínio conta
+            // nesse limite: com 800 a resposta saía cortada ou vazia. O tamanho do texto é o prompt que segura.
+            maxOutputTokens: 2048,
             thinkingConfig: { thinkingBudget: 0 },
           },
         }),
@@ -150,6 +152,16 @@ async function callGemini(
     const data = await res.json();
     addUsage(usage, data?.usageMetadata);
     const content = data?.candidates?.[0]?.content as { role?: string; parts?: GeminiPart[] } | undefined;
+    const finishReason = data?.candidates?.[0]?.finishReason ?? null;
+    // Parou no limite: o texto pode estar cortado no meio da frase. Não manda; quem chamou tenta de novo.
+    if (finishReason === 'MAX_TOKENS' && !content?.parts?.some((p) => p.functionCall)) {
+      logger.warn('assistant.ai_max_tokens', {
+        model: GEMINI_MODEL,
+        outputTokens: data?.usageMetadata?.candidatesTokenCount ?? null,
+        thoughtTokens: data?.usageMetadata?.thoughtsTokenCount ?? null,
+      });
+      return null;
+    }
     if (!content?.parts?.length) {
       logger.warn('assistant.ai_empty_response', {
         model: GEMINI_MODEL,

@@ -49,6 +49,11 @@ export async function generateAi(params: {
     }
     const data = await res.json();
     addUsage(usage, data?.usageMetadata);
+    // Parou no limite: JSON cortado não serve; texto cortado fica registrado para aumentar o limite.
+    if (data?.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+      logger.warn('ai.max_tokens', { label: params.label, output: data?.usageMetadata?.candidatesTokenCount ?? null, thoughts: data?.usageMetadata?.thoughtsTokenCount ?? null });
+      if (params.json) return null;
+    }
     const text = (data?.candidates?.[0]?.content?.parts || [])
       .filter((p: { thought?: boolean }) => !p.thought)
       .map((p: { text?: string }) => p.text || '')

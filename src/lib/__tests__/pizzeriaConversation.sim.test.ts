@@ -108,7 +108,7 @@ async function gemini(system: string, contents: Turn[]) {
       systemInstruction: { parts: [{ text: system }] },
       contents,
       tools: [{ functionDeclarations: pizzeriaToolDeclarations() }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 800, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0.4, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
     }),
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 300)}`);

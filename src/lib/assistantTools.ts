@@ -105,6 +105,16 @@ export function assistantToolDeclarations(vertical: SchedulingVertical = 'automo
     },
   },
   {
+    name: 'perguntar_equipe',
+    description:
+      'Manda para a equipe uma dúvida do cliente que não está nos dados (ex.: garantia, estacionamento, marca de produto). A equipe responde por aqui depois; você continua atendendo normalmente.',
+    parameters: {
+      type: 'OBJECT',
+      properties: { pergunta: { type: STRING, description: 'A dúvida do cliente, em português.' } },
+      required: ['pergunta'],
+    },
+  },
+  {
     name: 'chamar_equipe',
     description:
       'Avisa a equipe para assumir a conversa (reclamação, pedido para falar com uma pessoa, algo que você não resolve). Depois disso você para de responder esta conversa.',
@@ -295,6 +305,21 @@ async function cancelarAgendamento(args: Record<string, unknown>, ctx: Assistant
   return { ok: true };
 }
 
+/** Dúvida que não está nos dados: avisa a equipe (sino e celular) sem pausar a atendente. */
+async function perguntarEquipe(args: Record<string, unknown>, ctx: AssistantToolContext): Promise<ToolResult> {
+  const question = String(args.pergunta ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (question.length < 3) return { ok: false, erro: 'Escreva a dúvida do cliente.' };
+  const phone = formatPhoneBR(ctx.leadPhone) || ctx.leadPhone;
+  await notifyTenantAdmins(ctx.tenantId, {
+    title: `${ctx.leadName} tem uma dúvida`,
+    message: `${question} · WhatsApp: ${phone}. Responda pelo WhatsApp Business quando puder; a atendente segue cuidando do resto.`,
+    type: 'INFO',
+    url: '/atendente',
+  });
+  logger.info('assistant.question_to_team', { tenantId: ctx.tenantId, leadId: ctx.leadId });
+  return { ok: true, observacao: 'Equipe avisada. Diga que vai confirmar com a equipe e que respondem por aqui; siga ajudando no que puder.' };
+}
+
 async function chamarEquipe(args: Record<string, unknown>, ctx: AssistantToolContext): Promise<ToolResult> {
   const reason = String(args.motivo ?? '').trim().slice(0, 300) || 'Cliente precisa de atendimento';
   return handOffToTeam(ctx, reason, '/atendente');
@@ -363,6 +388,8 @@ export async function executeAssistantTool(
       return verAgendamentos(ctx);
     case 'cancelar_agendamento':
       return cancelarAgendamento(args, ctx);
+    case 'perguntar_equipe':
+      return perguntarEquipe(args, ctx);
     case 'chamar_equipe':
       return chamarEquipe(args, ctx);
     default:

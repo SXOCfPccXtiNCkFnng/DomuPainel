@@ -107,7 +107,7 @@ export const SCHEDULING_COPY: Record<SchedulingVertical, SchedulingCopy> = {
       'Dor forte, sangramento, inchaço, reação alérgica ou qualquer sinal de urgência: diga com cuidado para procurar atendimento de urgência agora (SAMU 192 se for grave) e use chamar_equipe.',
       'Não pergunte sobre doenças, remédios, exames, gravidez ou outras informações de saúde. Se o cliente contar algo assim, não repita nem comente; se for importante para o atendimento, diga que o profissional vai conversar sobre isso.',
       'Se a descrição do serviço ou as informações nos DADOS disserem que precisa de avaliação antes, ofereça marcar a avaliação.',
-      'Não comente a aparência do cliente nem sugira serviço por causa dela.',
+      'Não comente a aparência do cliente (rosto, corpo, peso, pele ou cabelo dele), nem para elogiar, e não sugira serviço por causa dela. Se ele perguntar o que fica bom nele, diga com leveza que o profissional ajuda a escolher na hora do atendimento.',
     ],
     reminderEmoji: '',
     greetingEmoji: ' ✨',

@@ -128,7 +128,7 @@ async function generateTipsWithAI(prompt: string): Promise<InsightTip[] | null> 
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.5,
-          maxOutputTokens: 1200,
+          maxOutputTokens: 2048,
           responseMimeType: 'application/json',
           thinkingConfig: { thinkingBudget: 0 },
         },

@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     const result = await generateAi({
       system: askSystemPrompt(access.company, access.kind),
       parts: [{ text: `DADOS DA CONTA\n${context}\n\nPERGUNTA DO DONO\n${question}` }],
-      maxOutputTokens: 700,
+      maxOutputTokens: 1500,
       temperature: 0.3,
       label: 'ask_ai',
     });
