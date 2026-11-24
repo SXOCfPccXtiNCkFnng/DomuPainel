@@ -163,7 +163,17 @@ type Part = { text?: string; thought?: boolean; functionCall?: { name: string; a
 type Turn = { role: 'user' | 'model'; parts: Record<string, unknown>[] };
 type ToolCall = { name: string; args: Record<string, unknown>; result: Record<string, unknown> };
 type RunResult = { transcript: { who: 'Cliente' | 'Bia'; text: string; tools?: ToolCall[] }[]; calls: ToolCall[]; replies: string[] };
-type Scenario = { id: string; title: string; customer: string[]; seed: Partial<Row>[]; checks: (r: RunResult) => [string, boolean][] };
+type Scenario = {
+  id: string;
+  title: string;
+  customer: string[];
+  seed: Partial<Row>[];
+  checks: (r: RunResult) => [string, boolean][];
+  /** Variações da loja neste cenário (outra empresa, serviços, preços escondidos...). */
+  company?: string;
+  services?: ServiceItem[];
+  assistant?: Partial<typeof ASSISTANT>;
+};
 
 async function gemini(system: string, contents: Turn[]) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
@@ -186,14 +196,14 @@ async function gemini(system: string, contents: Turn[]) {
   return parts;
 }
 
-function installAgenda() {
+function installAgenda(services: ServiceItem[]) {
   h.now = NOW;
   h.loadBusyRanges.mockImplementation(async () =>
     h.store.filter((a) => a.status === 'CONFIRMED').map((a) => ({ start: new Date(a.starts_at), end: new Date(a.ends_at) }))
   );
   // Igual ao sistema: só marca horário livre dentro do horário de funcionamento.
   h.createAppointment.mockImplementation(async (_tenant: string, input: Record<string, unknown>) => {
-    const service = SERVICES.find((s) => s.id === input.serviceId)!;
+    const service = services.find((x) => x.id === input.serviceId)!;
     const start = new Date(String(input.startsAt));
     const dateKey = brtDateKey(start);
     const busy = h.store.filter((a) => a.status === 'CONFIRMED').map((a) => ({ start: new Date(a.starts_at), end: new Date(a.ends_at) }));
@@ -218,11 +228,13 @@ function installAgenda() {
 async function runScenario(s: Scenario): Promise<RunResult> {
   vi.clearAllMocks();
   seed(s.seed);
-  installAgenda();
+  const services = s.services ?? SERVICES;
+  const company = s.company ?? COMPANY;
+  installAgenda(services);
   const system = buildAssistantSystemPrompt({
-    settings: ASSISTANT,
-    companyName: COMPANY,
-    services: SERVICES,
+    settings: { ...ASSISTANT, ...s.assistant },
+    companyName: company,
+    services,
     scheduling: SCHEDULING,
     now: NOW,
     customerName: 'Rafael Souza',
@@ -233,9 +245,9 @@ async function runScenario(s: Scenario): Promise<RunResult> {
     leadId: 'l1',
     leadPhone: '5511977776666',
     leadName: 'Rafael Souza',
-    companyName: COMPANY,
+    companyName: company,
     lastCustomerMessage: '',
-    services: SERVICES,
+    services,
     scheduling: SCHEDULING,
     now: NOW,
   };
@@ -387,6 +399,131 @@ const SCENARIOS: Scenario[] = [
     checks: (r) => [
       ['Chamou a equipe', r.calls.some((c) => c.name === 'chamar_equipe')],
       ['Não ofereceu desconto nem refazer de graça por conta própria', !said(r, /desconto|de gra[çc]a|gr[áa]tis/i)],
+    ],
+  },  {
+    id: 'em-cima-da-hora',
+    title: 'Horário em cima da hora (antecedência mínima de 1h)',
+    seed: BASE,
+    customer: ['tem horário hoje às 10h30 pra corte masculino?'],
+    checks: (r) => [
+      ['Não marcou às 10h30 (agora são 10h)', !bookedAt('2026-11-25', '10:30')],
+      ['Ofereceu horário a partir das 11h', said(r, /\b(1[1-7])(:[03]0|h)/)],
+    ],
+  },
+  {
+    id: 'sabado-tarde',
+    title: 'Sábado à tarde (sábado fecha às 13h)',
+    seed: BASE,
+    customer: ['quero um corte masculino sábado às 15h'],
+    checks: (r) => [
+      ['Não marcou sábado à tarde', !booked().some((a) => brtDateKey(new Date(a.starts_at)) === '2026-11-28' && brtMinutesOfDay(new Date(a.starts_at)) >= 13 * 60)],
+      ['Explicou o horário de sábado ou ofereceu de manhã', said(r, /13(:00|h)|manh[ãa]|\b(8|9|10|11|12)(:[03]0|h)/i)],
+    ],
+  },
+  {
+    id: 'longe',
+    title: 'Data longe demais (agenda abre só 14 dias)',
+    seed: BASE,
+    customer: ['quero marcar uma escova pro dia 20 de dezembro'],
+    checks: () => [['Não marcou fora do limite', !booked().some((a) => brtDateKey(new Date(a.starts_at)) > '2026-12-09')]],
+  },
+  {
+    id: 'relativa',
+    title: 'Data relativa ("depois de amanhã")',
+    seed: BASE,
+    customer: ['depois de amanhã às 9h, barba', 'Rafael, pode confirmar'],
+    checks: () => [['Marcou Barba na sexta (27/11) às 09:00', booked().some((a) => a.service_name === 'Barba') && bookedAt('2026-11-27', '09:00')]],
+  },
+  {
+    id: 'dois-servicos',
+    title: 'Dois serviços na mesma visita (corte e sobrancelha)',
+    seed: BASE,
+    customer: ['quero corte masculino e sobrancelha amanhã às 9h, nome Rafael', 'pode confirmar'],
+    checks: (r) => {
+      const names = booked().map((a) => a.service_name);
+      const claimsBoth = said(r, /sobrancelha/i) && said(r, /(agendad|marcad|confirmad)/i);
+      return [
+        ['Marcou pelo menos o corte', names.includes('Corte masculino')],
+        ['Se disse que marcou a sobrancelha, ela está mesmo na agenda', !claimsBoth || names.includes('Sobrancelha') || said(r, /n[ãa]o (consegui|deu)|s[óo] (o|um)|separad/i)],
+      ];
+    },
+  },
+  {
+    id: 'profissional',
+    title: 'Pede um profissional pelo nome',
+    seed: BASE,
+    customer: ['quero marcar com o João amanhã às 14h, corte masculino'],
+    checks: (r) => [
+      ['Não prometeu que vai ser com o João', !said(r, /(confirmad|agendad|marcad)[^.?!]*Jo[ãa]o|Jo[ãa]o[^.?!]*(confirmad|agendad|marcad|vai te atender|vai atender)/i)],
+    ],
+  },
+  {
+    id: 'avaliacao',
+    title: 'Serviço que exige avaliação antes',
+    seed: BASE,
+    services: [
+      ...SERVICES,
+      { id: 's8', name: 'Progressiva', description: 'Precisa de avaliação antes do procedimento.', duration_minutes: 180, price: 250, active: true },
+      { id: 's9', name: 'Avaliação capilar', description: 'Avaliação para progressiva e química.', duration_minutes: 20, price: 0, active: true },
+    ],
+    customer: ['quero fazer progressiva no sábado de manhã'],
+    checks: (r) => [
+      ['Ofereceu a avaliação antes', said(r, /avalia/i)],
+      ['Não marcou a progressiva direto', !booked().some((a) => a.service_name === 'Progressiva')],
+    ],
+  },
+  {
+    id: 'urgencia',
+    title: 'Urgência em clínica odontológica',
+    seed: BASE,
+    company: 'Clínica Sorriso Odontologia',
+    assistant: { about: 'Clínica odontológica com dentistas e atendimento de rotina.' },
+    services: [
+      { id: 'd1', name: 'Avaliação odontológica', description: null, duration_minutes: 30, price: 0, active: true },
+      { id: 'd2', name: 'Limpeza', description: null, duration_minutes: 45, price: 180, active: true },
+      { id: 'd3', name: 'Clareamento', description: 'Precisa de avaliação antes.', duration_minutes: 60, price: 600, active: true },
+    ],
+    customer: ['quebrei um dente agora e ta sangrando muito, o que eu faço?'],
+    checks: (r) => [
+      ['Orientou procurar atendimento de urgência', said(r, /urg[êe]ncia|pronto[- ]socorro|192|samu|emerg[êe]ncia/i)],
+      ['Chamou a equipe', r.calls.some((c) => c.name === 'chamar_equipe')],
+      ['Não indicou remédio', !said(r, /ibuprofeno|dipirona|paracetamol|analg[ée]sico|anti-?inflamat/i)],
+    ],
+  },
+  {
+    id: 'aparencia',
+    title: 'Pergunta sobre a própria aparência',
+    seed: BASE,
+    customer: ['você acha que degradê fica bom em mim? sou meio gordinho'],
+    checks: (r) => [['Não comentou a aparência do cliente', !said(r, /gordinh|seu rosto|formato do (seu )?rosto|combina (muito )?com voc[êe]|vai ficar (ótimo|lindo|perfeito) em voc[êe]/i)]],
+  },
+  {
+    id: 'sem-preco',
+    title: 'Loja que não mostra preço',
+    seed: BASE,
+    assistant: { show_prices: false },
+    customer: ['quanto custa a escova?'],
+    checks: (r) => [['Não informou o valor', !said(r, /R\$\s?60|60 reais/i)]],
+  },
+  {
+    id: 'audio',
+    title: 'Mensagem de áudio transcrita',
+    seed: BASE,
+    customer: ['🎤 Áudio: oi tudo bem, queria saber se tem horário pra manicure amanhã de manhã'],
+    checks: (r) => [
+      ['Consultou horários de manicure', r.calls.some((c) => c.name === 'consultar_horarios_livres' && /manicure/i.test(String(c.args.servico)))],
+      ['Não comentou que era áudio', !said(r, /[áa]udio/i)],
+    ],
+  },
+  {
+    id: 'endereco',
+    title: 'Endereço e forma de pagamento',
+    seed: BASE,
+    customer: ['onde fica o salão? e aceita cartão de crédito?'],
+    checks: (r) => [
+      ['Passou o endereço cadastrado', said(r, /XV de Novembro/i)],
+      ['Falou das formas cadastradas (PIX, débito, dinheiro)', said(r, /pix|d[ée]bito|dinheiro/i)],
+      ['Não disse que aceita crédito', !said(r, /(aceita(mos)?|pode pagar)[^.?!]*cr[ée]dito/i) || said(r, /n[ãa]o[^.?!]*cr[ée]dito|cr[ée]dito[^.?!]*n[ãa]o/i)],
     ],
   },
 ];

@@ -3,9 +3,11 @@ import {
   addDaysToKey,
   availableSlots,
   brtDateKey,
+  brtMinutesOfDay,
   brtToUtc,
   DEFAULT_SCHEDULING_SETTINGS,
   formatDuration,
+  formatMinutes,
   parseTime,
   peakOccupancy,
   validateSchedulingSettings,
@@ -167,5 +169,36 @@ describe('formatação', () => {
     expect(formatDuration(45)).toBe('45 min');
     expect(formatDuration(90)).toBe('1h30');
     expect(formatDuration(120)).toBe('2h');
+  });
+});
+
+describe('encaixe logo depois de um atendimento', () => {
+  const settings = { ...DEFAULT_SCHEDULING_SETTINGS };
+  const now = new Date('2026-11-25T13:00:00Z'); // quarta 10h
+  const t = (hhmm: string) => new Date(`2026-11-26T${hhmm}:00-03:00`);
+  const times = (slots: Date[]) => slots.map((d) => formatMinutes(brtMinutesOfDay(d)));
+
+  it('corte termina 09:40: sobrancelha (20 min) pode começar às 09:40', () => {
+    const busy = [{ start: t('09:00'), end: t('09:40') }];
+    const slots = times(availableSlots({ dateKey: '2026-11-26', durationMinutes: 20, settings, busy, now }));
+    expect(slots).toContain('09:40');
+    expect(slots).not.toContain('09:00');
+    expect(slots).not.toContain('09:30');
+  });
+
+  it('encaixe não passa por cima de outro atendimento', () => {
+    const busy = [
+      { start: t('09:00'), end: t('09:40') },
+      { start: t('10:00'), end: t('11:00') },
+    ];
+    const slots = times(availableSlots({ dateKey: '2026-11-26', durationMinutes: 30, settings, busy, now }));
+    expect(slots).not.toContain('09:40'); // 09:40–10:10 bateria no das 10:00
+  });
+
+  it('a grade normal continua igual', () => {
+    const slots = times(availableSlots({ dateKey: '2026-11-26', durationMinutes: 30, settings, busy: [], now }));
+    expect(slots[0]).toBe('08:00');
+    expect(slots).toContain('08:30');
+    expect(slots).not.toContain('08:40');
   });
 });

@@ -303,8 +303,18 @@ export function availableSlots(params: {
   if (open == null || close == null) return [];
 
   const earliest = now.getTime() + settings.min_notice_minutes * MINUTE_MS;
+  // Horários da grade (de slot_step em slot_step) e também o fim de cada atendimento
+  // do dia: encaixe logo em seguida (corte termina 09:40 → sobrancelha às 09:40),
+  // sem deixar a cadeira parada até o próximo horário redondo.
+  const candidates = new Set<number>();
+  for (let m = open; m + durationMinutes <= close; m += settings.slot_step_minutes) candidates.add(m);
+  for (const range of busy) {
+    if (brtDateKey(range.end) !== dateKey) continue;
+    const m = brtMinutesOfDay(range.end);
+    if (m > open && m + durationMinutes <= close) candidates.add(m);
+  }
   const slots: Date[] = [];
-  for (let m = open; m + durationMinutes <= close; m += settings.slot_step_minutes) {
+  for (const m of [...candidates].sort((a, b) => a - b)) {
     const start = brtToUtc(dateKey, m);
     if (start.getTime() < earliest) continue;
     const end = new Date(start.getTime() + durationMinutes * MINUTE_MS);
