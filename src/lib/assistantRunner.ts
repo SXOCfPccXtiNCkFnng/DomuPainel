@@ -35,6 +35,8 @@ import {
   HUMAN_PAUSE_MS,
   HUMAN_SENDER_TYPES,
   approachFromHistory,
+  isLikelyAutoReply,
+  type ApproachInfo,
   shouldAssistantReply,
   fallbackReplyForEffects,
   splitReply,
@@ -333,16 +335,16 @@ async function recordRun(trigger: AssistantTrigger, run: RunRecord): Promise<voi
 }
 
 /** Vendedora: a conversa atual (últimos 60 dias, separada por pausas de 7 dias) começou com a abordagem? */
-async function loadApproach(tenantId: string, leadId: string): Promise<{ approached: boolean; firstReplyAt: Date | null }> {
+async function loadApproach(tenantId: string, leadId: string): Promise<ApproachInfo> {
   const { data } = await supabaseAdmin
     .from('chat_messages')
-    .select('direction, created_at')
+    .select('direction, created_at, body')
     .eq('tenant_id', tenantId)
     .eq('lead_id', leadId)
     .gte('created_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
     .order('created_at', { ascending: false })
     .limit(300);
-  return approachFromHistory((data || []) as { direction: string; created_at: string }[]);
+  return approachFromHistory((data || []) as { direction: string; created_at: string; body: string | null }[]);
 }
 
 type LeadForAssistant = {
@@ -586,6 +588,13 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
       // Fica no monitor do /interno: dá para ver por que a vendedora não respondeu.
       logger.info('assistant.skipped', { tenantId, leadId, reason: 'NOT_APPROACHED' });
       await recordRun(trigger, { status: 'SKIPPED', reason: 'NAO_ABORDADO', usage, tools: toolLog });
+      return;
+    }
+    // Resposta automática do WhatsApp Business do estabelecimento ("Bem-vindo à...", link de agendamento):
+    // não é o dono respondendo. A vendedora espera a pessoa escrever.
+    if (approach && isLikelyAutoReply(approach)) {
+      logger.info('assistant.skipped', { tenantId, leadId, reason: 'AUTO_REPLY' });
+      await recordRun(trigger, { status: 'SKIPPED', reason: 'RESPOSTA_AUTOMATICA', usage, tools: toolLog });
       return;
     }
 

@@ -22,6 +22,7 @@ export const SALES_SKIP_LABELS: Record<string, string> = {
   HUMAN_REPLIED: 'Você respondeu, então ela ficou quieta por 12h',
   PAUSED_BY_HANDOFF: 'Pausada: chamou você (ou bateu o limite)',
   NAO_ABORDADO: 'Não foi abordado (a pessoa escreveu primeiro)',
+  RESPOSTA_AUTOMATICA: 'Era a resposta automática do WhatsApp dela; esperando a pessoa responder',
   JA_E_CLIENTE: 'Já é cliente da Domu',
   RATE_LIMIT: 'Bateu o limite de mensagens por hora',
   OPT_OUT: 'A pessoa pediu para não receber mais',

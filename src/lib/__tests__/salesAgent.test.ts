@@ -4,7 +4,7 @@ vi.mock('@/lib/supabaseServer', () => ({ supabaseAdmin: {} }));
 
 import { alertParam, isSalesTenant, normalizeNotifyPhone, salesEventText } from '../salesAgent';
 import { buildSalesSystemPrompt, couponText } from '../salesPrompt';
-import { approachFromHistory, shouldAssistantReply } from '../assistantRules';
+import { approachFromHistory, isLikelyAutoReply, shouldAssistantReply } from '../assistantRules';
 
 const now = new Date('2026-11-10T15:00:00Z');
 const base = {
@@ -174,5 +174,42 @@ describe('vendedora não cita nomes nem monitoramento', () => {
     });
     expect(prompt).not.toMatch(/Alan/);
     expect(prompt).toContain('Nunca diga que alguém acompanha, monitora ou lê as conversas');
+  });
+});
+
+describe('resposta automática do WhatsApp Business do estabelecimento', () => {
+  const approach = new Date('2026-11-24T20:48:00Z');
+  const at = (sec: number) => new Date(approach.getTime() + sec * 1000).toISOString();
+  const info = (replies: { sec: number; body: string }[]) => ({
+    startedAt: approach,
+    replies: replies.map((r) => ({ created_at: at(r.sec), body: r.body })),
+  });
+
+  it('saudação automática (casos reais das barbearias) não recebe resposta', () => {
+    expect(isLikelyAutoReply(info([{ sec: 3, body: 'Bem-vindo à JF Barbearia & Pub 💈 Como podemos te ajudar hoje?' }]))).toBe(true);
+    expect(
+      isLikelyAutoReply(
+        info([{ sec: 4, body: 'Eai tudo bom? Richard Alcantara agradece seu contato !! Gostaria de agendar algum horário ? Utilize nosso link de agendamento sites.appbarber.com.br/barbeariaalcantara' }])
+      )
+    ).toBe(true);
+    expect(isLikelyAutoReply(info([{ sec: 2, body: '[mensagem não suportada pela API — veja no celular]' }]))).toBe(true);
+  });
+
+  it('o dono respondendo de verdade, mesmo rápido, recebe resposta', () => {
+    expect(isLikelyAutoReply(info([{ sec: 15, body: 'sim, pode mostrar' }]))).toBe(false);
+    expect(isLikelyAutoReply(info([{ sec: 90, body: 'oi, como funciona isso?' }]))).toBe(false);
+  });
+
+  it('depois da resposta automática, a mensagem do dono vale', () => {
+    expect(
+      isLikelyAutoReply(info([
+        { sec: 3, body: 'Bem-vindo à JF Barbearia! Como podemos te ajudar?' },
+        { sec: 120, body: 'quanto custa?' },
+      ]))
+    ).toBe(false);
+  });
+
+  it('muito depois da abordagem, nunca é tratado como automático', () => {
+    expect(isLikelyAutoReply(info([{ sec: 3600, body: 'Bem-vindo! Como podemos te ajudar?' }]))).toBe(false);
   });
 });

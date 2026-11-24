@@ -187,20 +187,58 @@ export function fallbackReplyForEffects(effects: ToolEffects): string | null {
  * Devolve também quando ele respondeu pela primeira vez nessa conversa:
  * mensagens da equipe antes disso são a abordagem e não pausam a IA.
  */
+export type ApproachInfo = {
+  approached: boolean;
+  firstReplyAt: Date | null;
+  /** Quando a conversa atual começou (a abordagem). */
+  startedAt: Date | null;
+  /** Mensagens do contato na conversa atual, em ordem. */
+  replies: { created_at: string; body: string | null }[];
+};
+
 export function approachFromHistory(
-  messages: { direction: string; created_at: string }[],
+  messages: { direction: string; created_at: string; body?: string | null }[],
   gapMs: number = APPROACH_SESSION_GAP_MS
-): { approached: boolean; firstReplyAt: Date | null } {
+): ApproachInfo {
   const sorted = [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  if (!sorted.length) return { approached: false, firstReplyAt: null };
+  if (!sorted.length) return { approached: false, firstReplyAt: null, startedAt: null, replies: [] };
   let start = 0;
   for (let i = 1; i < sorted.length; i++) {
     if (new Date(sorted[i].created_at).getTime() - new Date(sorted[i - 1].created_at).getTime() >= gapMs) start = i;
   }
   const session = sorted.slice(start);
-  const reply = session.find((m) => m.direction === 'INBOUND');
+  const replies = session.filter((m) => m.direction === 'INBOUND').map((m) => ({ created_at: m.created_at, body: m.body ?? null }));
   return {
     approached: session[0].direction === 'OUTBOUND',
-    firstReplyAt: reply ? new Date(reply.created_at) : null,
+    firstReplyAt: replies[0] ? new Date(replies[0].created_at) : null,
+    startedAt: new Date(session[0].created_at),
+    replies,
   };
+}
+
+/** Frases de saudação e de ausência automáticas do WhatsApp Business. */
+const AUTO_REPLY_RE =
+  /bem[- ]?vind|agradece (o |seu |pelo )?contato|obrigad[oa] (pelo|por entrar em|por nos chamar|pela mensagem)|como (podemos|posso) (te |lhe )?ajudar|em breve (retornaremos|responderemos|entraremos)|retornaremos|responderemos (o mais|assim que)|assim que poss[íi]vel|no momento (n[ãa]o|estamos)|fora do (nosso )?hor[áa]rio|hor[áa]rio de (atendimento|funcionamento)|link (de|para) agendamento|agende (pelo|no|atrav[ée]s)|mensagem autom[áa]tica|atendimento autom[áa]tico/i;
+
+/** Mensagem sem conteúdo que a API não entrega (resposta automática costuma chegar assim). */
+const PLACEHOLDER_RE = /^\[(mensagem n[ãa]o suportada|unsupported|interactive|button|system|template)/i;
+
+export const AUTO_REPLY_INSTANT_MS = 20_000;
+export const AUTO_REPLY_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * Vendedora: a mensagem mais recente do contato parece a resposta automática
+ * do WhatsApp Business dele (e não o dono respondendo)? Ela chegou logo depois
+ * da abordagem e veio sem conteúdo, tem cara de saudação/ausência automática,
+ * ou chegou em segundos com link ou texto longo. Resposta curta e rápida é gente.
+ */
+export function isLikelyAutoReply(info: Pick<ApproachInfo, 'startedAt' | 'replies'>): boolean {
+  const last = info.replies[info.replies.length - 1];
+  if (!info.startedAt || !last) return false;
+  const delay = new Date(last.created_at).getTime() - info.startedAt.getTime();
+  if (delay > AUTO_REPLY_WINDOW_MS) return false;
+  const text = String(last.body || '').trim();
+  if (PLACEHOLDER_RE.test(text) || AUTO_REPLY_RE.test(text)) return true;
+  // Resposta em segundos com link ou texto longo de saudação: robô. Resposta curta e rápida ("sim, pode") é gente.
+  return delay <= AUTO_REPLY_INSTANT_MS && (/https?:\/\/|www\.|\.com\b/i.test(text) || text.length > 120);
 }
