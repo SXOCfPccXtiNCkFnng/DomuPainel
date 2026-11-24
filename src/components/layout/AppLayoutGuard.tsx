@@ -17,6 +17,7 @@ import { syncSessionToStorage, userIdentity } from '@/lib/sessionHelpers';
 import { getAuthItem, isLoggedIn, setAuthItem, clearAuthSession } from '@/lib/authStorage';
 import SupportChatbot from '@/components/shared/SupportChatbot';
 import TestModePanel, { TEST_ONBOARDING_KEY } from '@/components/layout/TestModePanel';
+import WhatsAppPendingBanner from '@/components/layout/WhatsAppPendingBanner';
 
 export default function AppLayoutGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -259,6 +260,7 @@ export default function AppLayoutGuard({ children }: { children: React.ReactNode
       <div className="flex-1 md:pl-64 flex flex-col min-h-screen w-full min-w-0">
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 pt-16 sm:pt-20 px-4 sm:px-6 lg:px-8 pb-10 sm:pb-12 overflow-x-hidden overflow-y-auto w-full min-w-0">
+          <WhatsAppPendingBanner />
           {children}
         </main>
       </div>

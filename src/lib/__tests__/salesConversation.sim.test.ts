@@ -333,6 +333,16 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    id: 'iniciante',
+    title: 'Iniciante com medo: "acho complicado, nem tenho WhatsApp Business"',
+    prospect: lavaRapido,
+    customer: ['achei legal mas acho complicado pra mim, nem tenho whatsapp business ainda'],
+    checks: (r) => [
+      ['Ofereceu testar a atendente no painel antes de conectar', said(r, /test|simul|convers/i) && said(r, /painel|antes de conectar|depois/i)],
+      ['Disse que a conexão pode ficar para depois', said(r, /depois|antes (de|mesmo de) (conectar|mexer)|sem conectar|sem mexer/i)],
+    ],
+  },
+  {
     id: 'fidelidade',
     title: '"Tem fidelidade? Posso cancelar?"',
     prospect: barbearia,

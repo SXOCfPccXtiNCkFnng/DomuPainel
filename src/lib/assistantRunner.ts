@@ -866,3 +866,117 @@ export async function runAssistantForTrigger(trigger: AssistantTrigger): Promise
     });
   }
 }
+
+// ───────── Simulador (página da Atendente IA) ─────────
+
+export type SimulationMessage = { from: 'cliente' | 'atendente'; text: string };
+export type SimulationResult = { ok: true; bubbles: string[]; actions: string[] } | { ok: false; error: string };
+
+/** Contato de mentira do simulador: não bate com nenhum cliente de verdade. */
+const SIM_LEAD_ID = '00000000-0000-0000-0000-000000000000';
+const SIM_PHONE = '5500000000000';
+
+const dayMonth = (dateKey: unknown) => String(dateKey || '').split('-').reverse().slice(0, 2).join('/');
+
+/**
+ * No simulador, as ferramentas que gravam ou avisam alguém só fingem (com as
+ * mesmas conferências de horário livre e de valor do pedido); as de consulta
+ * leem os dados de verdade (agenda, cardápio, catálogo).
+ */
+export async function simulateTool(
+  name: string,
+  args: Record<string, unknown>,
+  real: ToolKit['execute'],
+  actions: string[]
+): Promise<Record<string, unknown>> {
+  switch (name) {
+    case 'agendar': {
+      const check = await real('consultar_horarios_livres', { servico: args.servico, data: args.data });
+      if (check.erro) return { ok: false, ...check };
+      const free = (check.horarios_livres as string[] | undefined) || [];
+      if (!free.includes(String(args.horario))) return { ok: false, erro: 'Esse horário não está livre. Ofereça os horários livres.' };
+      actions.push(`Marcaria ${check.servico} em ${dayMonth(args.data)} às ${args.horario}`);
+      return {
+        ok: true,
+        agendamento: { id: 'teste', servico: check.servico, data: args.data, dia_da_semana: check.dia_da_semana, horario: args.horario },
+      };
+    }
+    case 'cancelar_agendamento':
+      return { ok: false, erro: 'Agendamento não encontrado.' };
+    case 'registrar_pedido': {
+      const calc = await real('calcular_pedido', args);
+      if (!calc.ok) return calc;
+      actions.push(`Mandaria o pedido para a cozinha (${calc.total})`);
+      return { ok: true, pedido: { numero: 'TESTE', total: calc.total, tipo: args.tipo } };
+    }
+    case 'solicitar_visita':
+      actions.push(`Pediria visita ao imóvel ${args.imovel_codigo || ''}${args.preferencia ? ` (${args.preferencia})` : ''}`);
+      return { ok: true, visita: { imovel: args.imovel_codigo, preferencia: args.preferencia } };
+    case 'registrar_interesse':
+      actions.push('Anotaria o que o cliente procura');
+      return { ok: true };
+    case 'chamar_equipe':
+    case 'chamar_corretor':
+    case 'perguntar_equipe':
+      actions.push(`Avisaria a equipe: ${String(args.motivo || args.pergunta || 'cliente precisa de atendimento')}`);
+      return { ok: true, observacao: 'Equipe avisada. Diga ao cliente que alguém responde por aqui.' };
+    default:
+      return real(name, args);
+  }
+}
+
+/**
+ * Conversa de teste com a atendente da conta, sem WhatsApp: mesmo prompt,
+ * mesmas regras e as consultas de verdade, mas nada é gravado, enviado ou
+ * contado nas métricas e na cota. Vale mesmo com a atendente desligada.
+ */
+export async function runAssistantSimulation(tenantId: string, messages: SimulationMessage[], now: Date = new Date()): Promise<SimulationResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { ok: false, error: 'A IA ainda não está configurada.' };
+  const [{ data: tenant }, { data: settingsRow }, { data: sub }] = await Promise.all([
+    supabaseAdmin.from('tenants').select('name, segment').eq('id', tenantId).maybeSingle(),
+    supabaseAdmin.from('assistant_settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
+    supabaseAdmin.from('subscriptions').select('plan_tier').eq('tenant_id', tenantId).maybeSingle(),
+  ]);
+  const vertical = tenant ? assistantVertical(tenant.segment) : null;
+  if (!tenant || !vertical) return { ok: false, error: 'A atendente virtual não está disponível para o ramo desta conta.' };
+
+  const last = messages[messages.length - 1];
+  const history: HistoryMessage[] = messages.map((m, i) => ({
+    direction: m.from === 'cliente' ? 'INBOUND' : 'OUTBOUND',
+    sender_type: m.from === 'cliente' ? null : ASSISTANT_SENDER_TYPE,
+    body: m.text,
+    created_at: new Date(now.getTime() - (messages.length - i) * 1000).toISOString(),
+  }));
+  const settings = assistantSettingsFromRow(settingsRow);
+  const setup = await prepareVertical(vertical, {
+    tenantId,
+    leadId: SIM_LEAD_ID,
+    leadPhone: SIM_PHONE,
+    leadName: 'Cliente',
+    companyName: tenant.name || 'a loja',
+    lastCustomerMessage: last?.text || '',
+    now,
+    settings,
+    planTier: sub?.plan_tier ?? null,
+  });
+
+  const actions: string[] = [];
+  const toolkit: ToolKit = {
+    declarations: setup.toolkit.declarations,
+    execute: (name, args) => simulateTool(name, args, setup.toolkit.execute, actions),
+  };
+  const usage = emptyUsage();
+  const toolLog: ToolCall[] = [];
+  const effects: ToolEffects = { booked: [], visits: [], orders: [], cancelled: 0, handoff: false };
+  const reply = await generateReply(apiKey, setup.systemPrompt, toGeminiContents(history), toolkit, tenantId, Date.now() + 40_000, usage, toolLog, effects);
+  logger.info('assistant.simulation', { tenantId, aiCalls: usage.calls, costUsd: costUsd(usage, GEMINI_MODEL) });
+
+  let bubbles = reply ? splitReply(reply) : [];
+  if (!bubbles.length) {
+    const fallback = fallbackReplyForEffects(effects);
+    if (fallback) bubbles = [fallback];
+  }
+  if (!bubbles.length) return { ok: false, error: 'A atendente não conseguiu responder agora. Tente de novo.' };
+  return { ok: true, bubbles, actions };
+}

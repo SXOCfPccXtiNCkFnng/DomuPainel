@@ -1334,16 +1334,37 @@ export default function OnboardingPage() {
                 <span>Voltar</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleAdvanceFromStep4}
-                className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2 disabled:opacity-50"
-                disabled={!isConnectedSimulated}
-              >
-                <span>Continuar</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-3">
+                {!isConnectedSimulated && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Quem ainda não tem o WhatsApp Business pronto segue e conecta depois pelo painel.
+                      setStep4Error('');
+                      setCurrentStep(5);
+                    }}
+                    className="text-sm font-semibold text-slate-600 hover:text-slate-900 underline underline-offset-4"
+                  >
+                    Conectar depois
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleAdvanceFromStep4}
+                  className="btn-domu-primary text-sm py-3 px-6 flex items-center gap-2 disabled:opacity-50"
+                  disabled={!isConnectedSimulated}
+                >
+                  <span>Continuar</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+            {!isConnectedSimulated && (
+              <p className="text-xs text-slate-500 text-right">
+                Pode conectar depois em Configurações. A atendente e as campanhas começam a funcionar depois da conexão;
+                até lá, você testa a atendente direto no painel.
+              </p>
+            )}
           </div>
         )}
 
