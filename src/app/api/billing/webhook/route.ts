@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import {
   activatePaidPayment,
+  countIntroDiscountPayment,
   discardPendingPlanChange,
   mapAsaasPaymentStatusToSubscription,
   mapAsaasSubscriptionStatus,
@@ -229,6 +230,12 @@ export async function POST(req: NextRequest) {
             paymentSubscriptionId: paymentSubId,
             fallbackPaymentMethod: source.billingType,
           });
+          // Desconto de entrada: conta esta mensalidade e, na última, volta ao preço cheio.
+          try {
+            await countIntroDiscountPayment(tenantId, payment.id, paymentSubId);
+          } catch (err) {
+            logger.error('billing.intro_discount_failed', { tenantId, message: err instanceof Error ? err.message : String(err) });
+          }
         } else if ((mapped === 'PAST_DUE' || mapped === 'CANCELED') && isPendingPlanPayment) {
           // Pix do upgrade venceu/foi cancelado: descarta só a troca, o plano atual segue ativo.
           await discardPendingPlanChange(tenantId, current);

@@ -151,13 +151,15 @@ export async function asaasCancelSubscription(subscriptionId: string): Promise<v
 }
 
 /** Atualiza o valor cobrado de uma assinatura já ativa (próximas cobranças passam a usar esse valor). */
+/** Muda o valor da assinatura. updatePendingPayments: também as cobranças já geradas e ainda não pagas. */
 export async function asaasUpdateSubscriptionValue(
   subscriptionId: string,
-  value: number
+  value: number,
+  opts?: { updatePendingPayments?: boolean }
 ): Promise<AsaasSubscription> {
   return asaasFetch<AsaasSubscription>(`/subscriptions/${subscriptionId}`, {
     method: 'PUT',
-    body: JSON.stringify({ value: Number(value.toFixed(2)) }),
+    body: JSON.stringify({ value: Number(value.toFixed(2)), ...(opts?.updatePendingPayments ? { updatePendingPayments: true } : {}) }),
   });
 }
 

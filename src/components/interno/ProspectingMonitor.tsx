@@ -17,6 +17,7 @@ import type { TenantSegment } from '@/types';
 import {
   DEFAULT_CITIES,
   DEFAULT_KIND_TEMPLATES,
+  withSalesPromo,
   DEFAULT_TEMPLATES,
   PROSPECT_KINDS,
   PROSPECT_STATUSES,
@@ -320,7 +321,9 @@ export default function ProspectingMonitor() {
     const number = whatsappNumber(p.phone_intl || p.phone);
     if (!number) return;
     // Sua mensagem do módulo (editada aqui) vale primeiro; senão, a pronta do tipo (barbearia, pizzaria...).
-    const text = fillTemplate(templates[p.module] || DEFAULT_KIND_TEMPLATES[p.kind] || templateFor(p.module), { nome: p.name, cidade: p.city });
+    const text = withSalesPromo(
+      fillTemplate(templates[p.module] || DEFAULT_KIND_TEMPLATES[p.kind] || templateFor(p.module), { nome: p.name, cidade: p.city })
+    );
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     if (p.status === 'NEW') patch([p.id], { status: 'CONTACTED', markContacted: true });
   };

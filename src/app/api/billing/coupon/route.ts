@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/requireAuth';
-import { canUseFreeDaysCoupon, computeSubscriptionPrice, couponFreeDays, findActiveCoupon } from '@/lib/billing';
+import { canUseFreeDaysCoupon, computeSubscriptionPrice, couponFreeDays, couponSummaryText, findActiveCoupon } from '@/lib/billing';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { getTenantPlanPrice } from '@/lib/planPricing';
 
@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
         description: found.coupon.description,
       },
       price,
+      // Frase pronta para a tela (dias grátis, desconto de entrada e preço depois).
+      summary: couponSummaryText(price),
     });
   } catch (error: unknown) {
     return NextResponse.json(

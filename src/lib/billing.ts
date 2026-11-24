@@ -22,6 +22,8 @@ export type CouponRow = {
   first_invoice_only: boolean;
   /** Cupom de dias grátis (sem desconto no valor). */
   free_days?: number | null;
+  /** Desconto de entrada: o % vale só nas N primeiras mensalidades pagas (junto com dias grátis). */
+  discount_months?: number | null;
   description?: string | null;
 };
 
@@ -35,6 +37,10 @@ export type PriceBreakdown = {
   /** Dias grátis antes da primeira cobrança (0 = cobra hoje). */
   freeDays: number;
   finalPrice: number;
+  /** Desconto de entrada: quantas mensalidades pagas saem por finalPrice (0 = o preço não muda depois). */
+  discountMonths: number;
+  /** Mensalidade depois do desconto de entrada (com o desconto do PIX, se for o caso). */
+  fullPrice: number;
 };
 
 export function couponFreeDays(coupon: Pick<CouponRow, 'free_days'> | null | undefined): number {
@@ -62,7 +68,7 @@ export function canUseFreeDaysCoupon(
 export function computeSubscriptionPrice(input: {
   planTier: string;
   paymentMethod: 'PIX' | 'CREDIT_CARD';
-  coupon?: Pick<CouponRow, 'code' | 'percent_off' | 'amount_off_brl' | 'free_days'> | null;
+  coupon?: Pick<CouponRow, 'code' | 'percent_off' | 'amount_off_brl' | 'free_days' | 'discount_months'> | null;
   basePrice?: number;
 }): PriceBreakdown {
   const planTier = normalizePlanTier(input.planTier);
@@ -72,10 +78,15 @@ export function computeSubscriptionPrice(input: {
   let couponAmount = 0;
   let couponCode: string | null = null;
   const freeDays = couponFreeDays(input.coupon);
+  const discountMonths = introDiscountMonths(input.coupon);
 
   if (input.coupon) {
     couponCode = input.coupon.code.toUpperCase();
-    if (freeDays > 0) {
+    if (freeDays > 0 && discountMonths > 0 && input.coupon.percent_off && input.coupon.percent_off > 0) {
+      // Desconto de entrada: dias grátis e depois X% nas primeiras mensalidades.
+      couponPercent = Number(input.coupon.percent_off);
+      price = price * (1 - couponPercent / 100);
+    } else if (freeDays > 0) {
       // Dias grátis: o valor da mensalidade não muda.
     } else if (input.coupon.percent_off && input.coupon.percent_off > 0) {
       couponPercent = Number(input.coupon.percent_off);
@@ -87,9 +98,9 @@ export function computeSubscriptionPrice(input: {
   }
 
   const pixDiscountPercent = input.paymentMethod === 'PIX' ? 5 : 0;
-  if (pixDiscountPercent > 0) {
-    price = price * (1 - pixDiscountPercent / 100);
-  }
+  const pixFactor = 1 - pixDiscountPercent / 100;
+  price = price * pixFactor;
+  const finalPrice = Math.round(price * 100) / 100;
 
   return {
     planTier,
@@ -99,8 +110,121 @@ export function computeSubscriptionPrice(input: {
     couponPercent,
     couponAmount,
     freeDays,
-    finalPrice: Math.round(price * 100) / 100,
+    finalPrice,
+    discountMonths: couponPercent > 0 && discountMonths > 0 ? discountMonths : 0,
+    fullPrice: couponPercent > 0 && discountMonths > 0 ? Math.round(listPrice * pixFactor * 100) / 100 : finalPrice,
   };
+}
+
+/** Mensalidades com desconto de entrada (1 a 12) ou 0. */
+export function introDiscountMonths(coupon: Pick<CouponRow, 'discount_months'> | null | undefined): number {
+  const n = Math.floor(Number(coupon?.discount_months || 0));
+  return n >= 1 && n <= 12 ? n : 0;
+}
+
+const brlText = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
+/** Frase do cupom para o cliente ("15 dias grátis, depois R$ 75/mês nos 2 primeiros meses e R$ 150/mês depois"). */
+export function couponSummaryText(price: PriceBreakdown): string {
+  const after = price.discountMonths
+    ? `${brlText(price.finalPrice)}/mês nos ${price.discountMonths === 1 ? 'primeiro mês' : `${price.discountMonths} primeiros meses`} e ${brlText(price.fullPrice)}/mês depois`
+    : `${brlText(price.finalPrice)}/mês`;
+  return price.freeDays ? `${price.freeDays} dias grátis, depois ${after}` : after;
+}
+
+/** Linha de public.subscriptions com o desconto de entrada. */
+export type IntroDiscountRow = {
+  asaas_subscription_id?: string | null;
+  intro_discount_payments_left?: number | null;
+  intro_full_price_brl?: number | string | null;
+  intro_last_payment_id?: string | null;
+};
+
+/**
+ * O que fazer quando uma mensalidade é paga: conta mais uma com desconto e,
+ * na última, manda voltar ao preço cheio. Reentrega do mesmo pagamento e
+ * pagamento de outra assinatura não contam.
+ */
+export function nextIntroDiscountStep(
+  row: IntroDiscountRow | null | undefined,
+  paymentId: string,
+  paymentSubscriptionId: string | null
+): { action: 'none' } | { action: 'count'; left: number } | { action: 'restore'; fullPrice: number } {
+  const left = Number(row?.intro_discount_payments_left || 0);
+  if (!row || left <= 0) return { action: 'none' };
+  if (row.intro_last_payment_id === paymentId) return { action: 'none' };
+  if (paymentSubscriptionId && row.asaas_subscription_id && paymentSubscriptionId !== row.asaas_subscription_id) return { action: 'none' };
+  if (left > 1) return { action: 'count', left: left - 1 };
+  const fullPrice = Number(row.intro_full_price_brl);
+  return Number.isFinite(fullPrice) && fullPrice > 0 ? { action: 'restore', fullPrice } : { action: 'none' };
+}
+
+const isMissingColumn = (error: { code?: string; message?: string } | null) =>
+  Boolean(error && (error.code === '42703' || error.code === 'PGRST204' || /intro_/.test(error.message || '')));
+
+/** Grava na assinatura o desconto de entrada do cupom (depois do checkout com dias grátis). */
+export async function saveIntroDiscount(tenantId: string, price: PriceBreakdown): Promise<void> {
+  if (!price.discountMonths) return;
+  const { error } = await supabaseAdmin
+    .from('subscriptions')
+    .update({
+      intro_discount_payments_left: price.discountMonths,
+      intro_full_price_brl: price.fullPrice,
+      intro_last_payment_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId);
+  if (error) {
+    // Sem a migration o desconto valeria para sempre: avisa alto para rodar.
+    console.error('[billing] desconto de entrada não gravado (rode 20261124_intro_discount.sql):', error.message);
+  }
+}
+
+/**
+ * Mensalidade paga: conta o desconto de entrada e, depois da última com
+ * desconto, volta a assinatura para o preço cheio na Asaas (as cobranças já
+ * geradas para frente também) e avisa o cliente. Nunca derruba o webhook.
+ */
+export async function countIntroDiscountPayment(tenantId: string, paymentId: string, paymentSubscriptionId: string | null): Promise<void> {
+  const { data, error } = await supabaseAdmin
+    .from('subscriptions')
+    .select('asaas_subscription_id, intro_discount_payments_left, intro_full_price_brl, intro_last_payment_id')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (error) {
+    if (!isMissingColumn(error)) console.error('[billing] desconto de entrada:', error.message);
+    return;
+  }
+  const row = data as IntroDiscountRow | null;
+  const step = nextIntroDiscountStep(row, paymentId, paymentSubscriptionId);
+  if (step.action === 'none') return;
+  const now = new Date().toISOString();
+  if (step.action === 'count') {
+    await supabaseAdmin
+      .from('subscriptions')
+      .update({ intro_discount_payments_left: step.left, intro_last_payment_id: paymentId, updated_at: now })
+      .eq('tenant_id', tenantId);
+    return;
+  }
+  const { asaasUpdateSubscriptionValue, isBillingMockEnabled } = await import('@/lib/asaasClient');
+  if (!isBillingMockEnabled() && row?.asaas_subscription_id) {
+    await asaasUpdateSubscriptionValue(row.asaas_subscription_id, step.fullPrice, { updatePendingPayments: true });
+  }
+  await supabaseAdmin
+    .from('subscriptions')
+    .update({
+      monthly_price_brl: step.fullPrice,
+      intro_discount_payments_left: 0,
+      intro_last_payment_id: paymentId,
+      updated_at: now,
+    })
+    .eq('tenant_id', tenantId);
+  await notifyTenantAdmins(tenantId, {
+    title: 'Seu desconto de entrada terminou',
+    message: `Obrigado por continuar com a Domu! A partir da próxima mensalidade o valor volta para ${brlText(step.fullPrice)}/mês.`,
+    type: 'INFO',
+    url: '/assinatura',
+  });
 }
 
 /**

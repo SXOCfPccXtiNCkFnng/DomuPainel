@@ -68,8 +68,12 @@ const PLANS: SalesPlanGroup[] = SALES_SEGMENTS.map(({ segment, label }) => ({
     features: planFeatures(segment, tier),
   })),
 }));
-const PRICES = TIERS.flatMap((t) => [PLAN_PRICES_BRL[t], Math.round(PLAN_PRICES_BRL[t] * 0.95)]);
-const COUPON: SalesCoupon = { code: 'DOMU15', freeDays: 15, percentOff: 0, amountOff: 0 };
+// Preço cheio, no PIX e com os 50% da Black Friday (com e sem PIX).
+const PRICES = TIERS.flatMap((t) => {
+  const p = PLAN_PRICES_BRL[t];
+  return [p, Math.round(p * 0.95), Math.round(p * 0.5), Math.round(p * 0.5 * 0.95), Math.round(p * 0.5 * 100) / 100, Math.round(p * 0.475 * 100) / 100];
+});
+const COUPON: SalesCoupon = { code: 'BLACK50', freeDays: 15, percentOff: 50, amountOff: 0, discountMonths: 2, validUntil: '2026-12-07' };
 const NOW = new Date('2026-11-24T15:00:00Z');
 
 // ───────── Conversa com o Gemini ─────────
@@ -179,7 +183,7 @@ const all = (r: RunResult) => r.replies.join('\n');
 const called = (r: RunResult, name: string) => r.calls.some((c) => c.name === name);
 const PRICE_RE = /R\$\s?([\d.]+)(?:,\d{2})?/g;
 const onlyRealPrices = (r: RunResult) =>
-  [...all(r).matchAll(PRICE_RE)].every((m) => PRICES.includes(Number(m[1].replace(/\./g, ''))));
+  [...all(r).matchAll(PRICE_RE)].every((m) => PRICES.some((p) => Math.floor(p) === Number(m[1].replace(/\./g, ''))));
 
 /** Regras que valem em toda conversa. */
 const always = (r: RunResult): [string, boolean][] => [
@@ -206,7 +210,9 @@ const SCENARIOS: Scenario[] = [
       ['Falou de agenda / marcar horário', said(r, /agend|hor[áa]rio/i)],
       ['Não falou de cardápio nem de imóveis', !said(r, /card[áa]pio|im[óo]ve/i)],
       ['Juntou o teste grátis ao preço', r.replies[1] ? /15 dias|gr[áa]tis|teste/i.test(r.replies[1]) : false],
-      ['Mandou o link e o cupom', said(r, /painel\.domutech\.digital\/cadastro/) && said(r, /DOMU15/)],
+      ['Mandou o link e o cupom', said(r, /painel\.domutech\.digital\/cadastro/) && said(r, /BLACK50/)],
+      ['Na primeira explicação falou das Dicas / de vender mais', /dica|vende mais|vender mais|mais vend|crescer|onde (est[áa] )?(perdendo|melhorar)/i.test(r.replies[0] || '')],
+      ['No preço citou a oferta (15 dias + 50%)', /50\s?%|metade/i.test(r.replies[1] || '') && /15 dias|gr[áa]tis/i.test(r.replies[1] || '')],
       ['Avisou o Alan do interesse', called(r, 'avisar_interesse')],
     ],
   },
@@ -284,7 +290,7 @@ const SCENARIOS: Scenario[] = [
     customer: ['vc é robo?'],
     checks: (r) => [
       ['Foi honesta (atendente virtual / IA)', said(r, /virtual|intelig[êe]ncia artificial|\bIA\b|rob[ôo]/i)],
-      ['Se apresentou como Júlia', said(r, /J[úu]lia/)],
+      ['Se apresentou como Helena', said(r, /Helena/)],
     ],
   },
   {

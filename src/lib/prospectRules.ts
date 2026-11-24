@@ -267,7 +267,25 @@ export function placeToProspect(p: PlacesPlace, kind: ProspectKind, searchCity: 
 // ───────── Mensagens prontas ─────────
 
 /** Nome da vendedora da Domu: assina a abordagem e é quem continua a conversa. */
-export const SALES_AGENT_NAME = 'Júlia';
+export const SALES_AGENT_NAME = 'Helena';
+
+/**
+ * Linha de promoção da abordagem enquanto a campanha valer (vai antes da
+ * pergunta final). Para trocar a campanha, mude o texto e a data aqui.
+ */
+export const SALES_PROMO = {
+  line: 'E nesta Black Friday estamos com uma condição especial de lançamento, válida até 7/12.',
+  until: '2026-12-07',
+};
+
+/** Coloca a linha da promoção antes da pergunta final (só até o último dia da campanha). */
+export function withSalesPromo(text: string, now: Date = new Date(), promo = SALES_PROMO): string {
+  const today = now.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  if (!promo.line || today > promo.until) return text;
+  const cut = text.lastIndexOf('. ');
+  if (cut < 0 || !text.trim().endsWith('?')) return `${text} ${promo.line}`;
+  return `${text.slice(0, cut + 1)} ${promo.line}${text.slice(cut + 1)}`;
+}
 
 /** Mensagem pronta por módulo (quando o tipo do estabelecimento não tem uma própria). */
 export const DEFAULT_TEMPLATES: Record<TenantSegment, string> = {

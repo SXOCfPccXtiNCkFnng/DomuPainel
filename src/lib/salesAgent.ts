@@ -85,7 +85,16 @@ export function salesNotifyPhone(): string | null {
 
 // ───────── Conhecimento que muda (planos e cupom) ─────────
 
-export type SalesCoupon = { code: string; freeDays: number; percentOff: number; amountOff: number };
+export type SalesCoupon = {
+  code: string;
+  freeDays: number;
+  percentOff: number;
+  amountOff: number;
+  /** Desconto de entrada: o % vale nas N primeiras mensalidades (0 = sem). */
+  discountMonths?: number;
+  /** Último dia para usar o cupom (AAAA-MM-DD, Brasília), se tiver. */
+  validUntil?: string | null;
+};
 
 /** Cupom que a IA pode oferecer (DOMU_SALES_COUPON), só se estiver ativo de verdade. */
 export async function loadSalesCoupon(): Promise<SalesCoupon | null> {
@@ -102,6 +111,8 @@ export async function loadSalesCoupon(): Promise<SalesCoupon | null> {
     freeDays: couponFreeDays(c),
     percentOff: Number(c.percent_off || 0),
     amountOff: Number(c.amount_off_brl || 0),
+    discountMonths: Math.max(0, Math.floor(Number(c.discount_months || 0))),
+    validUntil: c.expires_at ? new Date(c.expires_at).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null,
   };
 }
 

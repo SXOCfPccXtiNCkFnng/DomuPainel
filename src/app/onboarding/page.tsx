@@ -475,9 +475,11 @@ export default function OnboardingPage() {
       );
       setCouponFinalPrice(data.price.finalPrice);
       setCouponMessage(
-        data.coupon.freeDays
-          ? `Cupom ${data.coupon.code} aplicado · ${data.coupon.freeDays} dias grátis, depois R$ ${data.price.finalPrice}/mês`
-          : `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
+        data.summary
+          ? `Cupom ${data.coupon.code} aplicado · ${data.summary}`
+          : data.coupon.freeDays
+            ? `Cupom ${data.coupon.code} aplicado · ${data.coupon.freeDays} dias grátis, depois R$ ${data.price.finalPrice}/mês`
+            : `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
       );
     } catch {
       setCouponMessage('Não foi possível validar o cupom.');

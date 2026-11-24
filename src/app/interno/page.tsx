@@ -40,6 +40,7 @@ type CouponRow = {
   code: string;
   percent_off: number | null;
   free_days?: number | null;
+  discount_months?: number | null;
   active: boolean;
   max_redemptions: number | null;
   redemption_count: number;
@@ -203,8 +204,10 @@ export default function InternoPage() {
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
   const [couponCode, setCouponCode] = useState('');
   const [couponPercent, setCouponPercent] = useState('100');
-  const [couponKind, setCouponKind] = useState<'percent' | 'days'>('percent');
+  const [couponKind, setCouponKind] = useState<'percent' | 'days' | 'intro'>('percent');
   const [couponDays, setCouponDays] = useState('15');
+  const [couponMonths, setCouponMonths] = useState('2');
+  const [couponExpires, setCouponExpires] = useState('');
   const [couponMax, setCouponMax] = useState('5');
   const [couponMsg, setCouponMsg] = useState('');
   const [grantBusy, setGrantBusy] = useState<string | null>(null);
@@ -291,16 +294,26 @@ export default function InternoPage() {
     const res = await fetch('/api/interno/coupons', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(
-        couponKind === 'days'
+      body: JSON.stringify({
+        ...(couponKind === 'days'
           ? { code: couponCode, freeDays: Number(couponDays), maxRedemptions: couponMax === '' ? null : Number(couponMax) }
-          : {
-              code: couponCode,
-              percentOff: Number(couponPercent),
-              maxRedemptions: couponMax === '' ? null : Number(couponMax),
-              description: Number(couponPercent) >= 100 ? 'Cortesia / teste' : undefined,
-            }
-      ),
+          : couponKind === 'intro'
+            ? {
+                code: couponCode,
+                freeDays: Number(couponDays),
+                percentOff: Number(couponPercent),
+                discountMonths: Number(couponMonths),
+                maxRedemptions: couponMax === '' ? null : Number(couponMax),
+              }
+            : {
+                code: couponCode,
+                percentOff: Number(couponPercent),
+                maxRedemptions: couponMax === '' ? null : Number(couponMax),
+                description: Number(couponPercent) >= 100 ? 'Cortesia / teste' : undefined,
+              }),
+        // Válido até o fim do dia escolhido (horário de Brasília).
+        ...(couponExpires ? { expiresAt: `${couponExpires}T23:59:59-03:00` } : {}),
+      }),
     });
     const json = await res.json();
     if (!json.success) {
@@ -1038,14 +1051,55 @@ export default function InternoPage() {
                 Tipo
                 <select
                   value={couponKind}
-                  onChange={(e) => setCouponKind(e.target.value as 'percent' | 'days')}
-                  className="mt-1 block w-36 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  onChange={(e) => {
+                    const kind = e.target.value as 'percent' | 'days' | 'intro';
+                    setCouponKind(kind);
+                    if (kind === 'intro' && Number(couponPercent) >= 100) setCouponPercent('50');
+                  }}
+                  className="mt-1 block w-48 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
                 >
                   <option value="percent">% de desconto</option>
                   <option value="days">Dias grátis</option>
+                  <option value="intro">Dias grátis + % nos primeiros meses</option>
                 </select>
               </label>
-              {couponKind === 'percent' ? (
+              {couponKind === 'intro' ? (
+                <>
+                  <label className="text-xs font-bold text-slate-600">
+                    Dias grátis
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={couponDays}
+                      onChange={(e) => setCouponDays(e.target.value)}
+                      className="mt-1 block w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    % desconto
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={couponPercent}
+                      onChange={(e) => setCouponPercent(e.target.value)}
+                      className="mt-1 block w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">
+                    Meses com desconto
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={couponMonths}
+                      onChange={(e) => setCouponMonths(e.target.value)}
+                      className="mt-1 block w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                </>
+              ) : couponKind === 'percent' ? (
                 <label className="text-xs font-bold text-slate-600">
                   % desconto
                   <select
@@ -1072,6 +1126,15 @@ export default function InternoPage() {
                   />
                 </label>
               )}
+              <label className="text-xs font-bold text-slate-600">
+                Válido até
+                <input
+                  type="date"
+                  value={couponExpires}
+                  onChange={(e) => setCouponExpires(e.target.value)}
+                  className="mt-1 block w-36 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                />
+              </label>
               <label className="text-xs font-bold text-slate-600">
                 Usos máx.
                 <input
@@ -1102,7 +1165,18 @@ export default function InternoPage() {
                     <tr key={c.code} className="border-t border-slate-100">
                       <td className="py-2 font-mono font-bold">{c.code}</td>
                       <td className="py-2">
-                        {c.free_days ? `${c.free_days} dias grátis` : c.percent_off != null ? `${c.percent_off}%` : '—'}
+                        {c.free_days && c.discount_months
+                          ? `${c.free_days} dias grátis + ${c.percent_off}% nos ${c.discount_months} primeiros meses`
+                          : c.free_days
+                            ? `${c.free_days} dias grátis`
+                            : c.percent_off != null
+                              ? `${c.percent_off}%`
+                              : '—'}
+                        {c.expires_at ? (
+                          <span className="block text-[10.5px] text-slate-400">
+                            até {new Date(c.expires_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="py-2 text-slate-600">
                         {c.redemption_count}

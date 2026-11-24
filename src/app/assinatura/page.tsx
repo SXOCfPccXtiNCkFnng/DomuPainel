@@ -222,9 +222,11 @@ export default function AssinaturaPage() {
             : `R$ ${data.coupon.amountOffBrl} off`
       );
       setModalCouponMsg(
-        data.coupon.freeDays
-          ? `Cupom ${data.coupon.code} aplicado · ${data.coupon.freeDays} dias grátis, depois R$ ${data.price.finalPrice}/mês`
-          : `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
+        data.summary
+          ? `Cupom ${data.coupon.code} aplicado · ${data.summary}`
+          : data.coupon.freeDays
+            ? `Cupom ${data.coupon.code} aplicado · ${data.coupon.freeDays} dias grátis, depois R$ ${data.price.finalPrice}/mês`
+            : `Cupom ${data.coupon.code} aplicado · R$ ${data.price.finalPrice}/mês`
       );
       setModalPriceLabel(`R$ ${data.price.finalPrice}`);
     } catch {

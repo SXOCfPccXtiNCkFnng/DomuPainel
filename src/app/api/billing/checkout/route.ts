@@ -7,6 +7,8 @@ import {
   activateTenantSubscription,
   canUseFreeDaysCoupon,
   isActiveSubscription,
+  couponSummaryText,
+  saveIntroDiscount,
   type SubscriptionRow,
 } from '@/lib/billing';
 import { getPlanMonthlyLimit, isPlanAllowedForSegment, normalizePlanTier } from '@/lib/planLimits';
@@ -336,6 +338,7 @@ export async function POST(req: NextRequest) {
         asaasCustomerId: 'mock_cus',
         asaasSubscriptionId: 'mock_sub',
       });
+      if (price.freeDays > 0) await saveIntroDiscount(tenantId, price);
 
       return NextResponse.json({
         success: true,
@@ -421,6 +424,8 @@ export async function POST(req: NextRequest) {
         status: 'TRIAL',
         periodDays: price.freeDays,
       });
+      // Desconto de entrada (ex.: 50% nos 2 primeiros meses): o webhook volta ao preço cheio depois.
+      await saveIntroDiscount(tenantId, price);
       return NextResponse.json({
         success: true,
         mock: false,
@@ -428,7 +433,7 @@ export async function POST(req: NextRequest) {
         price,
         status: 'TRIAL',
         isOnboarded: true,
-        message: `Cupom aplicado: ${price.freeDays} dias grátis. A primeira cobrança vence só no fim do período.`,
+        message: `Cupom aplicado: ${couponSummaryText(price)}. A primeira cobrança vence só no fim do período.`,
       });
     }
 
