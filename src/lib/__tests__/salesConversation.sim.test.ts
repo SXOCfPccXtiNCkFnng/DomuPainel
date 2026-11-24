@@ -39,7 +39,7 @@ import { buildSalesSystemPrompt } from '../salesPrompt';
 import { executeSalesTool, salesToolDeclarations } from '../salesTools';
 import { planBlurb, planFeatures } from '../planFeatures';
 import { getPlanDisplayName, PLAN_PRICES_BRL, type PlanTier } from '../planLimits';
-import { DEFAULT_TEMPLATES, fillTemplate } from '../prospectRules';
+import { DEFAULT_KIND_TEMPLATES, DEFAULT_TEMPLATES, fillTemplate, PROSPECT_KINDS } from '../prospectRules';
 import type { TenantSegment } from '@/types';
 
 // ───────── Chave da IA (do .env.local, sem imprimir) ─────────
@@ -131,7 +131,10 @@ async function runScenario(s: Scenario): Promise<RunResult> {
   };
   // Como em produção: a abordagem do Alan é a primeira mensagem (nossa) do histórico.
   const approach = p
-    ? fillTemplate(DEFAULT_TEMPLATES[p.segment] || DEFAULT_TEMPLATES.geral, { nome: p.name, cidade: p.city })
+    ? fillTemplate(
+        DEFAULT_KIND_TEMPLATES[PROSPECT_KINDS.find((k) => k.label === p.kind)?.id || ''] || DEFAULT_TEMPLATES[p.segment] || DEFAULT_TEMPLATES.geral,
+        { nome: p.name, cidade: p.city }
+      )
     : 'Oi, tudo bem? Aqui é da Domu. A gente ajuda negócios a atender e vender mais pelo WhatsApp oficial. Posso te mostrar como funciona?';
   const history: Turn[] = [
     { role: 'user', parts: [{ text: '(início da conversa)' }] },
@@ -279,7 +282,10 @@ const SCENARIOS: Scenario[] = [
     title: '"Você é robô?"',
     prospect: lavaRapido,
     customer: ['vc é robo?'],
-    checks: (r) => [['Foi honesta (atendente virtual / IA)', said(r, /virtual|intelig[êe]ncia artificial|\bIA\b|rob[ôo]/i)]],
+    checks: (r) => [
+      ['Foi honesta (atendente virtual / IA)', said(r, /virtual|intelig[êe]ncia artificial|\bIA\b|rob[ôo]/i)],
+      ['Se apresentou como Júlia', said(r, /J[úu]lia/)],
+    ],
   },
   {
     id: 'sem-interesse',

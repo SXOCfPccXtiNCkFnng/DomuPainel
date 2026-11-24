@@ -16,6 +16,7 @@ import {
 import type { TenantSegment } from '@/types';
 import {
   DEFAULT_CITIES,
+  DEFAULT_KIND_TEMPLATES,
   DEFAULT_TEMPLATES,
   PROSPECT_KINDS,
   PROSPECT_STATUSES,
@@ -318,7 +319,8 @@ export default function ProspectingMonitor() {
   const openWhatsApp = (p: Prospect) => {
     const number = whatsappNumber(p.phone_intl || p.phone);
     if (!number) return;
-    const text = fillTemplate(templateFor(p.module), { nome: p.name, cidade: p.city });
+    // Sua mensagem do módulo (editada aqui) vale primeiro; senão, a pronta do tipo (barbearia, pizzaria...).
+    const text = fillTemplate(templates[p.module] || DEFAULT_KIND_TEMPLATES[p.kind] || templateFor(p.module), { nome: p.name, cidade: p.city });
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     if (p.status === 'NEW') patch([p.id], { status: 'CONTACTED', markContacted: true });
   };
@@ -494,7 +496,7 @@ export default function ProspectingMonitor() {
         {showTemplates ? (
           <div className="px-4 pb-4 space-y-3">
             <p className="text-[11px] text-slate-500">
-              Use <code>{'{nome}'}</code> para o nome do estabelecimento e <code>{'{cidade}'}</code> para a cidade. Fica salvo neste navegador.
+              Use <code>{'{nome}'}</code> para o nome do estabelecimento, <code>{'{cidade}'}</code> para a cidade e <code>{'{atendente}'}</code> para o nome da vendedora. Sem edição, cada tipo (barbearia, pizzaria, dentista...) usa a própria mensagem pronta. Fica salvo neste navegador.
             </p>
             {MODULES.map((module) => (
               <label key={module} className="block">
