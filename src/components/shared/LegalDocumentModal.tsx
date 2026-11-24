@@ -21,12 +21,50 @@ export function TermsBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">2. Descrição do serviço</h4>
         <p>
-          A Plataforma oferece ferramentas de disparo de mensagens, automação de atendimento, gestão de contatos
-          (leads) e relatórios, integradas à WhatsApp Business Platform (Meta Cloud API). A Plataforma depende de
-          serviços de terceiros — Meta (WhatsApp), Asaas (pagamentos) e provedores de e-mail — cuja
-          disponibilidade não está sob nosso controle. Podemos alterar, melhorar ou descontinuar funcionalidades
-          da Plataforma a qualquer momento, buscando sempre comunicar mudanças relevantes com antecedência
-          razoável.
+          A Plataforma oferece, conforme o ramo e o plano contratados: atendente virtual que responde os clientes
+          do contratante no WhatsApp com uso de inteligência artificial; agenda de serviços com lembretes;
+          recebimento de pedidos de delivery e quadro de pedidos; catálogo de imóveis, leads e pedidos de visita;
+          campanhas e follow-up de mensagens; financeiro; métricas, dicas e inteligência de vendas; e relatórios.
+          Tudo integrado à WhatsApp Business Platform (Meta Cloud API).
+        </p>
+        <p>
+          A Plataforma depende de serviços de terceiros, como Meta (WhatsApp), Google (modelo de inteligência
+          artificial), Asaas (pagamentos), provedores de hospedagem, de e-mail e de proteção contra robôs, cuja
+          disponibilidade e políticas não estão sob nosso controle. Podemos alterar, melhorar ou descontinuar
+          funcionalidades a qualquer momento, buscando comunicar mudanças relevantes com antecedência razoável.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">2.1. WhatsApp e conta na Meta</h4>
+        <p>
+          O número de WhatsApp e a conta comercial na Meta são do contratante, que deve cumprir as Políticas
+          Comerciais e de Mensagens do WhatsApp. A conexão pode ser feita em coexistência (o aplicativo WhatsApp
+          Business continua funcionando no celular) ou com número dedicado. Modelos de mensagem (templates)
+          dependem de aprovação da Meta, e a qualidade do número e os limites de envio são definidos pela Meta.
+          A Domu Tech não tem como reverter bloqueios, restrições ou reprovações aplicados pela Meta.
+        </p>
+      </section>
+      <section className="space-y-2">
+        <h4 className="font-bold text-slate-900">2.2. Atendente virtual e recursos de inteligência artificial</h4>
+        <p>
+          A atendente virtual e os recursos de dicas, métricas comentadas e perguntas à IA geram respostas
+          automaticamente, com base nas informações que o contratante cadastra (serviços, preços, horários,
+          cardápio, imóveis, regras e textos) e no histórico das conversas. Respostas automáticas podem conter
+          erros, imprecisões ou interpretações equivocadas. Por isso, o contratante se compromete a:
+        </p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>manter corretas e atualizadas as informações que a atendente usa;</li>
+          <li>acompanhar as conversas e os agendamentos, pedidos ou visitas registrados, e assumir o atendimento quando necessário;</li>
+          <li>conferir valores, horários e condições antes de confirmar qualquer coisa ao cliente final quando houver dúvida;</li>
+          <li>informar aos seus clientes que usa atendimento automatizado, quando a lei ou as regras do seu setor exigirem.</li>
+        </ul>
+        <p>
+          A atendente não substitui profissional habilitado: não dá orientação de saúde, jurídica ou financeira,
+          não faz diagnóstico e não garante aprovação de crédito. Dicas, métricas e sugestões da inteligência de
+          vendas são apoio à decisão, calculadas a partir dos dados disponíveis na Plataforma, e não garantem
+          resultado; as decisões de negócio são do contratante. Os recursos de IA têm limites mensais de uso
+          conforme o plano (por exemplo, conversas atendidas e perguntas à IA). Mensagens de áudio recebidas
+          podem ser transcritas automaticamente para que a atendente responda ao conteúdo.
         </p>
       </section>
       <section className="space-y-2">
@@ -34,7 +72,7 @@ export function TermsBody() {
         <p>
           Você é responsável pela veracidade dos dados cadastrados, pela guarda de sua senha e por toda
           atividade realizada com sua conta. Contas são de uso da empresa contratante; usuários adicionais
-          (corretores, atendentes) podem ser convidados pelo administrador da conta, que responde pelo uso
+          (atendentes, corretores, equipe da cozinha ou do balcão) podem ser convidados pelo administrador da conta, que responde pelo uso
           feito por sua equipe, inclusive após o desligamento de algum colaborador — é responsabilidade do
           administrador remover o acesso de quem deixar a empresa.
         </p>
@@ -48,7 +86,7 @@ export function TermsBody() {
         </p>
         <p>
           Sempre que a Plataforma sugerir alguma recomendação de segurança — como usar uma senha forte e
-          exclusiva, ativar alguma camada extra de confirmação quando disponível, revisar periodicamente quem
+          exclusiva, ativar a verificação em duas etapas, revisar periodicamente quem
           tem acesso à conta, ou remover pessoas que já não fazem parte da equipe — é responsabilidade do
           contratante seguir essas recomendações. Se um problema de segurança acontecer justamente porque uma
           dessas recomendações não foi seguida, a Domu Tech não responde por esse problema.
@@ -77,8 +115,9 @@ export function TermsBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">5. Conteúdo das mensagens e conformidade</h4>
         <p>
-          O conteúdo das mensagens, campanhas, imagens e informações sobre imóveis ou serviços divulgados
-          através da Plataforma é de sua exclusiva responsabilidade — incluindo a veracidade das informações
+          O conteúdo das mensagens, campanhas, imagens, cardápios, preços e informações sobre imóveis, produtos
+          ou serviços divulgados através da Plataforma, inclusive o que a atendente virtual responde com base
+          nas informações cadastradas, é de sua exclusiva responsabilidade — incluindo a veracidade das informações
           anunciadas, o cumprimento do Código de Defesa do Consumidor, e qualquer regra específica de
           publicidade do seu setor de atuação. A Domu Tech não revisa, aprova nem se responsabiliza pelo
           conteúdo do que você envia através da Plataforma, apenas fornece a ferramenta de envio.
@@ -88,13 +127,29 @@ export function TermsBody() {
         <h4 className="font-bold text-slate-900">6. Planos, cobrança e cancelamento</h4>
         <p>
           A assinatura é mensal, recorrente e cobrada via Asaas (PIX ou cartão de crédito), conforme o plano
-          escolhido. Limites de disparo e recursos seguem a tabela vigente na Plataforma. O cancelamento pode ser
-          solicitado a qualquer momento e produz efeito ao final do período já pago; não há reembolso
-          proporcional de período já iniciado, salvo obrigação legal em contrário. Taxas cobradas diretamente
-          pela Meta (ex.: conversas iniciadas por template fora da janela gratuita) são de responsabilidade do
-          contratante, diretamente junto à Meta. Os preços dos planos podem ser reajustados; para quem já é
-          assinante, qualquer reajuste é comunicado por e-mail com no mínimo 30 dias de antecedência antes de
-          entrar em vigor na cobrança, e o cancelamento sem ônus pode ser feito a qualquer momento antes disso.
+          escolhido. Limites de disparo, conversas da atendente, usuários e demais recursos seguem a tabela
+          vigente na Plataforma. Os planos não têm fidelidade nem multa: o cancelamento pode ser feito a
+          qualquer momento pela tela de Assinatura e produz efeito ao final do período já pago, encerrando as
+          cobranças seguintes. Não há reembolso proporcional de período já iniciado, ressalvado o direito de
+          arrependimento de 7 (sete) dias da primeira contratação feita pela internet, quando aplicável nos
+          termos do Código de Defesa do Consumidor.
+        </p>
+        <p>
+          <strong>Teste grátis e descontos de entrada.</strong> Cupons de dias grátis liberam o plano sem cobrança
+          durante o período indicado; a primeira mensalidade vence no fim desse período, e quem não quiser
+          continuar deve cancelar antes do vencimento. Dias grátis valem apenas na primeira assinatura de cada
+          empresa. Cupons de desconto de entrada (por exemplo, um percentual nas primeiras mensalidades) valem
+          apenas pelo número de mensalidades pagas indicado no cupom; depois disso, a assinatura passa a ser
+          cobrada pelo preço vigente do plano, sem necessidade de novo aviso. Cupons têm validade, podem ter
+          limite de uso e não são cumulativos, salvo indicação em contrário.
+        </p>
+        <p>
+          Com a assinatura vencida ou não paga, o acesso ao painel pode continuar, mas campanhas, lembretes e a
+          atendente virtual ficam suspensos até a regularização. Taxas cobradas diretamente pela Meta (ex.:
+          mensagens de modelos de marketing) são de responsabilidade do contratante, diretamente junto à Meta, e
+          não fazem parte da mensalidade. Os preços dos planos podem ser reajustados; para quem já é assinante,
+          qualquer reajuste é comunicado por e-mail com no mínimo 30 dias de antecedência antes de entrar em
+          vigor na cobrança, e o cancelamento sem ônus pode ser feito a qualquer momento antes disso.
         </p>
       </section>
       <section className="space-y-2">
@@ -228,8 +283,17 @@ export function PrivacyBody() {
         <p>Coletamos e tratamos, principalmente:</p>
         <ul className="list-disc pl-5 space-y-1">
           <li>Dados de conta: nome, e-mail, telefone e senha.</li>
-          <li>Dados da empresa: razão comercial, segmento de atuação, número de WhatsApp.</li>
+          <li>Dados da empresa: nome comercial, cidade, segmento de atuação, número de WhatsApp.</li>
           <li>Dados de cobrança: CPF/CNPJ e histórico de pagamento, processados pelo Asaas.</li>
+          <li>Dados de segurança: registros de acesso, endereço IP, dispositivo e, se ativada, a configuração da verificação em duas etapas.</li>
+          <li>
+            Conversas do WhatsApp da empresa (mensagens, áudios, imagens e documentos trocados com os clientes do
+            contratante), necessárias para a atendente responder, para o histórico e para os relatórios.
+          </li>
+          <li>
+            Dados operacionais cadastrados ou gerados pelo contratante: serviços, agenda e agendamentos, cardápio e
+            pedidos, imóveis e pedidos de visita, lançamentos financeiros, campanhas e métricas.
+          </li>
           <li>
             Dados de contatos (leads) importados ou cadastrados pelo contratante, sob responsabilidade{' '}
             <strong>exclusiva</strong> dele quanto à origem, à licitude da coleta e ao consentimento (opt-in)
@@ -242,9 +306,23 @@ export function PrivacyBody() {
         <h4 className="font-bold text-slate-900">3. Como usamos os dados</h4>
         <p>
           Usamos os dados para: operar a Plataforma e suas funcionalidades; processar pagamentos; enviar
-          comunicações operacionais (confirmação de conta, redefinição de senha, avisos de cobrança); cumprir
-          obrigações legais e fiscais; e melhorar a segurança e a qualidade do serviço. Não usamos os dados
-          para publicidade de terceiros, nem vendemos dados de clientes ou de leads.
+          comunicações operacionais (confirmação de conta, redefinição de senha, avisos de cobrança, resumo
+          semanal de resultados); cumprir obrigações legais e fiscais; e melhorar a segurança e a qualidade do
+          serviço. Não usamos os dados para publicidade de terceiros, nem vendemos dados de clientes ou de leads.
+        </p>
+        <p>
+          <strong>Inteligência artificial.</strong> Para a atendente responder, transcrever áudios, gerar dicas e
+          responder perguntas sobre os números da conta, trechos das conversas e dos dados da conta são enviados
+          ao provedor do modelo de inteligência artificial (Google), contratado por meio de sua interface para
+          empresas (API), apenas para gerar a resposta daquele momento. A Domu Tech não usa as conversas dos
+          clientes para treinar modelos próprios. Registramos o uso (quantidade e custo) e trechos das respostas
+          para monitorar a qualidade e corrigir erros do atendimento.
+        </p>
+        <p>
+          <strong>Prospecção comercial da Domu Tech.</strong> Para oferecer a Plataforma, podemos usar dados
+          públicos de estabelecimentos (como nome, endereço e telefone comercial divulgados em mapas e buscadores)
+          para entrar em contato, com base no legítimo interesse. Quem não quiser mais receber contato pode pedir
+          a qualquer momento, pela própria conversa ou pelo e-mail abaixo, e deixa de ser contatado.
         </p>
       </section>
       <section className="space-y-2">
@@ -253,8 +331,12 @@ export function PrivacyBody() {
         <ul className="list-disc pl-5 space-y-1">
           <li><strong>Meta (WhatsApp Business Platform)</strong> — envio e recebimento de mensagens.</li>
           <li><strong>Asaas</strong> — processamento de pagamentos (PIX/cartão) e emissão de cobranças.</li>
-          <li><strong>Supabase</strong> — hospedagem do banco de dados e infraestrutura.</li>
-          <li><strong>Provedor de e-mail transacional</strong> — envio de e-mails de conta (convites, recuperação de senha).</li>
+          <li><strong>Google (Gemini API)</strong> — modelo de inteligência artificial da atendente, da transcrição de áudios e das dicas.</li>
+          <li><strong>Supabase</strong> — hospedagem do banco de dados e armazenamento de arquivos.</li>
+          <li><strong>Vercel</strong> — hospedagem da aplicação.</li>
+          <li><strong>Cloudflare</strong> — proteção contra robôs nas telas de cadastro, login e recuperação de senha.</li>
+          <li><strong>Provedor de e-mail transacional</strong> — envio de e-mails de conta (convites, recuperação de senha, avisos).</li>
+          <li><strong>Serviços de notificação do navegador</strong> — avisos no celular ou computador, quando o usuário ativa.</li>
         </ul>
         <p>
           Além dos casos acima, só compartilhamos dados com terceiros se você autorizar expressamente, se
@@ -265,7 +347,7 @@ export function PrivacyBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">5. Transferência internacional de dados</h4>
         <p>
-          Alguns dos provedores que usamos (como Meta e serviços de e-mail) podem processar dados em
+          Alguns dos provedores que usamos (como Meta, Google, Vercel, Cloudflare e serviços de e-mail) podem processar dados em
           servidores localizados fora do Brasil. Nesses casos, exigimos que esses provedores adotem padrões de
           proteção compatíveis com a LGPD, seja por meio de cláusulas contratuais específicas, selos de
           conformidade internacionalmente reconhecidos, ou por estarem sediados em país com nível de proteção
@@ -282,6 +364,8 @@ export function PrivacyBody() {
           <li>O acesso direto ao banco de dados é restrito a rotinas internas da própria Plataforma; não existe uma porta de acesso público direto aos dados.</li>
           <li>Os dados de cada empresa contratante são isolados dos dados das demais empresas, impedindo que uma cliente veja informação de outra.</li>
           <li>Diferentes perfis de usuário (administrador, corretor, atendente) têm acessos diferentes, limitando quem na sua equipe pode ver ou fazer o quê.</li>
+          <li>Verificação em duas etapas disponível para todas as contas, e obrigatória para a equipe interna da Domu Tech que acessa o painel de operação.</li>
+          <li>Proteção contra robôs e limites de tentativas nas telas de cadastro, login e recuperação de senha.</li>
         </ul>
         <p>
           Nenhum sistema é 100% imune a incidentes. Mantemos essas medidas em revisão constante, mas a
@@ -335,8 +419,10 @@ export function PrivacyBody() {
       <section className="space-y-2">
         <h4 className="font-bold text-slate-900">10. Cookies e sessão</h4>
         <p>
-          Usamos apenas um cookie técnico, essencial para manter você conectado enquanto usa a Plataforma, que
-          não pode ser lido por scripts no navegador. Não utilizamos cookies de rastreamento, publicidade ou
+          Usamos apenas cookies técnicos, essenciais para manter você conectado e concluir a verificação em duas
+          etapas, que não podem ser lidos por scripts no navegador. A proteção contra robôs da Cloudflare pode
+          usar cookies técnicos próprios para essa finalidade. Algumas preferências da tela (como filtros e textos
+          salvos) ficam guardadas só no seu navegador. Não utilizamos cookies de rastreamento, publicidade ou
           análise de comportamento de terceiros.
         </p>
       </section>

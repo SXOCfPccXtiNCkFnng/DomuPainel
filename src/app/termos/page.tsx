@@ -27,7 +27,7 @@ export default function TermosPage() {
               Termos de Uso — Domu Tech
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Plataforma de automação e mensageria WhatsApp para o setor imobiliário
+              Atendimento, vendas e campanhas pelo WhatsApp oficial para pequenas e médias empresas
             </p>
           </div>
 
